@@ -115,14 +115,16 @@ export function DiffViewer({
                   return [
                     <tr
                       key={`${hunk.header}-${index}`}
-                      className={`diff-row diff-row-${line.kind} ${selectedAnchorKey === anchorKey ? "diff-row-selected" : ""} ${
+                      className={`diff-row diff-row-${line.kind} ${
+                        anchorKey && selectedAnchorKey === anchorKey ? "diff-row-selected" : ""
+                      } ${
                         commentableSide ? "diff-row-clickable" : ""
                       }`}
                       {...rowInteractionProps}
                     >
-                      <td className="gutter">{line.oldLineNumber ?? ""}</td>
-                      <td className="gutter">{line.newLineNumber ?? ""}</td>
-                      <td className="code-cell">{line.text || " "}</td>
+                      <td className={`gutter gutter-old gutter-${line.kind}`}>{line.oldLineNumber ?? ""}</td>
+                      <td className={`gutter gutter-new gutter-${line.kind}`}>{line.newLineNumber ?? ""}</td>
+                      <td className={`code-cell code-cell-${line.kind}`}>{line.text || " "}</td>
                     </tr>,
                     showThread && commentableSide ? (
                       <tr key={`${hunk.header}-${index}-thread`} className="inline-thread-row">
@@ -190,12 +192,14 @@ export function DiffViewer({
                   <tr key={row.key} className="diff-row">
                     <SideCell
                       line={row.left}
+                      lane="left"
                       hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
                     />
                     <SideCell
                       line={row.right}
+                      lane="right"
                       hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
@@ -267,17 +271,19 @@ export function DiffViewer({
 
 function SideCell({
   line,
+  lane,
   hunkHeader,
   selectedAnchorKey,
   onSelectLine
 }: {
   line: DiffLine | null;
+  lane: "left" | "right";
   hunkHeader: string;
   selectedAnchorKey: string | null;
   onSelectLine: DiffViewerProps["onSelectLine"];
 }) {
   if (!line) {
-    return <td className="side-cell empty-cell" colSpan={3} />;
+    return <td className={`side-cell empty-cell lane-${lane}`} colSpan={3} />;
   }
 
   const anchorKey = getAnchorKey(hunkHeader, line);
@@ -294,17 +300,19 @@ function SideCell({
           },
           onSelectLine
         );
-  const cellClassName = `${selectedAnchorKey === anchorKey ? "selected-cell " : ""}${commentableSide ? "line-clickable-cell" : ""}`;
+  const cellClassName = `${anchorKey && selectedAnchorKey === anchorKey ? "selected-cell " : ""}${
+    commentableSide ? "line-clickable-cell" : ""
+  }`;
 
   return (
     <>
-      <td className={`gutter ${cellClassName}`} {...cellInteractionProps}>
+      <td className={`gutter gutter-old gutter-${line.kind} lane-${lane} ${cellClassName}`} {...cellInteractionProps}>
         {line.oldLineNumber ?? ""}
       </td>
-      <td className={`gutter ${cellClassName}`} {...cellInteractionProps}>
+      <td className={`gutter gutter-new gutter-${line.kind} lane-${lane} ${cellClassName}`} {...cellInteractionProps}>
         {line.newLineNumber ?? ""}
       </td>
-      <td className={`code-cell line-${line.kind} ${cellClassName}`} {...cellInteractionProps}>
+      <td className={`code-cell code-cell-${line.kind} line-${line.kind} lane-${lane} ${cellClassName}`} {...cellInteractionProps}>
         {line.text || " "}
       </td>
     </>
