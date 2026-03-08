@@ -10,9 +10,9 @@
   --crucible-muted: #6b778c;
   --crucible-hunk-bg: #e8edf3;
   --crucible-hunk-border: #c2ccd8;
-  --crucible-added-bg: #e6f6e9;
+  --crucible-added-bg: #baeeba;
   --crucible-added-accent: #2f7d4a;
-  --crucible-removed-bg: #fdebea;
+  --crucible-removed-bg: #eebaba;
   --crucible-removed-accent: #c14d3f;
   --crucible-hover: #e9f2ff;
   --crucible-select: #ffd15c;
@@ -41,7 +41,7 @@ textarea {
 button,
 .button-link {
   border: 1px solid #283948;
-  background: #f8fafc;
+  background: #ffffff;
   color: #16212a;
   border-radius: 999px;
   padding: 0.55rem 0.95rem;
@@ -575,11 +575,11 @@ p {
   white-space: pre;
   word-break: normal;
   padding: 0.16rem 0.55rem;
-  background: #fafbfc;
+  background: #ffffff;
 }
 
 .code-cell-context {
-  background: #fafbfc;
+  background: #ffffff;
 }
 
 .selected-cell,
