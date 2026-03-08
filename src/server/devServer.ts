@@ -5,8 +5,8 @@ async function main() {
   const options = parseServerOptions(process.argv.slice(2));
   const { server, port } = await startServer(options, { dev: true });
 
-  server.listen(port, "127.0.0.1", () => {
-    console.log(`API listening on http://127.0.0.1:${port}`);
+  server.listen(port, "localhost", () => {
+    console.log(`API listening on http://localhost:${port}`);
   });
 }
 

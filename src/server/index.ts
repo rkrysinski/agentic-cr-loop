@@ -5,8 +5,8 @@ async function main() {
   const options = parseServerOptions(process.argv.slice(2));
   const { server, port } = await startServer(options);
 
-  server.listen(port, "127.0.0.1", () => {
-    console.log(`Review tool listening on http://127.0.0.1:${port}`);
+  server.listen(port, "localhost", () => {
+    console.log(`Review tool listening on http://localhost:${port}`);
   });
 }
 
