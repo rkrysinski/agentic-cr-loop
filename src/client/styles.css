@@ -635,7 +635,7 @@ p {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-weight: 550;
+  font-weight: 600;
   white-space: inherit;
   overflow-wrap: inherit;
   word-break: inherit;
@@ -645,44 +645,44 @@ p {
 .diff-syntax-code .token.prolog,
 .diff-syntax-code .token.doctype,
 .diff-syntax-code .token.cdata {
-  color: #66768a;
+  color: #5f6f82;
 }
 
 .diff-syntax-code .token.punctuation,
 .diff-syntax-code .token.operator {
-  color: #4d5a67;
+  color: #445261;
 }
 
 .diff-syntax-code .token.keyword,
 .diff-syntax-code .token.atrule {
-  color: #7a4a13;
-  font-weight: 600;
+  color: #0b5cab;
+  font-weight: 650;
 }
 
 .diff-syntax-code .token.string,
 .diff-syntax-code .token.char,
 .diff-syntax-code .token.attr-value {
-  color: #2a6844;
+  color: #1f7a5c;
 }
 
 .diff-syntax-code .token.number,
 .diff-syntax-code .token.boolean,
 .diff-syntax-code .token.constant,
 .diff-syntax-code .token.symbol {
-  color: #9a5a1a;
+  color: #8a5712;
 }
 
 .diff-syntax-code .token.function,
 .diff-syntax-code .token.selector {
-  color: #1d5e88;
-  font-weight: 600;
+  color: #005a7a;
+  font-weight: 650;
 }
 
 .diff-syntax-code .token.property,
 .diff-syntax-code .token.attr-name,
 .diff-syntax-code .token.class-name,
 .diff-syntax-code .token.regex {
-  color: #5b4376;
+  color: #6b46c1;
 }
 
 .side-table .code-cell {
