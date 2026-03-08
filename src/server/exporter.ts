@@ -8,39 +8,28 @@ type ExportFile = {
 };
 
 export function renderCommentsMarkdown(repoPath: string, files: ExportFile[]): string {
-  const lines: string[] = [
-    "# Review Comments",
-    "",
-    `Repository Path: ${repoPath}`,
-    "Base Ref: HEAD",
-    ""
-  ];
+  void repoPath;
+  const lines: string[] = [];
 
   for (const file of [...files].sort((left, right) => left.path.localeCompare(right.path))) {
-    lines.push(`## File: ${file.path}`);
-    lines.push("");
-
     const comments = [
       ...file.current.map((comment) => ({ comment, status: "current" as const })),
       ...file.outdated.map((comment) => ({ comment, status: "outdated" as const }))
     ].sort(compareCommentExportOrder);
 
     if (comments.length === 0) {
-      lines.push("No comments.");
-      lines.push("");
       continue;
     }
 
+    lines.push(`REVIEW ${file.path}`);
+    lines.push("");
+
     for (const { comment, status } of comments) {
+      void status;
       const lineNumber = comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber;
-      lines.push(`### Comment: ${comment.commentId}`);
-      lines.push(`Status: ${status}`);
-      lines.push(`Anchor Side: ${comment.side}`);
-      lines.push(`Line Number: ${lineNumber ?? "n/a"}`);
-      lines.push(`Hunk Header: ${comment.hunkHeader}`);
-      lines.push(`Created At: ${comment.createdAt}`);
-      lines.push("Body:");
+      lines.push(`NOTE ${comment.commentId} LINE ${lineNumber ?? "n/a"}`);
       lines.push(comment.body);
+      lines.push("END NOTE");
       lines.push("");
     }
   }

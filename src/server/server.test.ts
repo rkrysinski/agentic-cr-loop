@@ -133,9 +133,10 @@ describe("server API", () => {
 
     const exportResponse = await invokeRoute(app, "get", "/api/export/comments.md");
     expect(exportResponse.headers["content-type"]).toBe("text/markdown");
-    expect(exportResponse.body).toContain("## File: tracked.txt");
-    expect(exportResponse.body).toContain("Status: outdated");
+    expect(exportResponse.body).toContain("REVIEW tracked.txt");
+    expect(exportResponse.body).toContain("NOTE");
     expect(exportResponse.body).toContain("Persist in export");
+    expect(exportResponse.body).toContain("END NOTE");
   });
 });
 

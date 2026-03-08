@@ -42,8 +42,8 @@ describe("renderCommentsMarkdown", () => {
       }
     ]);
 
-    expect(markdown.indexOf("## File: a.ts")).toBeLessThan(markdown.indexOf("## File: b.ts"));
-    expect(markdown).toContain("Status: current");
-    expect(markdown).toContain("Body:\nFirst");
+    expect(markdown.indexOf("REVIEW a.ts")).toBeLessThan(markdown.indexOf("REVIEW b.ts"));
+    expect(markdown).toContain("NOTE 1 LINE 3\nFirst\nEND NOTE");
+    expect(markdown).toContain("NOTE 2 LINE 10\nSecond\nEND NOTE");
   });
 });
