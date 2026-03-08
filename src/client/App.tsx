@@ -549,7 +549,7 @@ export function App() {
               </select>
             </label>
             <a className="button-link" href="/api/export/comments.md" target="_blank" rel="noreferrer">
-              Export Markdown
+              Export Comments
             </a>
           </div>
           <div className="view-toggle" role="group" aria-label="View mode">
