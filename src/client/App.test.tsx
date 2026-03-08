@@ -9,9 +9,9 @@ afterEach(() => {
 describe("App", () => {
   it("renders changed files as a filesystem tree", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
+      const url = parseRequestUrl(input);
 
-      if (url === "/api/repo") {
+      if (url.pathname === "/api/repo") {
         return jsonResponse({
           repoPath: "/repo",
           baseRef: "HEAD",
@@ -20,7 +20,7 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/changes") {
+      if (url.pathname === "/api/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -58,7 +58,7 @@ describe("App", () => {
         ]);
       }
 
-      if (url === "/api/changes/change-1") {
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -70,7 +70,7 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/comments?changeId=change-1") {
+      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
         return jsonResponse({
           current: [],
           outdated: []
@@ -85,6 +85,7 @@ describe("App", () => {
     render(<App />);
 
     const folderButton = await screen.findByRole("button", { name: "src/client" });
+    expect(screen.getByRole("combobox", { name: "Diff context" })).toHaveValue("full");
     const resizeHandle = screen.getByRole("separator", { name: "Resize changed files panel" });
     expect(folderButton).toHaveAttribute("aria-expanded", "true");
     expect(resizeHandle).toHaveAttribute("aria-valuenow", "448");
@@ -136,9 +137,9 @@ describe("App", () => {
     };
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
+      const url = parseRequestUrl(input);
 
-      if (url === "/api/repo") {
+      if (url.pathname === "/api/repo") {
         return jsonResponse({
           repoPath: "/repo",
           baseRef: "HEAD",
@@ -147,7 +148,7 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/changes") {
+      if (url.pathname === "/api/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -163,7 +164,7 @@ describe("App", () => {
         ]);
       }
 
-      if (url === "/api/changes/change-1") {
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -184,11 +185,11 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/comments?changeId=change-1") {
+      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
         return jsonResponse(commentsState);
       }
 
-      if (url === "/api/comments" && init?.method === "POST") {
+      if (url.pathname === "/api/comments" && init?.method === "POST") {
         return jsonResponse({
           commentId: "created",
           fileId: "change-1",
@@ -202,7 +203,7 @@ describe("App", () => {
         }, 201);
       }
 
-      if (url === "/api/comments/current" && init?.method === "PATCH") {
+      if (url.pathname === "/api/comments/current" && init?.method === "PATCH") {
         commentsState = {
           ...commentsState,
           current: commentsState.current.map((comment) =>
@@ -217,7 +218,7 @@ describe("App", () => {
         return jsonResponse(commentsState.current[0]);
       }
 
-      if (url === "/api/comments/outdated" && init?.method === "DELETE") {
+      if (url.pathname === "/api/comments/outdated" && init?.method === "DELETE") {
         commentsState = {
           ...commentsState,
           outdated: []
@@ -277,9 +278,9 @@ describe("App", () => {
 
   it("offers a unified-only toggle to hide removed code", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
+      const url = parseRequestUrl(input);
 
-      if (url === "/api/repo") {
+      if (url.pathname === "/api/repo") {
         return jsonResponse({
           repoPath: "/repo",
           baseRef: "HEAD",
@@ -288,7 +289,7 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/changes") {
+      if (url.pathname === "/api/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -304,7 +305,7 @@ describe("App", () => {
         ]);
       }
 
-      if (url === "/api/changes/change-1") {
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -325,7 +326,7 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/comments?changeId=change-1") {
+      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
         return jsonResponse({
           current: [],
           outdated: []
@@ -343,7 +344,7 @@ describe("App", () => {
     const topbarActions = document.querySelector(".topbar-actions");
     const reviewControls = () => document.querySelector(".review-controls");
 
-    expect(topbarActions?.children).toHaveLength(2);
+    expect(topbarActions?.children).toHaveLength(3);
     const toggle = await screen.findByRole("checkbox", { name: "Hide removed code" });
     expect(toggle).not.toBeChecked();
     expect(reviewControls()).not.toBeNull();
@@ -353,12 +354,12 @@ describe("App", () => {
     expect(toggle).toBeChecked();
     expect(screen.queryByText("before")).not.toBeInTheDocument();
     expect(screen.getByText("after")).toBeInTheDocument();
-    expect(topbarActions?.children).toHaveLength(2);
+    expect(topbarActions?.children).toHaveLength(3);
 
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.queryByRole("checkbox", { name: "Hide removed code" })).not.toBeInTheDocument();
     expect(reviewControls()).toBeNull();
-    expect(topbarActions?.children).toHaveLength(2);
+    expect(topbarActions?.children).toHaveLength(3);
 
     fireEvent.click(screen.getByRole("button", { name: "Unified" }));
     const toggleAfterReturn = screen.getByRole("checkbox", { name: "Hide removed code" });
@@ -366,7 +367,107 @@ describe("App", () => {
     expect(reviewControls()).not.toBeNull();
     expect(screen.queryByText("before")).not.toBeInTheDocument();
   });
+
+  it("defaults to full context and reloads the selected diff when the context option changes", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repo") {
+        return jsonResponse({
+          repoPath: "/repo",
+          baseRef: "HEAD",
+          changeCount: 1,
+          viewModeDefault: "unified"
+        });
+      }
+
+      if (url.pathname === "/api/changes" && !url.search) {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: {
+              current: 0,
+              outdated: 0
+            }
+          }
+        ]);
+      }
+
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: [
+            {
+              header: "@@ -1,4 +1,4 @@",
+              lines: [
+                { kind: "context", oldLineNumber: 1, newLineNumber: 1, text: "top", commentableSide: null },
+                { kind: "removed", oldLineNumber: 2, newLineNumber: null, text: "before", commentableSide: "old" },
+                { kind: "added", oldLineNumber: null, newLineNumber: 2, text: "after", commentableSide: "new" },
+                { kind: "context", oldLineNumber: 3, newLineNumber: 3, text: "bottom", commentableSide: null }
+              ]
+            }
+          ]
+        });
+      }
+
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "0") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: [
+            {
+              header: "@@ -2 +2 @@",
+              lines: [
+                { kind: "removed", oldLineNumber: 2, newLineNumber: null, text: "before", commentableSide: "old" },
+                { kind: "added", oldLineNumber: null, newLineNumber: 2, text: "after", commentableSide: "new" }
+              ]
+            }
+          ]
+        });
+      }
+
+      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
+        return jsonResponse({
+          current: [],
+          outdated: []
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("top")).toBeInTheDocument());
+    const contextSelect = screen.getByRole("combobox", { name: "Diff context" });
+    expect(contextSelect).toHaveValue("full");
+
+    fireEvent.change(contextSelect, { target: { value: "0" } });
+
+    await waitFor(() => expect(screen.queryByText("top")).not.toBeInTheDocument());
+    expect(screen.queryByText("bottom")).not.toBeInTheDocument();
+    expect(screen.getByText("after")).toBeInTheDocument();
+  });
 });
+
+function parseRequestUrl(input: RequestInfo | URL): URL {
+  return new URL(String(input), "http://localhost");
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {

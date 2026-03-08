@@ -1,7 +1,8 @@
 import http from "node:http";
 import path from "node:path";
 import express from "express";
-import type { CreateCommentRequest, UpdateCommentRequest } from "../shared/api.js";
+import { DIFF_CONTEXT_VALUES } from "../shared/api.js";
+import type { CreateCommentRequest, DiffContextValue, UpdateCommentRequest } from "../shared/api.js";
 import { ReviewService } from "./reviewService.js";
 
 type StartOptions = {
@@ -36,7 +37,7 @@ export async function startServer(
 
   app.get("/api/changes/:changeId", async (request, response, next) => {
     try {
-      const change = await reviewService.getChange(request.params.changeId);
+      const change = await reviewService.getChange(request.params.changeId, parseDiffContext(request.query.context));
       if (!change) {
         response.status(404).json({ error: "Change not found" });
         return;
@@ -144,7 +145,10 @@ export async function startServer(
 
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = message.startsWith("Unknown changeId") || message.startsWith("Comment anchor") ? 400 : 500;
+    const status =
+      message.startsWith("Unknown changeId") || message.startsWith("Comment anchor") || message.startsWith("Invalid diff context")
+        ? 400
+        : 500;
     response.status(status).json({ error: message });
   });
 
@@ -161,4 +165,16 @@ export async function startServer(
     server: http.createServer(app),
     port
   };
+}
+
+function parseDiffContext(rawValue: unknown): DiffContextValue {
+  if (rawValue === undefined) {
+    return "full";
+  }
+
+  if (typeof rawValue !== "string" || !DIFF_CONTEXT_VALUES.includes(rawValue as DiffContextValue)) {
+    throw new Error("Invalid diff context");
+  }
+
+  return rawValue as DiffContextValue;
 }

@@ -55,6 +55,36 @@ describe("parseTrackedDiff", () => {
     expect(change.isBinary).toBe(true);
     expect(change.hunks).toEqual([]);
   });
+
+  it("keeps the diff fingerprint stable when only context lines change", () => {
+    const shortPatch = [
+      "diff --git a/tracked.txt b/tracked.txt",
+      "index 83db48f..bf8a6f4 100644",
+      "--- a/tracked.txt",
+      "+++ b/tracked.txt",
+      "@@ -2 +2 @@",
+      "-before",
+      "+after"
+    ].join("\n");
+    const fullPatch = [
+      "diff --git a/tracked.txt b/tracked.txt",
+      "index 83db48f..bf8a6f4 100644",
+      "--- a/tracked.txt",
+      "+++ b/tracked.txt",
+      "@@ -1,4 +1,4 @@",
+      " top",
+      "-before",
+      "+after",
+      " stay",
+      " bottom"
+    ].join("\n");
+
+    const [shortChange] = parseTrackedDiff(shortPatch);
+    const [fullChange] = parseTrackedDiff(fullPatch);
+
+    expect(shortChange.diffFingerprint).toBe(fullChange.diffFingerprint);
+    expect(shortChange.hunks[0].header).not.toBe(fullChange.hunks[0].header);
+  });
 });
 
 describe("untracked changes", () => {

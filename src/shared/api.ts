@@ -1,5 +1,9 @@
 import type { FileChange, ReviewComment, ViewMode } from "./types.js";
 
+export const DIFF_CONTEXT_VALUES = ["0", "3", "20", "100", "full"] as const;
+
+export type DiffContextValue = (typeof DIFF_CONTEXT_VALUES)[number];
+
 export type RepoResponse = {
   repoPath: string;
   baseRef: "HEAD";

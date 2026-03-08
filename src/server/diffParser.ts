@@ -9,7 +9,7 @@ type ParseState = {
 };
 
 type ParsedFile = Omit<FileChange, "diffFingerprint"> & {
-  rawFingerprintSource: string;
+  rawFingerprintLines: string[];
 };
 
 type MutableHunk = {
@@ -86,14 +86,15 @@ export function parseTrackedDiff(patch: string): FileChange[] {
     if (line.startsWith("@@ ")) {
       finalizeHunk(state);
       state.currentHunk = createHunk(line);
-      appendFingerprintLine(state.current, line);
       continue;
     }
 
     if (state.currentHunk && isDiffBodyLine(line)) {
       const diffLine = parseDiffLine(line, state.currentHunk);
       state.currentHunk.lines.push(diffLine);
-      appendFingerprintLine(state.current, normalizeDiffLine(diffLine));
+      if (diffLine.kind !== "context") {
+        appendFingerprintLine(state.current, normalizeDiffLine(diffLine));
+      }
       continue;
     }
 
@@ -106,9 +107,9 @@ export function parseTrackedDiff(patch: string): FileChange[] {
   finalizeFile(state);
 
   return state.files
-    .map(({ rawFingerprintSource, ...file }) => ({
+    .map(({ rawFingerprintLines, ...file }) => ({
       ...file,
-      diffFingerprint: sha256(rawFingerprintSource)
+      diffFingerprint: sha256(rawFingerprintLines.join("\n"))
     }))
     .sort((left, right) => displayPath(left).localeCompare(displayPath(right)));
 }
@@ -167,7 +168,7 @@ function createFileFromHeader(line: string): ParsedFile {
     newPath,
     isBinary: false,
     hunks: [],
-    rawFingerprintSource: line
+    rawFingerprintLines: [line]
   };
 }
 
@@ -209,7 +210,7 @@ function finalizeFile(state: ParseState): void {
 }
 
 function appendFingerprintLine(file: ParsedFile, line: string): void {
-  file.rawFingerprintSource = `${file.rawFingerprintSource}\n${line}`;
+  file.rawFingerprintLines.push(line);
 }
 
 function updatePathsFromPatchLine(file: ParsedFile, line: string): void {

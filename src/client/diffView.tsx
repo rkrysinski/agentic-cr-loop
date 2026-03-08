@@ -554,9 +554,9 @@ export function pairHunkLines(hunk: DiffHunk): SideBySideRow[] {
 }
 
 function getCommentsForLine(comments: ReviewComment[], hunkHeader: string, line: DiffLine): ReviewComment[] {
+  void hunkHeader;
   return comments.filter(
     (comment) =>
-      comment.hunkHeader === hunkHeader &&
       comment.oldLineNumber === line.oldLineNumber &&
       comment.newLineNumber === line.newLineNumber
   );

@@ -109,6 +109,46 @@ describe("server API", () => {
     expect(staleResponse.body.outdated).toHaveLength(1);
   });
 
+  it("returns different detail context without changing comment currency", async () => {
+    const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
+
+    const changesResponse = await invokeRoute(app, "get", "/api/changes");
+    const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
+    const fullDetailResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+      params: { changeId: trackedChange.changeId },
+      query: { context: "full" }
+    });
+    const noContextResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+      params: { changeId: trackedChange.changeId },
+      query: { context: "0" }
+    });
+
+    expect(fullDetailResponse.statusCode).toBe(200);
+    expect(noContextResponse.statusCode).toBe(200);
+    expect(fullDetailResponse.body.hunks[0].lines.length).toBeGreaterThan(noContextResponse.body.hunks[0].lines.length);
+
+    const line = noContextResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
+    const createResponse = await invokeRoute(app, "post", "/api/comments", {
+      body: {
+        changeId: trackedChange.changeId,
+        side: "new",
+        oldLineNumber: line.oldLineNumber,
+        newLineNumber: line.newLineNumber,
+        hunkHeader: noContextResponse.body.hunks[0].header,
+        body: "Still current"
+      }
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+
+    const commentsResponse = await invokeRoute(app, "get", "/api/comments", {
+      query: { changeId: trackedChange.changeId }
+    });
+    expect(commentsResponse.statusCode).toBe(200);
+    expect(commentsResponse.body.current).toHaveLength(1);
+    expect(commentsResponse.body.outdated).toHaveLength(0);
+  });
+
   it("exports orphaned stale comments even after a file leaves the diff", async () => {
     const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
     const changesResponse = await invokeRoute(app, "get", "/api/changes");

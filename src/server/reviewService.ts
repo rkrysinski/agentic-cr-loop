@@ -4,8 +4,11 @@ import { CommentStore } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
 import { renderCommentsMarkdown } from "./exporter.js";
 import { runGit } from "./git.js";
-import type { ChangeSummary, CommentsResponse, CreateCommentRequest, RepoResponse } from "../shared/api.js";
+import type { ChangeSummary, CommentsResponse, CreateCommentRequest, DiffContextValue, RepoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment } from "../shared/types.js";
+
+const SUMMARY_CONTEXT: DiffContextValue = "0";
+const FULL_CONTEXT_LINES = 1_000_000;
 
 export class ReviewService {
   readonly commentStore: CommentStore;
@@ -53,13 +56,13 @@ export class ReviewService {
     });
   }
 
-  async getChange(changeId: string): Promise<FileChange | null> {
-    const changes = await this.getChanges();
+  async getChange(changeId: string, context: DiffContextValue = SUMMARY_CONTEXT): Promise<FileChange | null> {
+    const changes = await this.getChanges(context);
     return changes.find((change) => change.changeId === changeId) ?? null;
   }
 
   async getComments(changeId: string): Promise<CommentsResponse> {
-    const change = await this.getChange(changeId);
+    const change = await this.getChange(changeId, SUMMARY_CONTEXT);
     if (!change) {
       throw new Error("Unknown changeId");
     }
@@ -69,13 +72,12 @@ export class ReviewService {
   }
 
   async createComment(request: CreateCommentRequest): Promise<ReviewComment> {
-    const change = await this.getChange(request.changeId);
+    const change = await this.getChange(request.changeId, SUMMARY_CONTEXT);
     if (!change) {
       throw new Error("Unknown changeId");
     }
 
     const isValidAnchor = change.hunks.some((hunk) =>
-      hunk.header === request.hunkHeader &&
       hunk.lines.some(
         (line) =>
           line.commentableSide === request.side &&
@@ -137,8 +139,16 @@ export class ReviewService {
     return renderCommentsMarkdown(this.repoPath, [...files, ...orphanedFiles]);
   }
 
-  private async getChanges(): Promise<FileChange[]> {
-    const trackedPatch = await runGit(this.repoPath, ["diff", "HEAD", "--find-renames", "--patch", "--binary", "--no-color"]);
+  private async getChanges(context: DiffContextValue = SUMMARY_CONTEXT): Promise<FileChange[]> {
+    const trackedPatch = await runGit(this.repoPath, [
+      "diff",
+      `--unified=${getGitUnifiedContext(context)}`,
+      "HEAD",
+      "--find-renames",
+      "--patch",
+      "--binary",
+      "--no-color"
+    ]);
     const tracked = parseTrackedDiff(trackedPatch);
     const untracked = await this.readUntrackedChanges();
 
@@ -168,6 +178,10 @@ export class ReviewService {
 
     return changes;
   }
+}
+
+function getGitUnifiedContext(context: DiffContextValue): number {
+  return context === "full" ? FULL_CONTEXT_LINES : Number(context);
 }
 
 function classifyCommentsForChange(comments: ReviewComment[], change: FileChange): CommentsResponse {

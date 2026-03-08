@@ -1,4 +1,11 @@
-import type { ChangeSummary, CommentsResponse, CreateCommentRequest, RepoResponse, UpdateCommentRequest } from "../shared/api.js";
+import type {
+  ChangeSummary,
+  CommentsResponse,
+  CreateCommentRequest,
+  DiffContextValue,
+  RepoResponse,
+  UpdateCommentRequest
+} from "../shared/api.js";
 import type { FileChange, ReviewComment } from "../shared/types.js";
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -24,8 +31,8 @@ export function getChanges(): Promise<ChangeSummary[]> {
   return request<ChangeSummary[]>("/api/changes");
 }
 
-export function getChange(changeId: string): Promise<FileChange> {
-  return request<FileChange>(`/api/changes/${encodeURIComponent(changeId)}`);
+export function getChange(changeId: string, context: DiffContextValue): Promise<FileChange> {
+  return request<FileChange>(`/api/changes/${encodeURIComponent(changeId)}?context=${encodeURIComponent(context)}`);
 }
 
 export function getComments(changeId: string): Promise<CommentsResponse> {

@@ -2,7 +2,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
 import { DiffViewer } from "./diffView.js";
-import type { ChangeSummary, CommentsResponse, RepoResponse } from "../shared/api.js";
+import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
 
 type PendingAnchor = {
@@ -21,6 +21,15 @@ const DEFAULT_SIDEBAR_WIDTH = 448;
 const MIN_SIDEBAR_WIDTH = 360;
 const MAX_SIDEBAR_WIDTH = 920;
 const KEYBOARD_RESIZE_STEP = 32;
+const DEFAULT_DIFF_CONTEXT: DiffContextValue = "full";
+
+const DIFF_CONTEXT_OPTIONS: Array<{ value: DiffContextValue; label: string }> = [
+  { value: "0", label: "No Context" },
+  { value: "3", label: "3 lines" },
+  { value: "20", label: "20 lines" },
+  { value: "100", label: "100 lines" },
+  { value: "full", label: "Full Context" }
+];
 
 type ChangeTreeFileNode = {
   kind: "file";
@@ -180,6 +189,7 @@ export function App() {
   const [expandedDirectoryKeys, setExpandedDirectoryKeys] = useState<Record<string, boolean>>({});
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [diffContext, setDiffContext] = useState<DiffContextValue>(DEFAULT_DIFF_CONTEXT);
 
   useEffect(() => {
     void refreshAll();
@@ -195,7 +205,7 @@ export function App() {
     let cancelled = false;
     setLoading(true);
 
-    Promise.all([getChange(selectedChangeId), getComments(selectedChangeId)])
+    Promise.all([getChange(selectedChangeId, diffContext), getComments(selectedChangeId)])
       .then(([change, nextComments]) => {
         if (cancelled) {
           return;
@@ -218,7 +228,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedChangeId]);
+  }, [selectedChangeId, diffContext]);
 
   async function refreshAll() {
     try {
@@ -520,6 +530,24 @@ export function App() {
             <button type="button" onClick={() => void refreshAll()}>
               Refresh
             </button>
+            <label className="context-select">
+              <span>Context</span>
+              <select
+                aria-label="Diff context"
+                value={diffContext}
+                onChange={(event) => {
+                  resetNewComment();
+                  resetEditingComment();
+                  setDiffContext(event.target.value as DiffContextValue);
+                }}
+              >
+                {DIFF_CONTEXT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <a className="button-link" href="/api/export/comments.md" target="_blank" rel="noreferrer">
               Export Markdown
             </a>
