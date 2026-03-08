@@ -31,6 +31,7 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pendingCommentActionId, setPendingCommentActionId] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     void refreshAll();
@@ -222,35 +223,54 @@ export function App() {
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <main className="layout">
-        <aside className="sidebar">
-          <h2>Changed files</h2>
-          <ul className="change-list">
-            {changes.map((change) => {
-              const path = change.newPath ?? change.oldPath ?? "(unknown)";
-              return (
-                <li key={change.changeId}>
-                  <button
-                    type="button"
-                    className={`change-item ${selectedChangeId === change.changeId ? "selected" : ""}`}
-                    onClick={() =>
-                      startTransition(() => {
-                        setSelectedChangeId(change.changeId);
-                        resetNewComment();
-                        resetEditingComment();
-                      })
-                    }
-                  >
-                    <span className="path-text">{path}</span>
-                    <span className="change-meta">
-                      {change.changeType} · {change.commentCounts.current}
-                      {change.commentCounts.outdated > 0 ? ` + ${change.commentCounts.outdated} outdated` : ""}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+      <main className={`layout ${isSidebarCollapsed ? "layout-sidebar-collapsed" : ""}`}>
+        <aside className={`sidebar-widget ${isSidebarCollapsed ? "sidebar-widget-collapsed" : ""}`}>
+          <div id="changed-files-panel" className="sidebar" aria-hidden={isSidebarCollapsed}>
+            <div className="sidebar-header">
+              <h2>Changed files</h2>
+            </div>
+            <ul className="change-list">
+              {changes.map((change) => {
+                const path = change.newPath ?? change.oldPath ?? "(unknown)";
+                return (
+                  <li key={change.changeId}>
+                    <button
+                      type="button"
+                      className={`change-item ${selectedChangeId === change.changeId ? "selected" : ""}`}
+                      onClick={() =>
+                        startTransition(() => {
+                          setSelectedChangeId(change.changeId);
+                          resetNewComment();
+                          resetEditingComment();
+                        })
+                      }
+                    >
+                      <span className="path-text">{path}</span>
+                      <span className="change-meta">
+                        {change.changeType} · {change.commentCounts.current}
+                        {change.commentCounts.outdated > 0 ? ` + ${change.commentCounts.outdated} outdated` : ""}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-controls="changed-files-panel"
+            aria-expanded={!isSidebarCollapsed}
+            aria-label={isSidebarCollapsed ? "Show changed files" : "Hide changed files"}
+            onClick={() => setIsSidebarCollapsed((current) => !current)}
+          >
+            <span className={`sidebar-toggle-icon ${isSidebarCollapsed ? "sidebar-toggle-icon-collapsed" : ""}`} aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false">
+                <rect x="2.5" y="3" width="5" height="14" rx="1.5" />
+                <path d={isSidebarCollapsed ? "M10 6.5L14 10L10 13.5" : "M14 6.5L10 10L14 13.5"} />
+              </svg>
+            </span>
+          </button>
         </aside>
 
         <section className="review-pane">

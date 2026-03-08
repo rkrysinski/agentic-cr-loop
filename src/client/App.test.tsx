@@ -140,6 +140,15 @@ describe("App", () => {
     expect(container.querySelectorAll(".comment-badge")).toHaveLength(0);
     expect(screen.queryByRole("heading", { name: "Comments" })).not.toBeInTheDocument();
 
+    const sidebarToggle = screen.getByRole("button", { name: "Hide changed files" });
+    fireEvent.click(sidebarToggle);
+    expect(screen.getByRole("button", { name: "Show changed files" })).toHaveAttribute("aria-expanded", "false");
+    expect(container.querySelector(".layout-sidebar-collapsed")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show changed files" }));
+    expect(screen.getByRole("button", { name: "Hide changed files" })).toHaveAttribute("aria-expanded", "true");
+    expect(container.querySelector(".layout-sidebar-collapsed")).toBeNull();
+
     fireEvent.click(screen.getByText("after"));
     expect(screen.getByLabelText("Add comment for new line 1")).toBeInTheDocument();
 
