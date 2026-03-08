@@ -128,7 +128,8 @@ export function DiffViewer({
                     </tr>,
                     showThread && commentableSide ? (
                       <tr key={`${hunk.header}-${index}-thread`} className="inline-thread-row">
-                        <td colSpan={3} className="inline-thread-cell">
+                        <td colSpan={2} className="inline-thread-gutter-spacer" aria-hidden="true" />
+                        <td className="inline-thread-cell inline-thread-cell-code">
                           <InlineThread
                             line={line}
                             currentComments={currentComments}
