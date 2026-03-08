@@ -7,6 +7,97 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("renders changed files as a filesystem tree", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/repo") {
+        return jsonResponse({
+          repoPath: "/repo",
+          baseRef: "HEAD",
+          changeCount: 3,
+          viewModeDefault: "unified"
+        });
+      }
+
+      if (url === "/api/changes") {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "src/client/App.tsx",
+            newPath: "src/client/App.tsx",
+            isBinary: false,
+            commentCounts: {
+              current: 2,
+              outdated: 0
+            }
+          },
+          {
+            changeId: "change-2",
+            changeType: "modified",
+            oldPath: "src/client/styles.css",
+            newPath: "src/client/styles.css",
+            isBinary: false,
+            commentCounts: {
+              current: 0,
+              outdated: 0
+            }
+          },
+          {
+            changeId: "change-3",
+            changeType: "added",
+            oldPath: null,
+            newPath: "README.md",
+            isBinary: false,
+            commentCounts: {
+              current: 1,
+              outdated: 0
+            }
+          }
+        ]);
+      }
+
+      if (url === "/api/changes/change-1") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "src/client/App.tsx",
+          newPath: "src/client/App.tsx",
+          isBinary: false,
+          diffFingerprint: "fp-1",
+          hunks: []
+        });
+      }
+
+      if (url === "/api/comments?changeId=change-1") {
+        return jsonResponse({
+          current: [],
+          outdated: []
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const folderButton = await screen.findByRole("button", { name: "src/client" });
+    expect(folderButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /styles\.css/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /README\.md/ })).toBeInTheDocument();
+
+    fireEvent.click(folderButton);
+    expect(screen.getByRole("button", { name: "src/client" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /App\.tsx/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "src/client" }));
+    expect(await screen.findByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
+  });
+
   it("opens inline comments from line clicks while supporting edit and delete actions", async () => {
     let commentsState = {
       current: [
