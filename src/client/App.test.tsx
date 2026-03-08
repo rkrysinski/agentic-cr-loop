@@ -138,12 +138,16 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("Old note")).toBeInTheDocument());
     expect(screen.getByText("Current note")).toBeInTheDocument();
     expect(container.querySelectorAll(".comment-badge")).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Comments" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Comment" })[1]);
+    expect(screen.getByLabelText("Add comment for new line 1")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Comment" })).toHaveLength(2);
 
-    const currentCard = screen.getByText("Current note").closest("li");
+    const currentCard = screen.getByText("Current note").closest("article");
     if (!currentCard) {
       throw new Error("Current comment card not found");
     }
@@ -155,7 +159,7 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("Updated note")).toBeInTheDocument());
     expect(screen.queryByText("Current note")).not.toBeInTheDocument();
 
-    const outdatedCard = screen.getByText("Old note").closest("li");
+    const outdatedCard = screen.getByText("Old note").closest("article");
     if (!outdatedCard) {
       throw new Error("Outdated comment card not found");
     }

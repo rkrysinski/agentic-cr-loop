@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useState } from "react";
 import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
-import { DiffViewer, getAnchorKey } from "./diffView.js";
+import { DiffViewer } from "./diffView.js";
 import type { ChangeSummary, CommentsResponse, RepoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
 
@@ -266,172 +266,32 @@ export function App() {
               </div>
               <DiffViewer
                 change={selectedChange}
-                comments={comments.current}
+                comments={comments}
                 mode={viewMode}
                 selectedAnchorKey={selectedAnchorKey}
+                draftComment={draftComment}
+                editingCommentId={editingCommentId}
+                editingBody={editingBody}
+                submitting={submitting}
+                pendingCommentActionId={pendingCommentActionId}
                 onSelectLine={(anchor) => {
                   resetEditingComment();
                   setPendingAnchor(anchor);
                 }}
+                onDraftCommentChange={setDraftComment}
+                onSubmitComment={() => void submitComment()}
+                onCancelNewComment={resetNewComment}
+                onBeginEdit={beginEditingComment}
+                onCancelEdit={resetEditingComment}
+                onChangeEditingBody={setEditingBody}
+                onSaveEdit={() => void submitCommentEdit()}
+                onDelete={(commentId) => void removeComment(commentId)}
               />
             </>
           ) : null}
           {!loading && !selectedChange ? <div className="empty-state">No changed files were found.</div> : null}
         </section>
-
-        <aside className="comment-panel">
-          <h2>Comments</h2>
-
-          {selectedChange && !selectedChange.isBinary && pendingAnchor ? (
-            <section className="comment-card">
-              <h3>New comment</h3>
-              <p className="comment-anchor">
-                {pendingAnchor.side} line {pendingAnchor.side === "old" ? pendingAnchor.oldLineNumber : pendingAnchor.newLineNumber}
-              </p>
-              <textarea value={draftComment} onChange={(event) => setDraftComment(event.target.value)} rows={6} />
-              <div className="comment-actions">
-                <button type="button" disabled={submitting || draftComment.trim().length === 0} onClick={() => void submitComment()}>
-                  Save comment
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => {
-                    setPendingAnchor(null);
-                    setDraftComment("");
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {!pendingAnchor && selectedChange && !selectedChange.isBinary ? (
-            <div className="empty-panel">Select an added or removed line to add a comment.</div>
-          ) : null}
-
-          {selectedChange?.isBinary ? <div className="empty-panel">Binary files support metadata-only review in v1.</div> : null}
-
-          <section className="comment-list-section">
-            <h3>Current</h3>
-            <CommentList
-              comments={comments.current}
-              editingCommentId={editingCommentId}
-              editingBody={editingBody}
-              pendingCommentActionId={pendingCommentActionId}
-              onBeginEdit={beginEditingComment}
-              onCancelEdit={resetEditingComment}
-              onChangeEditingBody={setEditingBody}
-              onSaveEdit={() => void submitCommentEdit()}
-              onDelete={(commentId) => void removeComment(commentId)}
-            />
-          </section>
-
-          <section className="comment-list-section">
-            <h3>Outdated</h3>
-            <CommentList
-              comments={comments.outdated}
-              muted
-              editingCommentId={editingCommentId}
-              editingBody={editingBody}
-              pendingCommentActionId={pendingCommentActionId}
-              onBeginEdit={beginEditingComment}
-              onCancelEdit={resetEditingComment}
-              onChangeEditingBody={setEditingBody}
-              onSaveEdit={() => void submitCommentEdit()}
-              onDelete={(commentId) => void removeComment(commentId)}
-            />
-          </section>
-        </aside>
       </main>
     </div>
-  );
-}
-
-function CommentList({
-  comments,
-  muted = false,
-  editingCommentId,
-  editingBody,
-  pendingCommentActionId,
-  onBeginEdit,
-  onCancelEdit,
-  onChangeEditingBody,
-  onSaveEdit,
-  onDelete
-}: {
-  comments: ReviewComment[];
-  muted?: boolean;
-  editingCommentId: string | null;
-  editingBody: string;
-  pendingCommentActionId: string | null;
-  onBeginEdit: (comment: ReviewComment) => void;
-  onCancelEdit: () => void;
-  onChangeEditingBody: (value: string) => void;
-  onSaveEdit: () => void;
-  onDelete: (commentId: string) => void;
-}) {
-  if (comments.length === 0) {
-    return <div className="empty-panel">No comments.</div>;
-  }
-
-  return (
-    <ul className="comment-list">
-      {comments.map((comment) => {
-        const anchorKey = getAnchorKey(comment.hunkHeader, {
-          oldLineNumber: comment.oldLineNumber,
-          newLineNumber: comment.newLineNumber,
-          commentableSide: comment.side
-        });
-        const isEditing = editingCommentId === comment.commentId;
-        const isPending = pendingCommentActionId === comment.commentId;
-
-        return (
-          <li key={comment.commentId} className={`comment-card ${muted ? "comment-card-muted" : ""}`} data-anchor={anchorKey ?? ""}>
-            <p className="comment-anchor">
-              {comment.side} line {comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber}
-            </p>
-            {isEditing ? (
-              <textarea
-                aria-label={`Edit comment ${comment.commentId}`}
-                value={editingBody}
-                onChange={(event) => onChangeEditingBody(event.target.value)}
-                rows={5}
-              />
-            ) : (
-              <p className="comment-body">{comment.body}</p>
-            )}
-            <p className="comment-date">{new Date(comment.createdAt).toLocaleString()}</p>
-            <div className="comment-actions comment-card-actions">
-              {isEditing ? (
-                <>
-                  <button type="button" disabled={isPending || editingBody.trim().length === 0} onClick={onSaveEdit}>
-                    Save
-                  </button>
-                  <button type="button" className="ghost-button" disabled={isPending} onClick={onCancelEdit}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" className="ghost-button" disabled={Boolean(pendingCommentActionId)} onClick={() => onBeginEdit(comment)}>
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button danger-button"
-                    disabled={Boolean(pendingCommentActionId)}
-                    onClick={() => onDelete(comment.commentId)}
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
   );
 }

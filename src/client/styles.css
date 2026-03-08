@@ -90,13 +90,13 @@ p {
 
 .layout {
   display: grid;
-  grid-template-columns: 18rem minmax(0, 1fr) 22rem;
+  grid-template-columns: 18rem minmax(0, 1fr);
   gap: 1rem;
+  align-items: start;
 }
 
 .sidebar,
-.review-pane,
-.comment-panel {
+.review-pane {
   background: rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(22, 33, 42, 0.12);
@@ -141,6 +141,10 @@ p {
 
 .file-header {
   margin-bottom: 1rem;
+}
+
+.review-pane {
+  min-width: 0;
 }
 
 .diff-scroll {
@@ -188,7 +192,7 @@ p {
 }
 
 .marker-cell {
-  width: 7.5rem;
+  width: 6.25rem;
   padding: 0.15rem 0.35rem;
   border-bottom: 1px solid rgba(22, 33, 42, 0.08);
   vertical-align: top;
@@ -240,13 +244,65 @@ p {
   padding: 0.9rem;
 }
 
-.comment-card + .comment-card,
-.comment-list-section + .comment-list-section {
+.comment-card + .comment-card {
   margin-top: 1rem;
 }
 
 .comment-card-muted {
   opacity: 0.72;
+}
+
+.comment-card-inline + .comment-card-inline,
+.comment-card-inline + .inline-composer,
+.inline-composer + .comment-card-inline {
+  margin-top: 0.75rem;
+}
+
+.inline-thread-row td {
+  border-bottom: 0;
+}
+
+.inline-thread-cell {
+  padding: 0;
+}
+
+.inline-thread-panel {
+  margin: 0.2rem 0 0.55rem;
+  padding: 0.85rem 0.95rem 0.95rem;
+  border-left: 3px solid rgba(138, 93, 31, 0.28);
+  background: rgba(138, 93, 31, 0.06);
+}
+
+.side-inline-thread-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.side-inline-thread-lane {
+  min-width: 0;
+}
+
+.compact-empty-panel {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.92rem;
+}
+
+.comment-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.comment-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  background: rgba(22, 33, 42, 0.1);
+  color: #445363;
+  font-size: 0.78rem;
 }
 
 .comment-anchor,
@@ -301,12 +357,15 @@ textarea {
   }
 
   .sidebar,
-  .review-pane,
-  .comment-panel {
+  .review-pane {
     min-height: auto;
   }
 
   .topbar {
     flex-direction: column;
+  }
+
+  .side-inline-thread-grid {
+    grid-template-columns: 1fr;
   }
 }

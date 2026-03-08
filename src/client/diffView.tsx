@@ -1,11 +1,32 @@
+import type { CommentsResponse } from "../shared/api.js";
 import type { DiffHunk, DiffLine, FileChange, ReviewComment } from "../shared/types.js";
+
+type CommentAnchor = {
+  side: "old" | "new";
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
+  hunkHeader: string;
+};
 
 type DiffViewerProps = {
   change: FileChange;
-  comments: ReviewComment[];
+  comments: CommentsResponse;
   mode: "unified" | "side-by-side";
   selectedAnchorKey: string | null;
-  onSelectLine: (payload: { side: "old" | "new"; oldLineNumber: number | null; newLineNumber: number | null; hunkHeader: string }) => void;
+  draftComment: string;
+  editingCommentId: string | null;
+  editingBody: string;
+  submitting: boolean;
+  pendingCommentActionId: string | null;
+  onSelectLine: (payload: CommentAnchor) => void;
+  onDraftCommentChange: (value: string) => void;
+  onSubmitComment: () => void;
+  onCancelNewComment: () => void;
+  onBeginEdit: (comment: ReviewComment) => void;
+  onCancelEdit: () => void;
+  onChangeEditingBody: (value: string) => void;
+  onSaveEdit: () => void;
+  onDelete: (commentId: string) => void;
 };
 
 type SideBySideRow = {
@@ -14,7 +35,46 @@ type SideBySideRow = {
   right: DiffLine | null;
 };
 
-export function DiffViewer({ change, comments, mode, selectedAnchorKey, onSelectLine }: DiffViewerProps) {
+type InlineThreadProps = {
+  line: DiffLine;
+  currentComments: ReviewComment[];
+  outdatedComments: ReviewComment[];
+  isComposerOpen: boolean;
+  draftComment: string;
+  editingCommentId: string | null;
+  editingBody: string;
+  submitting: boolean;
+  pendingCommentActionId: string | null;
+  onDraftCommentChange: (value: string) => void;
+  onSubmitComment: () => void;
+  onCancelNewComment: () => void;
+  onBeginEdit: (comment: ReviewComment) => void;
+  onCancelEdit: () => void;
+  onChangeEditingBody: (value: string) => void;
+  onSaveEdit: () => void;
+  onDelete: (commentId: string) => void;
+};
+
+export function DiffViewer({
+  change,
+  comments,
+  mode,
+  selectedAnchorKey,
+  draftComment,
+  editingCommentId,
+  editingBody,
+  submitting,
+  pendingCommentActionId,
+  onSelectLine,
+  onDraftCommentChange,
+  onSubmitComment,
+  onCancelNewComment,
+  onBeginEdit,
+  onCancelEdit,
+  onChangeEditingBody,
+  onSaveEdit,
+  onDelete
+}: DiffViewerProps) {
   if (change.isBinary) {
     return (
       <div className="binary-state">
@@ -32,10 +92,14 @@ export function DiffViewer({ change, comments, mode, selectedAnchorKey, onSelect
             <div className="hunk-header">{hunk.header}</div>
             <table className="diff-table unified-table">
               <tbody>
-                {hunk.lines.map((line, index) => {
+                {hunk.lines.flatMap((line, index) => {
                   const anchorKey = getAnchorKey(hunk.header, line);
-                  const commentCount = countComments(comments, hunk.header, line);
-                  return (
+                  const commentableSide = line.commentableSide;
+                  const currentComments = getCommentsForLine(comments.current, hunk.header, line);
+                  const outdatedComments = getCommentsForLine(comments.outdated, hunk.header, line);
+                  const showThread = shouldShowThread(anchorKey, selectedAnchorKey, currentComments, outdatedComments);
+
+                  return [
                     <tr
                       key={`${hunk.header}-${index}`}
                       className={`diff-row diff-row-${line.kind} ${selectedAnchorKey === anchorKey ? "diff-row-selected" : ""}`}
@@ -43,13 +107,13 @@ export function DiffViewer({ change, comments, mode, selectedAnchorKey, onSelect
                       <td className="gutter">{line.oldLineNumber ?? ""}</td>
                       <td className="gutter">{line.newLineNumber ?? ""}</td>
                       <td className="marker-cell">
-                        {line.commentableSide ? (
+                        {commentableSide ? (
                           <button
                             type="button"
                             className="line-action"
                             onClick={() =>
                               onSelectLine({
-                                side: line.commentableSide,
+                                side: commentableSide,
                                 oldLineNumber: line.oldLineNumber,
                                 newLineNumber: line.newLineNumber,
                                 hunkHeader: hunk.header
@@ -59,11 +123,38 @@ export function DiffViewer({ change, comments, mode, selectedAnchorKey, onSelect
                             Comment
                           </button>
                         ) : null}
-                        {commentCount > 0 ? <span className="comment-badge">{commentCount}</span> : null}
+                        {countComments(comments.current, hunk.header, line) > 0 ? (
+                          <span className="comment-badge">{countComments(comments.current, hunk.header, line)}</span>
+                        ) : null}
                       </td>
                       <td className="code-cell">{line.text || " "}</td>
-                    </tr>
-                  );
+                    </tr>,
+                    showThread && commentableSide ? (
+                      <tr key={`${hunk.header}-${index}-thread`} className="inline-thread-row">
+                        <td colSpan={4} className="inline-thread-cell">
+                          <InlineThread
+                            line={line}
+                            currentComments={currentComments}
+                            outdatedComments={outdatedComments}
+                            isComposerOpen={selectedAnchorKey === anchorKey}
+                            draftComment={draftComment}
+                            editingCommentId={editingCommentId}
+                            editingBody={editingBody}
+                            submitting={submitting}
+                            pendingCommentActionId={pendingCommentActionId}
+                            onDraftCommentChange={onDraftCommentChange}
+                            onSubmitComment={onSubmitComment}
+                            onCancelNewComment={onCancelNewComment}
+                            onBeginEdit={onBeginEdit}
+                            onCancelEdit={onCancelEdit}
+                            onChangeEditingBody={onChangeEditingBody}
+                            onSaveEdit={onSaveEdit}
+                            onDelete={onDelete}
+                          />
+                        </td>
+                      </tr>
+                    ) : null
+                  ];
                 })}
               </tbody>
             </table>
@@ -80,24 +171,99 @@ export function DiffViewer({ change, comments, mode, selectedAnchorKey, onSelect
           <div className="hunk-header">{hunk.header}</div>
           <table className="diff-table side-table">
             <tbody>
-              {pairHunkLines(hunk).map((row) => (
-                <tr key={row.key} className="diff-row">
-                  <SideCell
-                    line={row.left}
-                    hunkHeader={hunk.header}
-                    comments={comments}
-                    selectedAnchorKey={selectedAnchorKey}
-                    onSelectLine={onSelectLine}
-                  />
-                  <SideCell
-                    line={row.right}
-                    hunkHeader={hunk.header}
-                    comments={comments}
-                    selectedAnchorKey={selectedAnchorKey}
-                    onSelectLine={onSelectLine}
-                  />
-                </tr>
-              ))}
+              {pairHunkLines(hunk).flatMap((row) => {
+                const leftAnchorKey = row.left ? getAnchorKey(hunk.header, row.left) : null;
+                const rightAnchorKey = row.right ? getAnchorKey(hunk.header, row.right) : null;
+                const leftCurrentComments = row.left ? getCommentsForLine(comments.current, hunk.header, row.left) : [];
+                const rightCurrentComments = row.right ? getCommentsForLine(comments.current, hunk.header, row.right) : [];
+                const leftOutdatedComments = row.left ? getCommentsForLine(comments.outdated, hunk.header, row.left) : [];
+                const rightOutdatedComments = row.right ? getCommentsForLine(comments.outdated, hunk.header, row.right) : [];
+                const showLeftThread = shouldShowThread(
+                  leftAnchorKey,
+                  selectedAnchorKey,
+                  leftCurrentComments,
+                  leftOutdatedComments
+                );
+                const showRightThread = shouldShowThread(
+                  rightAnchorKey,
+                  selectedAnchorKey,
+                  rightCurrentComments,
+                  rightOutdatedComments
+                );
+
+                return [
+                  <tr key={row.key} className="diff-row">
+                    <SideCell
+                      line={row.left}
+                      hunkHeader={hunk.header}
+                      comments={comments.current}
+                      selectedAnchorKey={selectedAnchorKey}
+                      onSelectLine={onSelectLine}
+                    />
+                    <SideCell
+                      line={row.right}
+                      hunkHeader={hunk.header}
+                      comments={comments.current}
+                      selectedAnchorKey={selectedAnchorKey}
+                      onSelectLine={onSelectLine}
+                    />
+                  </tr>,
+                  showLeftThread || showRightThread ? (
+                    <tr key={`${row.key}-thread`} className="inline-thread-row side-inline-thread-row">
+                      <td colSpan={8} className="inline-thread-cell">
+                        <div className="side-inline-thread-grid">
+                          <div className="side-inline-thread-lane">
+                            {showLeftThread && row.left?.commentableSide ? (
+                              <InlineThread
+                                line={row.left}
+                                currentComments={leftCurrentComments}
+                                outdatedComments={leftOutdatedComments}
+                                isComposerOpen={selectedAnchorKey === leftAnchorKey}
+                                draftComment={draftComment}
+                                editingCommentId={editingCommentId}
+                                editingBody={editingBody}
+                                submitting={submitting}
+                                pendingCommentActionId={pendingCommentActionId}
+                                onDraftCommentChange={onDraftCommentChange}
+                                onSubmitComment={onSubmitComment}
+                                onCancelNewComment={onCancelNewComment}
+                                onBeginEdit={onBeginEdit}
+                                onCancelEdit={onCancelEdit}
+                                onChangeEditingBody={onChangeEditingBody}
+                                onSaveEdit={onSaveEdit}
+                                onDelete={onDelete}
+                              />
+                            ) : null}
+                          </div>
+                          <div className="side-inline-thread-lane">
+                            {showRightThread && row.right?.commentableSide ? (
+                              <InlineThread
+                                line={row.right}
+                                currentComments={rightCurrentComments}
+                                outdatedComments={rightOutdatedComments}
+                                isComposerOpen={selectedAnchorKey === rightAnchorKey}
+                                draftComment={draftComment}
+                                editingCommentId={editingCommentId}
+                                editingBody={editingBody}
+                                submitting={submitting}
+                                pendingCommentActionId={pendingCommentActionId}
+                                onDraftCommentChange={onDraftCommentChange}
+                                onSubmitComment={onSubmitComment}
+                                onCancelNewComment={onCancelNewComment}
+                                onBeginEdit={onBeginEdit}
+                                onCancelEdit={onCancelEdit}
+                                onChangeEditingBody={onChangeEditingBody}
+                                onSaveEdit={onSaveEdit}
+                                onDelete={onDelete}
+                              />
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null
+                ];
+              })}
             </tbody>
           </table>
         </section>
@@ -124,6 +290,7 @@ function SideCell({
   }
 
   const anchorKey = getAnchorKey(hunkHeader, line);
+  const commentableSide = line.commentableSide;
   const commentCount = countComments(comments, hunkHeader, line);
 
   return (
@@ -131,13 +298,13 @@ function SideCell({
       <td className={`gutter ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.oldLineNumber ?? ""}</td>
       <td className={`gutter ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.newLineNumber ?? ""}</td>
       <td className={`marker-cell ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>
-        {line.commentableSide ? (
+        {commentableSide ? (
           <button
             type="button"
             className="line-action"
             onClick={() =>
               onSelectLine({
-                side: line.commentableSide,
+                side: commentableSide,
                 oldLineNumber: line.oldLineNumber,
                 newLineNumber: line.newLineNumber,
                 hunkHeader
@@ -151,6 +318,164 @@ function SideCell({
       </td>
       <td className={`code-cell line-${line.kind} ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.text || " "}</td>
     </>
+  );
+}
+
+function InlineThread({
+  line,
+  currentComments,
+  outdatedComments,
+  isComposerOpen,
+  draftComment,
+  editingCommentId,
+  editingBody,
+  submitting,
+  pendingCommentActionId,
+  onDraftCommentChange,
+  onSubmitComment,
+  onCancelNewComment,
+  onBeginEdit,
+  onCancelEdit,
+  onChangeEditingBody,
+  onSaveEdit,
+  onDelete
+}: InlineThreadProps) {
+  const lineNumber = line.commentableSide === "old" ? line.oldLineNumber : line.newLineNumber;
+
+  return (
+    <div className="inline-thread-panel">
+      {currentComments.map((comment) => (
+        <InlineCommentCard
+          key={comment.commentId}
+          comment={comment}
+          editingCommentId={editingCommentId}
+          editingBody={editingBody}
+          pendingCommentActionId={pendingCommentActionId}
+          onBeginEdit={onBeginEdit}
+          onCancelEdit={onCancelEdit}
+          onChangeEditingBody={onChangeEditingBody}
+          onSaveEdit={onSaveEdit}
+          onDelete={onDelete}
+        />
+      ))}
+
+      {outdatedComments.map((comment) => (
+        <InlineCommentCard
+          key={comment.commentId}
+          comment={comment}
+          outdated
+          editingCommentId={editingCommentId}
+          editingBody={editingBody}
+          pendingCommentActionId={pendingCommentActionId}
+          onBeginEdit={onBeginEdit}
+          onCancelEdit={onCancelEdit}
+          onChangeEditingBody={onChangeEditingBody}
+          onSaveEdit={onSaveEdit}
+          onDelete={onDelete}
+        />
+      ))}
+
+      {isComposerOpen ? (
+        <section className="comment-card inline-composer">
+          <p className="comment-anchor">
+            New comment on {line.commentableSide} line {lineNumber}
+          </p>
+          <textarea
+            aria-label={`Add comment for ${line.commentableSide} line ${lineNumber ?? "unknown"}`}
+            value={draftComment}
+            onChange={(event) => onDraftCommentChange(event.target.value)}
+            rows={5}
+          />
+          <div className="comment-actions">
+            <button type="button" disabled={submitting || draftComment.trim().length === 0} onClick={onSubmitComment}>
+              Save comment
+            </button>
+            <button type="button" className="ghost-button" disabled={submitting} onClick={onCancelNewComment}>
+              Cancel
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {currentComments.length === 0 && outdatedComments.length === 0 && !isComposerOpen ? (
+        <div className="empty-panel compact-empty-panel">No comments for this line.</div>
+      ) : null}
+    </div>
+  );
+}
+
+function InlineCommentCard({
+  comment,
+  outdated = false,
+  editingCommentId,
+  editingBody,
+  pendingCommentActionId,
+  onBeginEdit,
+  onCancelEdit,
+  onChangeEditingBody,
+  onSaveEdit,
+  onDelete
+}: {
+  comment: ReviewComment;
+  outdated?: boolean;
+  editingCommentId: string | null;
+  editingBody: string;
+  pendingCommentActionId: string | null;
+  onBeginEdit: (comment: ReviewComment) => void;
+  onCancelEdit: () => void;
+  onChangeEditingBody: (value: string) => void;
+  onSaveEdit: () => void;
+  onDelete: (commentId: string) => void;
+}) {
+  const isEditing = editingCommentId === comment.commentId;
+  const isPending = pendingCommentActionId === comment.commentId;
+
+  return (
+    <article className={`comment-card comment-card-inline ${outdated ? "comment-card-muted" : ""}`}>
+      <div className="comment-card-header">
+        <p className="comment-anchor">
+          {comment.side} line {comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber}
+        </p>
+        {outdated ? <span className="comment-status">Outdated</span> : null}
+      </div>
+      {isEditing ? (
+        <textarea
+          aria-label={`Edit comment ${comment.commentId}`}
+          value={editingBody}
+          onChange={(event) => onChangeEditingBody(event.target.value)}
+          rows={5}
+        />
+      ) : (
+        <p className="comment-body">{comment.body}</p>
+      )}
+      <p className="comment-date">{new Date(comment.createdAt).toLocaleString()}</p>
+      <div className="comment-actions comment-card-actions">
+        {isEditing ? (
+          <>
+            <button type="button" disabled={isPending || editingBody.trim().length === 0} onClick={onSaveEdit}>
+              Save
+            </button>
+            <button type="button" className="ghost-button" disabled={isPending} onClick={onCancelEdit}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="ghost-button" disabled={Boolean(pendingCommentActionId)} onClick={() => onBeginEdit(comment)}>
+              Edit
+            </button>
+            <button
+              type="button"
+              className="ghost-button danger-button"
+              disabled={Boolean(pendingCommentActionId)}
+              onClick={() => onDelete(comment.commentId)}
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -197,13 +522,26 @@ export function pairHunkLines(hunk: DiffHunk): SideBySideRow[] {
   return rows;
 }
 
-function countComments(comments: ReviewComment[], hunkHeader: string, line: DiffLine): number {
+function getCommentsForLine(comments: ReviewComment[], hunkHeader: string, line: DiffLine): ReviewComment[] {
   return comments.filter(
     (comment) =>
       comment.hunkHeader === hunkHeader &&
       comment.oldLineNumber === line.oldLineNumber &&
       comment.newLineNumber === line.newLineNumber
-  ).length;
+  );
+}
+
+function countComments(comments: ReviewComment[], hunkHeader: string, line: DiffLine): number {
+  return getCommentsForLine(comments, hunkHeader, line).length;
+}
+
+function shouldShowThread(
+  anchorKey: string | null,
+  selectedAnchorKey: string | null,
+  currentComments: ReviewComment[],
+  outdatedComments: ReviewComment[]
+): boolean {
+  return Boolean(anchorKey) && (selectedAnchorKey === anchorKey || currentComments.length > 0 || outdatedComments.length > 0);
 }
 
 export function getAnchorKey(
