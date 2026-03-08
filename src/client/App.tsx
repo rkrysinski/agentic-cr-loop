@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
 import { DiffViewer } from "./diffView.js";
@@ -16,6 +16,11 @@ const EMPTY_COMMENTS: CommentsResponse = {
   current: [],
   outdated: []
 };
+
+const DEFAULT_SIDEBAR_WIDTH = 448;
+const MIN_SIDEBAR_WIDTH = 360;
+const MAX_SIDEBAR_WIDTH = 920;
+const KEYBOARD_RESIZE_STEP = 32;
 
 type ChangeTreeFileNode = {
   kind: "file";
@@ -155,6 +160,7 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
 }
 
 export function App() {
+  const layoutRef = useRef<HTMLElement | null>(null);
   const [repo, setRepo] = useState<RepoResponse | null>(null);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
@@ -171,6 +177,8 @@ export function App() {
   const [pendingCommentActionId, setPendingCommentActionId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [expandedDirectoryKeys, setExpandedDirectoryKeys] = useState<Record<string, boolean>>({});
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   useEffect(() => {
     void refreshAll();
@@ -328,6 +336,43 @@ export function App() {
     ? `${pendingAnchor.hunkHeader}:${pendingAnchor.side}:${pendingAnchor.oldLineNumber ?? "-"}:${pendingAnchor.newLineNumber ?? "-"}`
     : null;
   const changeTree = buildChangeTree(changes);
+  const layoutStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
+
+  function clampSidebarWidth(nextWidth: number): number {
+    const layoutWidth = layoutRef.current?.getBoundingClientRect().width ?? 0;
+    const maxWidth = layoutWidth > 0 ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, layoutWidth - 320)) : MAX_SIDEBAR_WIDTH;
+    return Math.min(Math.max(nextWidth, MIN_SIDEBAR_WIDTH), maxWidth);
+  }
+
+  useEffect(() => {
+    if (!isResizingSidebar) {
+      return;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const layoutBounds = layoutRef.current?.getBoundingClientRect();
+      if (!layoutBounds) {
+        return;
+      }
+      setSidebarWidth(clampSidebarWidth(event.clientX - layoutBounds.left));
+    }
+
+    function handlePointerUp() {
+      setIsResizingSidebar(false);
+    }
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isResizingSidebar]);
 
   useEffect(() => {
     const nextDirectoryKeys = collectDirectoryKeys(changeTree);
@@ -492,7 +537,7 @@ export function App() {
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <main className={`layout ${isSidebarCollapsed ? "layout-sidebar-collapsed" : ""}`}>
+      <main ref={layoutRef} className={`layout ${isSidebarCollapsed ? "layout-sidebar-collapsed" : ""}`} style={layoutStyle}>
         <aside className={`sidebar-widget ${isSidebarCollapsed ? "sidebar-widget-collapsed" : ""}`}>
           <div id="changed-files-panel" className="sidebar" aria-hidden={isSidebarCollapsed}>
             <div className="sidebar-header">
@@ -516,6 +561,41 @@ export function App() {
             </span>
           </button>
         </aside>
+        <div
+          className={`sidebar-resizer ${isResizingSidebar ? "sidebar-resizer-active" : ""}`}
+          role="separator"
+          aria-label="Resize changed files panel"
+          aria-orientation="vertical"
+          aria-valuemin={MIN_SIDEBAR_WIDTH}
+          aria-valuemax={MAX_SIDEBAR_WIDTH}
+          aria-valuenow={sidebarWidth}
+          tabIndex={isSidebarCollapsed ? -1 : 0}
+          onPointerDown={(event) => {
+            if (isSidebarCollapsed) {
+              return;
+            }
+            event.preventDefault();
+            setIsResizingSidebar(true);
+          }}
+          onKeyDown={(event) => {
+            if (isSidebarCollapsed) {
+              return;
+            }
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              setSidebarWidth((current) => clampSidebarWidth(current - KEYBOARD_RESIZE_STEP));
+            } else if (event.key === "ArrowRight") {
+              event.preventDefault();
+              setSidebarWidth((current) => clampSidebarWidth(current + KEYBOARD_RESIZE_STEP));
+            } else if (event.key === "Home") {
+              event.preventDefault();
+              setSidebarWidth(MIN_SIDEBAR_WIDTH);
+            } else if (event.key === "End") {
+              event.preventDefault();
+              setSidebarWidth(clampSidebarWidth(MAX_SIDEBAR_WIDTH));
+            }
+          }}
+        />
 
         <section className="review-pane">
           {loading ? <div className="empty-state">Loading review data…</div> : null}

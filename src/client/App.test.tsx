@@ -85,10 +85,15 @@ describe("App", () => {
     render(<App />);
 
     const folderButton = await screen.findByRole("button", { name: "src/client" });
+    const resizeHandle = screen.getByRole("separator", { name: "Resize changed files panel" });
     expect(folderButton).toHaveAttribute("aria-expanded", "true");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "640");
     expect(screen.getByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /styles\.css/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /README\.md/ })).toBeInTheDocument();
+
+    fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
+    expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "672");
 
     fireEvent.click(folderButton);
     expect(screen.getByRole("button", { name: "src/client" })).toHaveAttribute("aria-expanded", "false");
