@@ -33,6 +33,36 @@ export class CommentStore {
     return comment;
   }
 
+  async update(commentId: string, body: string): Promise<ReviewComment | null> {
+    const session = await this.read();
+    const index = session.comments.findIndex((comment) => comment.commentId === commentId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const updated = {
+      ...session.comments[index],
+      body
+    };
+    session.comments[index] = updated;
+    await this.write(session);
+    return updated;
+  }
+
+  async delete(commentId: string): Promise<boolean> {
+    const session = await this.read();
+    const nextComments = session.comments.filter((comment) => comment.commentId !== commentId);
+
+    if (nextComments.length === session.comments.length) {
+      return false;
+    }
+
+    session.comments = nextComments;
+    await this.write(session);
+    return true;
+  }
+
   private async getSessionFilePath(): Promise<string> {
     await fs.mkdir(this.storageDir, { recursive: true });
     return path.join(this.storageDir, `${sha256(this.repoPath)}.json`);

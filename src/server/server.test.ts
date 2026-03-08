@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 describe("server API", () => {
-  it("lists tracked and untracked changes and persists comments", async () => {
+  it("lists tracked and untracked changes and supports editing and deleting comments", async () => {
     const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
 
     const changesResponse = await invokeRoute(app, "get", "/api/changes");
@@ -47,13 +47,34 @@ describe("server API", () => {
       }
     });
     expect(createResponse.statusCode).toBe(201);
+    expect((createResponse.body as { body: string }).body).toBe("Check wording");
+
+    const updateResponse = await invokeRoute(app, "patch", "/api/comments/:commentId", {
+      params: { commentId: (createResponse.body as { commentId: string }).commentId },
+      body: { body: "Updated wording" }
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect((updateResponse.body as { body: string }).body).toBe("Updated wording");
 
     const commentsResponse = await invokeRoute(app, "get", "/api/comments", {
       query: { changeId: trackedChange.changeId }
     });
     expect(commentsResponse.statusCode).toBe(200);
     expect(commentsResponse.body.current).toHaveLength(1);
+    expect(commentsResponse.body.current[0].body).toBe("Updated wording");
     expect(commentsResponse.body.outdated).toHaveLength(0);
+
+    const deleteResponse = await invokeRoute(app, "delete", "/api/comments/:commentId", {
+      params: { commentId: (createResponse.body as { commentId: string }).commentId }
+    });
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const afterDeleteResponse = await invokeRoute(app, "get", "/api/comments", {
+      query: { changeId: trackedChange.changeId }
+    });
+    expect(afterDeleteResponse.statusCode).toBe(200);
+    expect(afterDeleteResponse.body.current).toHaveLength(0);
+    expect(afterDeleteResponse.body.outdated).toHaveLength(0);
   });
 
   it("marks comments outdated when the diff fingerprint changes", async () => {
@@ -120,7 +141,7 @@ describe("server API", () => {
 
 async function invokeRoute(
   app: import("express").Express,
-  method: "get" | "post",
+  method: "get" | "post" | "patch" | "delete",
   pathPattern: string,
   options: {
     params?: Record<string, string>;

@@ -274,8 +274,17 @@ textarea {
   gap: 0.5rem;
 }
 
+.comment-card-actions {
+  margin-top: 0.75rem;
+}
+
 .ghost-button {
   background: transparent;
+}
+
+.danger-button {
+  color: #7b2514;
+  border-color: rgba(123, 37, 20, 0.32);
 }
 
 .error-banner {

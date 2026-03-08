@@ -37,4 +37,30 @@ describe("CommentStore", () => {
       createdAt: created.createdAt
     });
   });
+
+  it("updates and deletes stored comments", async () => {
+    const storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
+    createdDirectories.push(storageDir);
+
+    const store = new CommentStore("/tmp/repo", storageDir);
+    const created = await store.create({
+      fileId: "change-1",
+      side: "new",
+      oldLineNumber: null,
+      newLineNumber: 4,
+      hunkHeader: "@@ -1,1 +1,2 @@",
+      body: "Looks good",
+      diffFingerprint: "fingerprint-1"
+    });
+
+    const updated = await store.update(created.commentId, "Needs work");
+    const deleted = await store.delete(created.commentId);
+
+    expect(updated).toMatchObject({
+      commentId: created.commentId,
+      body: "Needs work"
+    });
+    expect(deleted).toBe(true);
+    await expect(store.list()).resolves.toHaveLength(0);
+  });
 });

@@ -99,6 +99,14 @@ export class ReviewService {
     });
   }
 
+  async updateComment(commentId: string, body: string): Promise<ReviewComment | null> {
+    return this.commentStore.update(commentId, body.trim());
+  }
+
+  async deleteComment(commentId: string): Promise<boolean> {
+    return this.commentStore.delete(commentId);
+  }
+
   async exportMarkdown(): Promise<string> {
     const changes = await this.getChanges();
     const comments = await this.commentStore.list();

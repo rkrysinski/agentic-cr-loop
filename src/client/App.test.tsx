@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App.js";
 
@@ -7,7 +7,36 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("keeps outdated comments out of inline markers while showing them in the panel", async () => {
+  it("keeps outdated comments out of inline markers while supporting edit and delete actions", async () => {
+    let commentsState = {
+      current: [
+        {
+          commentId: "current",
+          fileId: "change-1",
+          side: "new",
+          oldLineNumber: null,
+          newLineNumber: 1,
+          hunkHeader: "@@ -1,2 +1,2 @@",
+          body: "Current note",
+          createdAt: "2026-03-10T10:00:00.000Z",
+          diffFingerprint: "fp"
+        }
+      ],
+      outdated: [
+        {
+          commentId: "outdated",
+          fileId: "change-1",
+          side: "new",
+          oldLineNumber: null,
+          newLineNumber: 1,
+          hunkHeader: "@@ -1,2 +1,2 @@",
+          body: "Old note",
+          createdAt: "2026-03-10T09:00:00.000Z",
+          diffFingerprint: "stale"
+        }
+      ]
+    };
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
 
@@ -58,34 +87,7 @@ describe("App", () => {
       }
 
       if (url === "/api/comments?changeId=change-1") {
-        return jsonResponse({
-          current: [
-            {
-              commentId: "current",
-              fileId: "change-1",
-              side: "new",
-              oldLineNumber: null,
-              newLineNumber: 1,
-              hunkHeader: "@@ -1,2 +1,2 @@",
-              body: "Current note",
-              createdAt: "2026-03-10T10:00:00.000Z",
-              diffFingerprint: "fp"
-            }
-          ],
-          outdated: [
-            {
-              commentId: "outdated",
-              fileId: "change-1",
-              side: "new",
-              oldLineNumber: null,
-              newLineNumber: 1,
-              hunkHeader: "@@ -1,2 +1,2 @@",
-              body: "Old note",
-              createdAt: "2026-03-10T09:00:00.000Z",
-              diffFingerprint: "stale"
-            }
-          ]
-        });
+        return jsonResponse(commentsState);
       }
 
       if (url === "/api/comments" && init?.method === "POST") {
@@ -100,6 +102,29 @@ describe("App", () => {
           createdAt: "2026-03-10T11:00:00.000Z",
           diffFingerprint: "fp"
         }, 201);
+      }
+
+      if (url === "/api/comments/current" && init?.method === "PATCH") {
+        commentsState = {
+          ...commentsState,
+          current: commentsState.current.map((comment) =>
+            comment.commentId === "current"
+              ? {
+                  ...comment,
+                  body: "Updated note"
+                }
+              : comment
+          )
+        };
+        return jsonResponse(commentsState.current[0]);
+      }
+
+      if (url === "/api/comments/outdated" && init?.method === "DELETE") {
+        commentsState = {
+          ...commentsState,
+          outdated: []
+        };
+        return emptyResponse(204);
       }
 
       throw new Error(`Unhandled fetch: ${url}`);
@@ -117,6 +142,26 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Comment" })).toHaveLength(2);
+
+    const currentCard = screen.getByText("Current note").closest("li");
+    if (!currentCard) {
+      throw new Error("Current comment card not found");
+    }
+
+    fireEvent.click(within(currentCard).getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Edit comment current"), { target: { value: "Updated note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.getByText("Updated note")).toBeInTheDocument());
+    expect(screen.queryByText("Current note")).not.toBeInTheDocument();
+
+    const outdatedCard = screen.getByText("Old note").closest("li");
+    if (!outdatedCard) {
+      throw new Error("Outdated comment card not found");
+    }
+
+    fireEvent.click(within(outdatedCard).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("Old note")).not.toBeInTheDocument());
   });
 });
 
@@ -125,5 +170,13 @@ function jsonResponse(body: unknown, status = 200): Response {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body
+  } as Response;
+}
+
+function emptyResponse(status = 204): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => undefined
   } as Response;
 }

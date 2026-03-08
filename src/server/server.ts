@@ -1,7 +1,7 @@
 import http from "node:http";
 import path from "node:path";
 import express from "express";
-import type { CreateCommentRequest } from "../shared/api.js";
+import type { CreateCommentRequest, UpdateCommentRequest } from "../shared/api.js";
 import { ReviewService } from "./reviewService.js";
 
 type StartOptions = {
@@ -87,6 +87,48 @@ export async function startServer(
           body: body.body
         })
       );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/comments/:commentId", async (request, response, next) => {
+    try {
+      const { commentId } = request.params;
+      const body = request.body as Partial<UpdateCommentRequest>;
+
+      if (typeof commentId !== "string" || typeof body.body !== "string" || body.body.trim().length === 0) {
+        response.status(400).json({ error: "Invalid comment payload" });
+        return;
+      }
+
+      const updated = await reviewService.updateComment(commentId, body.body);
+      if (!updated) {
+        response.status(404).json({ error: "Comment not found" });
+        return;
+      }
+
+      response.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/comments/:commentId", async (request, response, next) => {
+    try {
+      const { commentId } = request.params;
+      if (typeof commentId !== "string") {
+        response.status(400).json({ error: "Missing commentId" });
+        return;
+      }
+
+      const deleted = await reviewService.deleteComment(commentId);
+      if (!deleted) {
+        response.status(404).json({ error: "Comment not found" });
+        return;
+      }
+
+      response.status(204).send();
     } catch (error) {
       next(error);
     }

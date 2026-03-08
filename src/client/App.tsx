@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useState } from "react";
-import { createComment, getChange, getChanges, getComments, getRepo } from "./api.js";
+import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
 import { DiffViewer, getAnchorKey } from "./diffView.js";
 import type { ChangeSummary, CommentsResponse, RepoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
@@ -25,9 +25,12 @@ export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [pendingAnchor, setPendingAnchor] = useState<PendingAnchor | null>(null);
   const [draftComment, setDraftComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingBody, setEditingBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingCommentActionId, setPendingCommentActionId] = useState<string | null>(null);
 
   useEffect(() => {
     void refreshAll();
@@ -81,8 +84,8 @@ export function App() {
       setChanges(nextChanges);
       setViewMode(repoInfo.viewModeDefault);
       setSelectedChangeId(nextSelectedChangeId);
-      setPendingAnchor(null);
-      setDraftComment("");
+      resetNewComment();
+      resetEditingComment();
       if (!nextSelectedChangeId) {
         setSelectedChange(null);
         setComments(EMPTY_COMMENTS);
@@ -109,19 +112,76 @@ export function App() {
         hunkHeader: pendingAnchor.hunkHeader,
         body: draftComment
       });
-      setDraftComment("");
-      setPendingAnchor(null);
+      resetNewComment();
       startTransition(() => {
-        void Promise.all([getChanges(), getComments(selectedChange.changeId)]).then(([nextChanges, nextComments]) => {
-          setChanges(nextChanges);
-          setComments(nextComments);
-        });
+        void refreshCommentsAndCounts(selectedChange.changeId);
       });
     } catch (nextError: unknown) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function refreshCommentsAndCounts(changeId: string) {
+    const [nextChanges, nextComments] = await Promise.all([getChanges(), getComments(changeId)]);
+    setChanges(nextChanges);
+    setComments(nextComments);
+  }
+
+  async function submitCommentEdit() {
+    if (!editingCommentId || editingBody.trim().length === 0 || !selectedChangeId) {
+      return;
+    }
+
+    try {
+      setPendingCommentActionId(editingCommentId);
+      await updateComment(editingCommentId, { body: editingBody });
+      const nextComments = await getComments(selectedChangeId);
+      setComments(nextComments);
+      resetEditingComment();
+    } catch (nextError: unknown) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setPendingCommentActionId(null);
+    }
+  }
+
+  async function removeComment(commentId: string) {
+    if (!selectedChangeId) {
+      return;
+    }
+
+    try {
+      setPendingCommentActionId(commentId);
+      await deleteComment(commentId);
+      if (editingCommentId === commentId) {
+        resetEditingComment();
+      }
+      startTransition(() => {
+        void refreshCommentsAndCounts(selectedChangeId);
+      });
+    } catch (nextError: unknown) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setPendingCommentActionId(null);
+    }
+  }
+
+  function beginEditingComment(comment: ReviewComment) {
+    resetNewComment();
+    setEditingCommentId(comment.commentId);
+    setEditingBody(comment.body);
+  }
+
+  function resetEditingComment() {
+    setEditingCommentId(null);
+    setEditingBody("");
+  }
+
+  function resetNewComment() {
+    setPendingAnchor(null);
+    setDraftComment("");
   }
 
   const selectedAnchorKey = pendingAnchor
@@ -176,8 +236,8 @@ export function App() {
                     onClick={() =>
                       startTransition(() => {
                         setSelectedChangeId(change.changeId);
-                        setPendingAnchor(null);
-                        setDraftComment("");
+                        resetNewComment();
+                        resetEditingComment();
                       })
                     }
                   >
@@ -209,7 +269,10 @@ export function App() {
                 comments={comments.current}
                 mode={viewMode}
                 selectedAnchorKey={selectedAnchorKey}
-                onSelectLine={(anchor) => setPendingAnchor(anchor)}
+                onSelectLine={(anchor) => {
+                  resetEditingComment();
+                  setPendingAnchor(anchor);
+                }}
               />
             </>
           ) : null}
@@ -252,12 +315,33 @@ export function App() {
 
           <section className="comment-list-section">
             <h3>Current</h3>
-            <CommentList comments={comments.current} />
+            <CommentList
+              comments={comments.current}
+              editingCommentId={editingCommentId}
+              editingBody={editingBody}
+              pendingCommentActionId={pendingCommentActionId}
+              onBeginEdit={beginEditingComment}
+              onCancelEdit={resetEditingComment}
+              onChangeEditingBody={setEditingBody}
+              onSaveEdit={() => void submitCommentEdit()}
+              onDelete={(commentId) => void removeComment(commentId)}
+            />
           </section>
 
           <section className="comment-list-section">
             <h3>Outdated</h3>
-            <CommentList comments={comments.outdated} muted />
+            <CommentList
+              comments={comments.outdated}
+              muted
+              editingCommentId={editingCommentId}
+              editingBody={editingBody}
+              pendingCommentActionId={pendingCommentActionId}
+              onBeginEdit={beginEditingComment}
+              onCancelEdit={resetEditingComment}
+              onChangeEditingBody={setEditingBody}
+              onSaveEdit={() => void submitCommentEdit()}
+              onDelete={(commentId) => void removeComment(commentId)}
+            />
           </section>
         </aside>
       </main>
@@ -265,7 +349,29 @@ export function App() {
   );
 }
 
-function CommentList({ comments, muted = false }: { comments: ReviewComment[]; muted?: boolean }) {
+function CommentList({
+  comments,
+  muted = false,
+  editingCommentId,
+  editingBody,
+  pendingCommentActionId,
+  onBeginEdit,
+  onCancelEdit,
+  onChangeEditingBody,
+  onSaveEdit,
+  onDelete
+}: {
+  comments: ReviewComment[];
+  muted?: boolean;
+  editingCommentId: string | null;
+  editingBody: string;
+  pendingCommentActionId: string | null;
+  onBeginEdit: (comment: ReviewComment) => void;
+  onCancelEdit: () => void;
+  onChangeEditingBody: (value: string) => void;
+  onSaveEdit: () => void;
+  onDelete: (commentId: string) => void;
+}) {
   if (comments.length === 0) {
     return <div className="empty-panel">No comments.</div>;
   }
@@ -278,14 +384,51 @@ function CommentList({ comments, muted = false }: { comments: ReviewComment[]; m
           newLineNumber: comment.newLineNumber,
           commentableSide: comment.side
         });
+        const isEditing = editingCommentId === comment.commentId;
+        const isPending = pendingCommentActionId === comment.commentId;
 
         return (
           <li key={comment.commentId} className={`comment-card ${muted ? "comment-card-muted" : ""}`} data-anchor={anchorKey ?? ""}>
             <p className="comment-anchor">
               {comment.side} line {comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber}
             </p>
-            <p className="comment-body">{comment.body}</p>
+            {isEditing ? (
+              <textarea
+                aria-label={`Edit comment ${comment.commentId}`}
+                value={editingBody}
+                onChange={(event) => onChangeEditingBody(event.target.value)}
+                rows={5}
+              />
+            ) : (
+              <p className="comment-body">{comment.body}</p>
+            )}
             <p className="comment-date">{new Date(comment.createdAt).toLocaleString()}</p>
+            <div className="comment-actions comment-card-actions">
+              {isEditing ? (
+                <>
+                  <button type="button" disabled={isPending || editingBody.trim().length === 0} onClick={onSaveEdit}>
+                    Save
+                  </button>
+                  <button type="button" className="ghost-button" disabled={isPending} onClick={onCancelEdit}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="ghost-button" disabled={Boolean(pendingCommentActionId)} onClick={() => onBeginEdit(comment)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button danger-button"
+                    disabled={Boolean(pendingCommentActionId)}
+                    onClick={() => onDelete(comment.commentId)}
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
           </li>
         );
       })}

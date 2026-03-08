@@ -32,3 +32,7 @@ export type CreateCommentRequest = {
   hunkHeader: string;
   body: string;
 };
+
+export type UpdateCommentRequest = {
+  body: string;
+};

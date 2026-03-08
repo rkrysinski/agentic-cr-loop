@@ -11,6 +11,7 @@ It reads local changes relative to `HEAD`, renders them in unified and side-by-s
 - Detects untracked files and shows untracked text files as fully added files
 - Renders diffs in unified and side-by-side modes from the same underlying diff model
 - Allows comments only on changed lines
+- Lets you edit and delete existing comments
 - Stores comments outside the reviewed repository
 - Marks comments as outdated when the underlying diff changes
 - Exports review comments as Markdown
@@ -190,7 +191,17 @@ Use the `Refresh` button to reload:
 - Selected diff
 - Comment classification
 
-### 7. Export Comments
+### 7. Edit Or Delete Comments
+
+Existing comments can be managed from the comment panel:
+
+1. Click `Edit` on a comment card to update its text
+2. Click `Save` to persist the change or `Cancel` to discard it
+3. Click `Delete` to remove the comment entirely
+
+Both current and outdated comments can be edited or deleted.
+
+### 8. Export Comments
 
 Click `Export Markdown` to fetch a deterministic Markdown document containing all stored comments for the selected review repository.
 
@@ -261,6 +272,8 @@ Main endpoints:
 - `GET /api/changes/:changeId`
 - `GET /api/comments?changeId=...`
 - `POST /api/comments`
+- `PATCH /api/comments/:commentId`
+- `DELETE /api/comments/:commentId`
 - `GET /api/export/comments.md`
 
 The shared request and response types live in [src/shared/api.ts](/Users/romankrysinski/work/repositories/code-review/src/shared/api.ts).

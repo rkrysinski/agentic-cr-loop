@@ -1,4 +1,4 @@
-import type { ChangeSummary, CommentsResponse, CreateCommentRequest, RepoResponse } from "../shared/api.js";
+import type { ChangeSummary, CommentsResponse, CreateCommentRequest, RepoResponse, UpdateCommentRequest } from "../shared/api.js";
 import type { FileChange, ReviewComment } from "../shared/types.js";
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -7,6 +7,10 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(payload?.error ?? `Request failed with ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json() as Promise<T>;
@@ -35,5 +39,21 @@ export function createComment(input: CreateCommentRequest): Promise<ReviewCommen
       "Content-Type": "application/json"
     },
     body: JSON.stringify(input)
+  });
+}
+
+export function updateComment(commentId: string, input: UpdateCommentRequest): Promise<ReviewComment> {
+  return request<ReviewComment>(`/api/comments/${encodeURIComponent(commentId)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+}
+
+export function deleteComment(commentId: string): Promise<void> {
+  return request<void>(`/api/comments/${encodeURIComponent(commentId)}`, {
+    method: "DELETE"
   });
 }
