@@ -41,6 +41,33 @@ const change: FileChange = {
   ]
 };
 
+const syntaxChange: FileChange = {
+  ...change,
+  oldPath: "src/App.tsx",
+  newPath: "src/App.tsx",
+  hunks: [
+    {
+      header: "@@ -1,1 +1,1 @@",
+      lines: [
+        {
+          kind: "removed",
+          oldLineNumber: 1,
+          newLineNumber: null,
+          text: "const before = 1;",
+          commentableSide: "old"
+        },
+        {
+          kind: "added",
+          oldLineNumber: null,
+          newLineNumber: 1,
+          text: "const after = 2;",
+          commentableSide: "new"
+        }
+      ]
+    }
+  ]
+};
+
 const comments: CommentsResponse = {
   current: [
     {
@@ -166,6 +193,107 @@ describe("DiffViewer", () => {
       newLineNumber: 1,
       hunkHeader: "@@ -1,2 +1,2 @@"
     });
+  });
+
+  it("renders syntax tokens for supported file types while keeping line selection working", () => {
+    const onSelectLine = vi.fn();
+    const selectedAnchorKey = getAnchorKey(syntaxChange.hunks[0].header, syntaxChange.hunks[0].lines[1]);
+    const { container, rerender } = render(
+      <DiffViewer
+        change={syntaxChange}
+        comments={comments}
+        mode="unified"
+        hideRemovedCode={false}
+        selectedAnchorKey={selectedAnchorKey}
+        draftComment=""
+        editingCommentId={null}
+        editingBody=""
+        submitting={false}
+        pendingCommentActionId={null}
+        onSelectLine={onSelectLine}
+        onDraftCommentChange={vi.fn()}
+        onSubmitComment={vi.fn()}
+        onCancelNewComment={vi.fn()}
+        onBeginEdit={vi.fn()}
+        onCancelEdit={vi.fn()}
+        onChangeEditingBody={vi.fn()}
+        onSaveEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(container.querySelector(".diff-syntax")).not.toBeNull();
+    expect(container.querySelectorAll(".token.keyword").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("const").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByText("const")[0]);
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "old",
+      oldLineNumber: 1,
+      newLineNumber: null,
+      hunkHeader: "@@ -1,1 +1,1 @@"
+    });
+
+    rerender(
+      <DiffViewer
+        change={syntaxChange}
+        comments={comments}
+        mode="side-by-side"
+        hideRemovedCode={false}
+        selectedAnchorKey={selectedAnchorKey}
+        draftComment=""
+        editingCommentId={null}
+        editingBody=""
+        submitting={false}
+        pendingCommentActionId={null}
+        onSelectLine={onSelectLine}
+        onDraftCommentChange={vi.fn()}
+        onSubmitComment={vi.fn()}
+        onCancelNewComment={vi.fn()}
+        onBeginEdit={vi.fn()}
+        onCancelEdit={vi.fn()}
+        onChangeEditingBody={vi.fn()}
+        onSaveEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getAllByText("const")[1]);
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "new",
+      oldLineNumber: null,
+      newLineNumber: 1,
+      hunkHeader: "@@ -1,1 +1,1 @@"
+    });
+  });
+
+  it("falls back to plain text for unsupported file types", () => {
+    const { container } = render(
+      <DiffViewer
+        change={change}
+        comments={{ current: [], outdated: [] }}
+        mode="unified"
+        hideRemovedCode={false}
+        selectedAnchorKey={null}
+        draftComment=""
+        editingCommentId={null}
+        editingBody=""
+        submitting={false}
+        pendingCommentActionId={null}
+        onSelectLine={vi.fn()}
+        onDraftCommentChange={vi.fn()}
+        onSubmitComment={vi.fn()}
+        onCancelNewComment={vi.fn()}
+        onBeginEdit={vi.fn()}
+        onCancelEdit={vi.fn()}
+        onChangeEditingBody={vi.fn()}
+        onSaveEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("before")).toBeInTheDocument();
+    expect(container.querySelector(".diff-syntax")).toBeNull();
   });
 
   it("hides removed rows in unified mode while preserving existing threads", () => {

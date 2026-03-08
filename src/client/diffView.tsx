@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from "react";
 import type { CommentsResponse } from "../shared/api.js";
 import type { DiffHunk, DiffLine, FileChange, ReviewComment } from "../shared/types.js";
+import { DiffSyntaxLine } from "./codeSyntax.js";
 
 type CommentAnchor = {
   side: "old" | "new";
@@ -78,6 +79,8 @@ export function DiffViewer({
   onSaveEdit,
   onDelete
 }: DiffViewerProps) {
+  const syntaxFilePath = change.newPath ?? change.oldPath ?? "";
+
   if (change.isBinary) {
     return (
       <div className="binary-state">
@@ -128,7 +131,9 @@ export function DiffViewer({
                       >
                         <td className={`gutter gutter-old gutter-${line.kind}`}>{line.oldLineNumber ?? ""}</td>
                         <td className={`gutter gutter-new gutter-${line.kind}`}>{line.newLineNumber ?? ""}</td>
-                        <td className={`code-cell code-cell-${line.kind}`}>{line.text || " "}</td>
+                        <td className={`code-cell code-cell-${line.kind}`}>
+                          <DiffSyntaxLine filePath={syntaxFilePath} lineText={line.text} />
+                        </td>
                       </tr>
                     ),
                     showThread && commentableSide ? (
@@ -199,6 +204,7 @@ export function DiffViewer({
                     <SideCell
                       line={row.left}
                       lane="left"
+                      filePath={syntaxFilePath}
                       hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
@@ -206,6 +212,7 @@ export function DiffViewer({
                     <SideCell
                       line={row.right}
                       lane="right"
+                      filePath={syntaxFilePath}
                       hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
@@ -290,12 +297,14 @@ export function DiffViewer({
 function SideCell({
   line,
   lane,
+  filePath,
   hunkHeader,
   selectedAnchorKey,
   onSelectLine
 }: {
   line: DiffLine | null;
   lane: "left" | "right";
+  filePath: string;
   hunkHeader: string;
   selectedAnchorKey: string | null;
   onSelectLine: DiffViewerProps["onSelectLine"];
@@ -337,7 +346,7 @@ function SideCell({
         {line.newLineNumber ?? ""}
       </td>
       <td className={`code-cell code-cell-${line.kind} line-${line.kind} lane-${lane} ${cellClassName}`} {...cellInteractionProps}>
-        {line.text || " "}
+        <DiffSyntaxLine filePath={filePath} lineText={line.text} />
       </td>
     </>
   );

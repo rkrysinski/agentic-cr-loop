@@ -621,6 +621,70 @@ p {
   background: #ffffff;
 }
 
+.diff-syntax {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  background: transparent;
+}
+
+.diff-syntax-code {
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 550;
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
+}
+
+.diff-syntax-code .token.comment,
+.diff-syntax-code .token.prolog,
+.diff-syntax-code .token.doctype,
+.diff-syntax-code .token.cdata {
+  color: #66768a;
+}
+
+.diff-syntax-code .token.punctuation,
+.diff-syntax-code .token.operator {
+  color: #4d5a67;
+}
+
+.diff-syntax-code .token.keyword,
+.diff-syntax-code .token.atrule {
+  color: #7a4a13;
+  font-weight: 600;
+}
+
+.diff-syntax-code .token.string,
+.diff-syntax-code .token.char,
+.diff-syntax-code .token.attr-value {
+  color: #2a6844;
+}
+
+.diff-syntax-code .token.number,
+.diff-syntax-code .token.boolean,
+.diff-syntax-code .token.constant,
+.diff-syntax-code .token.symbol {
+  color: #9a5a1a;
+}
+
+.diff-syntax-code .token.function,
+.diff-syntax-code .token.selector {
+  color: #1d5e88;
+  font-weight: 600;
+}
+
+.diff-syntax-code .token.property,
+.diff-syntax-code .token.attr-name,
+.diff-syntax-code .token.class-name,
+.diff-syntax-code .token.regex {
+  color: #5b4376;
+}
+
 .side-table .code-cell {
   width: calc((100% - (var(--diff-gutter-width) * 4)) / 2);
   min-width: 0;
