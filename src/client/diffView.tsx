@@ -40,6 +40,7 @@ type SideBySideRow = {
 
 type InlineThreadProps = {
   line: DiffLine;
+  anchorSide: "old" | "new";
   currentComments: ReviewComment[];
   outdatedComments: ReviewComment[];
   isComposerOpen: boolean;
@@ -99,8 +100,8 @@ export function DiffViewer({
             <table className="diff-table unified-table">
               <tbody>
                 {hunk.lines.flatMap((line, index) => {
-                  const anchorKey = getAnchorKey(hunk.header, line);
-                  const commentableSide = line.commentableSide;
+                  const commentableSide = getCommentableSide(line, "new");
+                  const anchorKey = getAnchorKey(hunk.header, line, commentableSide);
                   const currentComments = getCommentsForLine(comments.current, hunk.header, line);
                   const outdatedComments = getCommentsForLine(comments.outdated, hunk.header, line);
                   const showThread = shouldShowThread(anchorKey, selectedAnchorKey, currentComments, outdatedComments);
@@ -142,6 +143,7 @@ export function DiffViewer({
                         <td className="inline-thread-cell inline-thread-cell-code">
                           <InlineThread
                             line={line}
+                            anchorSide={commentableSide}
                             currentComments={currentComments}
                             outdatedComments={outdatedComments}
                             isComposerOpen={selectedAnchorKey === anchorKey}
@@ -180,8 +182,8 @@ export function DiffViewer({
           <table className="diff-table side-table">
             <tbody>
               {pairHunkLines(hunk).flatMap((row) => {
-                const leftAnchorKey = row.left ? getAnchorKey(hunk.header, row.left) : null;
-                const rightAnchorKey = row.right ? getAnchorKey(hunk.header, row.right) : null;
+                const leftAnchorKey = row.left ? getAnchorKey(hunk.header, row.left, "old") : null;
+                const rightAnchorKey = row.right ? getAnchorKey(hunk.header, row.right, "new") : null;
                 const leftCurrentComments = row.left ? getCommentsForLine(comments.current, hunk.header, row.left) : [];
                 const rightCurrentComments = row.right ? getCommentsForLine(comments.current, hunk.header, row.right) : [];
                 const leftOutdatedComments = row.left ? getCommentsForLine(comments.outdated, hunk.header, row.left) : [];
@@ -229,9 +231,10 @@ export function DiffViewer({
                         aria-hidden="true"
                       />
                       <td className="code-cell code-cell-context inline-thread-cell side-inline-thread-code-cell lane-left">
-                        {showLeftThread && row.left?.commentableSide ? (
+                        {showLeftThread && row.left ? (
                           <InlineThread
                             line={row.left}
+                            anchorSide="old"
                             currentComments={leftCurrentComments}
                             outdatedComments={leftOutdatedComments}
                             isComposerOpen={selectedAnchorKey === leftAnchorKey}
@@ -260,9 +263,10 @@ export function DiffViewer({
                         aria-hidden="true"
                       />
                       <td className="code-cell code-cell-context inline-thread-cell side-inline-thread-code-cell lane-right">
-                        {showRightThread && row.right?.commentableSide ? (
+                        {showRightThread && row.right ? (
                           <InlineThread
                             line={row.right}
+                            anchorSide="new"
                             currentComments={rightCurrentComments}
                             outdatedComments={rightOutdatedComments}
                             isComposerOpen={selectedAnchorKey === rightAnchorKey}
@@ -319,8 +323,8 @@ function SideCell({
     );
   }
 
-  const anchorKey = getAnchorKey(hunkHeader, line);
-  const commentableSide = line.commentableSide;
+  const commentableSide = getCommentableSide(line, lane === "left" ? "old" : "new");
+  const anchorKey = getAnchorKey(hunkHeader, line, commentableSide);
   const cellInteractionProps =
     commentableSide === null
       ? undefined
@@ -354,6 +358,7 @@ function SideCell({
 
 function InlineThread({
   line,
+  anchorSide,
   currentComments,
   outdatedComments,
   isComposerOpen,
@@ -371,7 +376,7 @@ function InlineThread({
   onSaveEdit,
   onDelete
 }: InlineThreadProps) {
-  const lineNumber = line.commentableSide === "old" ? line.oldLineNumber : line.newLineNumber;
+  const lineNumber = anchorSide === "old" ? line.oldLineNumber : line.newLineNumber;
 
   return (
     <div className="inline-thread-panel">
@@ -409,10 +414,10 @@ function InlineThread({
       {isComposerOpen ? (
         <section className="comment-card inline-composer">
           <p className="comment-anchor">
-            New comment on {line.commentableSide} line {lineNumber}
+            New comment on {anchorSide} line {lineNumber}
           </p>
           <textarea
-            aria-label={`Add comment for ${line.commentableSide} line ${lineNumber ?? "unknown"}`}
+            aria-label={`Add comment for ${anchorSide} line ${lineNumber ?? "unknown"}`}
             value={draftComment}
             onChange={(event) => onDraftCommentChange(event.target.value)}
             rows={5}
@@ -562,6 +567,18 @@ function getCommentsForLine(comments: ReviewComment[], hunkHeader: string, line:
   );
 }
 
+function getCommentableSide(line: DiffLine, preferredContextSide: "old" | "new"): "old" | "new" | null {
+  if (line.commentableSide) {
+    return line.commentableSide;
+  }
+
+  if (line.kind === "context") {
+    return preferredContextSide;
+  }
+
+  return null;
+}
+
 function shouldShowThread(
   anchorKey: string | null,
   selectedAnchorKey: string | null,
@@ -587,11 +604,13 @@ function getLineInteractionProps(anchor: CommentAnchor, onSelectLine: DiffViewer
 
 export function getAnchorKey(
   hunkHeader: string,
-  line: Pick<DiffLine, "oldLineNumber" | "newLineNumber" | "commentableSide">
+  line: Pick<DiffLine, "oldLineNumber" | "newLineNumber" | "commentableSide">,
+  sideOverride?: "old" | "new" | null
 ): string | null {
-  if (!line.commentableSide) {
+  const side = sideOverride ?? line.commentableSide;
+  if (!side) {
     return null;
   }
 
-  return `${hunkHeader}:${line.commentableSide}:${line.oldLineNumber ?? "-"}:${line.newLineNumber ?? "-"}`;
+  return `${hunkHeader}:${side}:${line.oldLineNumber ?? "-"}:${line.newLineNumber ?? "-"}`;
 }

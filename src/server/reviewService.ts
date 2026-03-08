@@ -72,7 +72,7 @@ export class ReviewService {
   }
 
   async createComment(request: CreateCommentRequest): Promise<ReviewComment> {
-    const change = await this.getChange(request.changeId, SUMMARY_CONTEXT);
+    const change = await this.getChange(request.changeId, "full");
     if (!change) {
       throw new Error("Unknown changeId");
     }
@@ -80,7 +80,7 @@ export class ReviewService {
     const isValidAnchor = change.hunks.some((hunk) =>
       hunk.lines.some(
         (line) =>
-          line.commentableSide === request.side &&
+          (line.commentableSide === request.side || (line.kind === "context" && (request.side === "old" || request.side === "new"))) &&
           line.oldLineNumber === request.oldLineNumber &&
           line.newLineNumber === request.newLineNumber
       )

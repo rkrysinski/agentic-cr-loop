@@ -127,14 +127,14 @@ describe("server API", () => {
     expect(noContextResponse.statusCode).toBe(200);
     expect(fullDetailResponse.body.hunks[0].lines.length).toBeGreaterThan(noContextResponse.body.hunks[0].lines.length);
 
-    const line = noContextResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
+    const line = fullDetailResponse.body.hunks[0].lines.find((entry: { kind: string }) => entry.kind === "context");
     const createResponse = await invokeRoute(app, "post", "/api/comments", {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
         oldLineNumber: line.oldLineNumber,
         newLineNumber: line.newLineNumber,
-        hunkHeader: noContextResponse.body.hunks[0].header,
+        hunkHeader: fullDetailResponse.body.hunks[0].header,
         body: "Still current"
       }
     });

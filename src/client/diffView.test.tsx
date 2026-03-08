@@ -136,7 +136,7 @@ describe("DiffViewer", () => {
       />
     );
 
-    expect(container.querySelectorAll(".diff-row-clickable")).toHaveLength(2);
+    expect(container.querySelectorAll(".diff-row-clickable")).toHaveLength(3);
     expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(0);
     expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.getByText("Outdated", { selector: ".comment-status" })).toBeInTheDocument();
@@ -147,6 +147,14 @@ describe("DiffViewer", () => {
       side: "old",
       oldLineNumber: 1,
       newLineNumber: null,
+      hunkHeader: "@@ -1,2 +1,2 @@"
+    });
+
+    fireEvent.click(screen.getByText("stay"));
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "new",
+      oldLineNumber: 2,
+      newLineNumber: 2,
       hunkHeader: "@@ -1,2 +1,2 @@"
     });
 
@@ -175,7 +183,7 @@ describe("DiffViewer", () => {
     );
 
     expect(container.querySelectorAll(".diff-row-clickable")).toHaveLength(0);
-    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(6);
+    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(12);
     expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.getByText("Outdated", { selector: ".comment-status" })).toBeInTheDocument();
     expect(
@@ -191,6 +199,14 @@ describe("DiffViewer", () => {
       side: "new",
       oldLineNumber: null,
       newLineNumber: 1,
+      hunkHeader: "@@ -1,2 +1,2 @@"
+    });
+
+    fireEvent.click(screen.getAllByText("stay")[0]);
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "old",
+      oldLineNumber: 2,
+      newLineNumber: 2,
       hunkHeader: "@@ -1,2 +1,2 @@"
     });
   });

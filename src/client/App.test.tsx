@@ -88,7 +88,7 @@ describe("App", () => {
     expect(screen.getByRole("combobox", { name: "Diff context" })).toHaveValue("full");
     const resizeHandle = screen.getByRole("separator", { name: "Resize changed files panel" });
     expect(folderButton).toHaveAttribute("aria-expanded", "true");
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "448");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "360");
     expect(screen.getByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /styles\.css/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /README\.md/ })).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("App", () => {
     expect(screen.queryByText(/modified · 2/)).not.toBeInTheDocument();
 
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
-    expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "480");
+    expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "392");
 
     fireEvent.click(folderButton);
     expect(screen.getByRole("button", { name: "src/client" })).toHaveAttribute("aria-expanded", "false");
@@ -251,9 +251,12 @@ describe("App", () => {
     fireEvent.click(screen.getByText("after"));
     expect(screen.getByLabelText("Add comment for new line 1")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByText("stay"));
+    expect(screen.getByLabelText("Add comment for new line 2")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
-    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(6);
+    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(12);
 
     const currentCard = screen.getByText("Current note").closest("article");
     if (!currentCard) {
