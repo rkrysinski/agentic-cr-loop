@@ -432,7 +432,7 @@ export function App() {
     }
 
     const selectedFileSection = fileSectionRefs.current.get(selectedChangeId);
-    if (!selectedFileSection) {
+    if (!selectedFileSection || typeof selectedFileSection.scrollIntoView !== "function") {
       return;
     }
 
