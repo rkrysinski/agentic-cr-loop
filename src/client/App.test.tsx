@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("keeps outdated comments out of inline markers while supporting edit and delete actions", async () => {
+  it("opens inline comments from line clicks while supporting edit and delete actions", async () => {
     let commentsState = {
       current: [
         {
@@ -137,15 +137,15 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("Old note")).toBeInTheDocument());
     expect(screen.getByText("Current note")).toBeInTheDocument();
-    expect(container.querySelectorAll(".comment-badge")).toHaveLength(1);
+    expect(container.querySelectorAll(".comment-badge")).toHaveLength(0);
     expect(screen.queryByRole("heading", { name: "Comments" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Comment" })[1]);
+    fireEvent.click(screen.getByText("after"));
     expect(screen.getByLabelText("Add comment for new line 1")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Comment" })).toHaveLength(2);
+    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(6);
 
     const currentCard = screen.getByText("Current note").closest("article");
     if (!currentCard) {

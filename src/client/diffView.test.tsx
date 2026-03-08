@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DiffViewer, getAnchorKey, pairHunkLines } from "./diffView.js";
 import type { CommentsResponse } from "../shared/api.js";
@@ -82,7 +82,8 @@ describe("pairHunkLines", () => {
 });
 
 describe("DiffViewer", () => {
-  it("renders comments inline while keeping outdated comments out of badges", () => {
+  it("opens the inline composer from line clicks and renders existing inline threads", () => {
+    const onSelectLine = vi.fn();
     const selectedAnchorKey = getAnchorKey(change.hunks[0].header, change.hunks[0].lines[1]);
     const { container, rerender } = render(
       <DiffViewer
@@ -95,7 +96,7 @@ describe("DiffViewer", () => {
         editingBody=""
         submitting={false}
         pendingCommentActionId={null}
-        onSelectLine={vi.fn()}
+        onSelectLine={onSelectLine}
         onDraftCommentChange={vi.fn()}
         onSubmitComment={vi.fn()}
         onCancelNewComment={vi.fn()}
@@ -107,11 +108,19 @@ describe("DiffViewer", () => {
       />
     );
 
-    expect(screen.getAllByRole("button", { name: "Comment" })).toHaveLength(2);
-    expect(container.querySelectorAll(".comment-badge")).toHaveLength(1);
+    expect(container.querySelectorAll(".diff-row-clickable")).toHaveLength(2);
+    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(0);
     expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.getByText("Outdated", { selector: ".comment-status" })).toBeInTheDocument();
     expect(screen.getByLabelText("Add comment for new line 1")).toHaveValue("Draft comment");
+
+    fireEvent.click(screen.getByText("before"));
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "old",
+      oldLineNumber: 1,
+      newLineNumber: null,
+      hunkHeader: "@@ -1,2 +1,2 @@"
+    });
 
     rerender(
       <DiffViewer
@@ -124,7 +133,7 @@ describe("DiffViewer", () => {
         editingBody=""
         submitting={false}
         pendingCommentActionId={null}
-        onSelectLine={vi.fn()}
+        onSelectLine={onSelectLine}
         onDraftCommentChange={vi.fn()}
         onSubmitComment={vi.fn()}
         onCancelNewComment={vi.fn()}
@@ -136,9 +145,17 @@ describe("DiffViewer", () => {
       />
     );
 
-    expect(screen.getAllByRole("button", { name: "Comment" })).toHaveLength(2);
-    expect(container.querySelectorAll(".comment-badge")).toHaveLength(1);
+    expect(container.querySelectorAll(".diff-row-clickable")).toHaveLength(0);
+    expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(6);
     expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.getByText("Outdated", { selector: ".comment-status" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("after"));
+    expect(onSelectLine).toHaveBeenCalledWith({
+      side: "new",
+      oldLineNumber: null,
+      newLineNumber: 1,
+      hunkHeader: "@@ -1,2 +1,2 @@"
+    });
   });
 });

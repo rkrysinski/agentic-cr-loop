@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react";
 import type { CommentsResponse } from "../shared/api.js";
 import type { DiffHunk, DiffLine, FileChange, ReviewComment } from "../shared/types.js";
 
@@ -98,40 +99,34 @@ export function DiffViewer({
                   const currentComments = getCommentsForLine(comments.current, hunk.header, line);
                   const outdatedComments = getCommentsForLine(comments.outdated, hunk.header, line);
                   const showThread = shouldShowThread(anchorKey, selectedAnchorKey, currentComments, outdatedComments);
+                  const rowInteractionProps =
+                    commentableSide === null
+                      ? undefined
+                      : getLineInteractionProps(
+                          {
+                            side: commentableSide,
+                            oldLineNumber: line.oldLineNumber,
+                            newLineNumber: line.newLineNumber,
+                            hunkHeader: hunk.header
+                          },
+                          onSelectLine
+                        );
 
                   return [
                     <tr
                       key={`${hunk.header}-${index}`}
-                      className={`diff-row diff-row-${line.kind} ${selectedAnchorKey === anchorKey ? "diff-row-selected" : ""}`}
+                      className={`diff-row diff-row-${line.kind} ${selectedAnchorKey === anchorKey ? "diff-row-selected" : ""} ${
+                        commentableSide ? "diff-row-clickable" : ""
+                      }`}
+                      {...rowInteractionProps}
                     >
                       <td className="gutter">{line.oldLineNumber ?? ""}</td>
                       <td className="gutter">{line.newLineNumber ?? ""}</td>
-                      <td className="marker-cell">
-                        {commentableSide ? (
-                          <button
-                            type="button"
-                            className="line-action"
-                            onClick={() =>
-                              onSelectLine({
-                                side: commentableSide,
-                                oldLineNumber: line.oldLineNumber,
-                                newLineNumber: line.newLineNumber,
-                                hunkHeader: hunk.header
-                              })
-                            }
-                          >
-                            Comment
-                          </button>
-                        ) : null}
-                        {countComments(comments.current, hunk.header, line) > 0 ? (
-                          <span className="comment-badge">{countComments(comments.current, hunk.header, line)}</span>
-                        ) : null}
-                      </td>
                       <td className="code-cell">{line.text || " "}</td>
                     </tr>,
                     showThread && commentableSide ? (
                       <tr key={`${hunk.header}-${index}-thread`} className="inline-thread-row">
-                        <td colSpan={4} className="inline-thread-cell">
+                        <td colSpan={3} className="inline-thread-cell">
                           <InlineThread
                             line={line}
                             currentComments={currentComments}
@@ -196,21 +191,19 @@ export function DiffViewer({
                     <SideCell
                       line={row.left}
                       hunkHeader={hunk.header}
-                      comments={comments.current}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
                     />
                     <SideCell
                       line={row.right}
                       hunkHeader={hunk.header}
-                      comments={comments.current}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
                     />
                   </tr>,
                   showLeftThread || showRightThread ? (
                     <tr key={`${row.key}-thread`} className="inline-thread-row side-inline-thread-row">
-                      <td colSpan={8} className="inline-thread-cell">
+                      <td colSpan={6} className="inline-thread-cell">
                         <div className="side-inline-thread-grid">
                           <div className="side-inline-thread-lane">
                             {showLeftThread && row.left?.commentableSide ? (
@@ -275,48 +268,45 @@ export function DiffViewer({
 function SideCell({
   line,
   hunkHeader,
-  comments,
   selectedAnchorKey,
   onSelectLine
 }: {
   line: DiffLine | null;
   hunkHeader: string;
-  comments: ReviewComment[];
   selectedAnchorKey: string | null;
   onSelectLine: DiffViewerProps["onSelectLine"];
 }) {
   if (!line) {
-    return <td className="side-cell empty-cell" colSpan={4} />;
+    return <td className="side-cell empty-cell" colSpan={3} />;
   }
 
   const anchorKey = getAnchorKey(hunkHeader, line);
   const commentableSide = line.commentableSide;
-  const commentCount = countComments(comments, hunkHeader, line);
+  const cellInteractionProps =
+    commentableSide === null
+      ? undefined
+      : getLineInteractionProps(
+          {
+            side: commentableSide,
+            oldLineNumber: line.oldLineNumber,
+            newLineNumber: line.newLineNumber,
+            hunkHeader
+          },
+          onSelectLine
+        );
+  const cellClassName = `${selectedAnchorKey === anchorKey ? "selected-cell " : ""}${commentableSide ? "line-clickable-cell" : ""}`;
 
   return (
     <>
-      <td className={`gutter ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.oldLineNumber ?? ""}</td>
-      <td className={`gutter ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.newLineNumber ?? ""}</td>
-      <td className={`marker-cell ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>
-        {commentableSide ? (
-          <button
-            type="button"
-            className="line-action"
-            onClick={() =>
-              onSelectLine({
-                side: commentableSide,
-                oldLineNumber: line.oldLineNumber,
-                newLineNumber: line.newLineNumber,
-                hunkHeader
-              })
-            }
-          >
-            Comment
-          </button>
-        ) : null}
-        {commentCount > 0 ? <span className="comment-badge">{commentCount}</span> : null}
+      <td className={`gutter ${cellClassName}`} {...cellInteractionProps}>
+        {line.oldLineNumber ?? ""}
       </td>
-      <td className={`code-cell line-${line.kind} ${selectedAnchorKey === anchorKey ? "selected-cell" : ""}`}>{line.text || " "}</td>
+      <td className={`gutter ${cellClassName}`} {...cellInteractionProps}>
+        {line.newLineNumber ?? ""}
+      </td>
+      <td className={`code-cell line-${line.kind} ${cellClassName}`} {...cellInteractionProps}>
+        {line.text || " "}
+      </td>
     </>
   );
 }
@@ -531,10 +521,6 @@ function getCommentsForLine(comments: ReviewComment[], hunkHeader: string, line:
   );
 }
 
-function countComments(comments: ReviewComment[], hunkHeader: string, line: DiffLine): number {
-  return getCommentsForLine(comments, hunkHeader, line).length;
-}
-
 function shouldShowThread(
   anchorKey: string | null,
   selectedAnchorKey: string | null,
@@ -542,6 +528,20 @@ function shouldShowThread(
   outdatedComments: ReviewComment[]
 ): boolean {
   return Boolean(anchorKey) && (selectedAnchorKey === anchorKey || currentComments.length > 0 || outdatedComments.length > 0);
+}
+
+function getLineInteractionProps(anchor: CommentAnchor, onSelectLine: DiffViewerProps["onSelectLine"]) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: () => onSelectLine(anchor),
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onSelectLine(anchor);
+      }
+    }
+  };
 }
 
 export function getAnchorKey(

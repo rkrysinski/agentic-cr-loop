@@ -191,13 +191,6 @@ p {
   border-bottom: 1px solid rgba(22, 33, 42, 0.08);
 }
 
-.marker-cell {
-  width: 6.25rem;
-  padding: 0.15rem 0.35rem;
-  border-bottom: 1px solid rgba(22, 33, 42, 0.08);
-  vertical-align: top;
-}
-
 .code-cell {
   white-space: pre-wrap;
   word-break: break-word;
@@ -205,29 +198,21 @@ p {
   border-bottom: 1px solid rgba(22, 33, 42, 0.08);
 }
 
-.line-action {
-  padding: 0.2rem 0.45rem;
-  border-radius: 0.55rem;
-  font-size: 0.75rem;
-}
-
-.comment-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.4rem;
-  height: 1.4rem;
-  margin-left: 0.35rem;
-  border-radius: 999px;
-  background: #16212a;
-  color: white;
-  font-size: 0.74rem;
-}
-
 .selected-cell,
 .diff-row-selected td {
   outline: 1px solid rgba(138, 93, 31, 0.45);
   outline-offset: -1px;
+}
+
+.diff-row-clickable,
+.line-clickable-cell {
+  cursor: pointer;
+}
+
+.diff-row-clickable:hover .gutter,
+.diff-row-clickable:hover .code-cell,
+.line-clickable-cell:hover {
+  background-color: rgba(138, 93, 31, 0.08);
 }
 
 .empty-cell {
