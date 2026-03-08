@@ -492,10 +492,11 @@ export function App() {
                 </svg>
               </span>
               <span className="path-text">{node.name}</span>
-            </span>
-            <span className="change-meta">
-              {node.change.changeType} · {node.change.commentCounts.current}
-              {node.change.commentCounts.outdated > 0 ? ` + ${node.change.commentCounts.outdated} outdated` : ""}
+              {node.change.commentCounts.current > 0 ? (
+                <span className="change-comment-count" aria-label={`${node.change.commentCounts.current} comments`}>
+                  {node.change.commentCounts.current}
+                </span>
+              ) : null}
             </span>
           </button>
         </li>
