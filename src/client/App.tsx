@@ -6,7 +6,6 @@ import type { ChangeSummary, CommentsResponse, RepoResponse } from "../shared/ap
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
 
 type PendingAnchor = {
-  changeId: string;
   side: "old" | "new";
   oldLineNumber: number | null;
   newLineNumber: number | null;
@@ -162,12 +161,11 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
 
 export function App() {
   const layoutRef = useRef<HTMLElement | null>(null);
-  const fileSectionRefs = useRef(new Map<string, HTMLElement>());
   const [repo, setRepo] = useState<RepoResponse | null>(null);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
-  const [changeDetailsById, setChangeDetailsById] = useState<Record<string, FileChange>>({});
-  const [commentsByChangeId, setCommentsByChangeId] = useState<Record<string, CommentsResponse>>({});
+  const [selectedChange, setSelectedChange] = useState<FileChange | null>(null);
+  const [comments, setComments] = useState<CommentsResponse>(EMPTY_COMMENTS);
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [pendingAnchor, setPendingAnchor] = useState<PendingAnchor | null>(null);
   const [draftComment, setDraftComment] = useState("");
@@ -186,6 +184,41 @@ export function App() {
     void refreshAll();
   }, []);
 
+  useEffect(() => {
+    if (!selectedChangeId) {
+      setSelectedChange(null);
+      setComments(EMPTY_COMMENTS);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    Promise.all([getChange(selectedChangeId), getComments(selectedChangeId)])
+      .then(([change, nextComments]) => {
+        if (cancelled) {
+          return;
+        }
+        setSelectedChange(change);
+        setComments(nextComments);
+      })
+      .catch((nextError: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        setError(nextError instanceof Error ? nextError.message : String(nextError));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChangeId]);
+
   async function refreshAll() {
     try {
       setLoading(true);
@@ -201,35 +234,11 @@ export function App() {
       setSelectedChangeId(nextSelectedChangeId);
       resetNewComment();
       resetEditingComment();
-
-      if (nextChanges.length === 0) {
-        setChangeDetailsById({});
-        setCommentsByChangeId({});
+      if (!nextSelectedChangeId) {
+        setSelectedChange(null);
+        setComments(EMPTY_COMMENTS);
         setLoading(false);
-        return;
       }
-
-      const nextDetailsEntries = await Promise.all(
-        nextChanges.map(async (changeSummary) => {
-          const [change, nextComments] = await Promise.all([
-            getChange(changeSummary.changeId),
-            getComments(changeSummary.changeId)
-          ]);
-          return [changeSummary.changeId, { change, comments: nextComments }] as const;
-        })
-      );
-
-      const nextChangeDetailsById: Record<string, FileChange> = {};
-      const nextCommentsByChangeId: Record<string, CommentsResponse> = {};
-
-      for (const [changeId, payload] of nextDetailsEntries) {
-        nextChangeDetailsById[changeId] = payload.change;
-        nextCommentsByChangeId[changeId] = payload.comments;
-      }
-
-      setChangeDetailsById(nextChangeDetailsById);
-      setCommentsByChangeId(nextCommentsByChangeId);
-      setLoading(false);
     } catch (nextError: unknown) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
       setLoading(false);
@@ -237,14 +246,14 @@ export function App() {
   }
 
   async function submitComment() {
-    if (!pendingAnchor || draftComment.trim().length === 0) {
+    if (!selectedChange || !pendingAnchor || draftComment.trim().length === 0) {
       return;
     }
 
     try {
       setSubmitting(true);
       await createComment({
-        changeId: pendingAnchor.changeId,
+        changeId: selectedChange.changeId,
         side: pendingAnchor.side,
         oldLineNumber: pendingAnchor.oldLineNumber,
         newLineNumber: pendingAnchor.newLineNumber,
@@ -253,7 +262,7 @@ export function App() {
       });
       resetNewComment();
       startTransition(() => {
-        void refreshCommentsAndCounts(pendingAnchor.changeId);
+        void refreshCommentsAndCounts(selectedChange.changeId);
       });
     } catch (nextError: unknown) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -265,10 +274,7 @@ export function App() {
   async function refreshCommentsAndCounts(changeId: string) {
     const [nextChanges, nextComments] = await Promise.all([getChanges(), getComments(changeId)]);
     setChanges(nextChanges);
-    setCommentsByChangeId((current) => ({
-      ...current,
-      [changeId]: nextComments
-    }));
+    setComments(nextComments);
   }
 
   async function submitCommentEdit() {
@@ -280,10 +286,7 @@ export function App() {
       setPendingCommentActionId(editingCommentId);
       await updateComment(editingCommentId, { body: editingBody });
       const nextComments = await getComments(selectedChangeId);
-      setCommentsByChangeId((current) => ({
-        ...current,
-        [selectedChangeId]: nextComments
-      }));
+      setComments(nextComments);
       resetEditingComment();
     } catch (nextError: unknown) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -315,7 +318,6 @@ export function App() {
 
   function beginEditingComment(comment: ReviewComment) {
     resetNewComment();
-    setSelectedChangeId(comment.fileId);
     setEditingCommentId(comment.commentId);
     setEditingBody(comment.body);
   }
@@ -333,7 +335,6 @@ export function App() {
   const selectedAnchorKey = pendingAnchor
     ? `${pendingAnchor.hunkHeader}:${pendingAnchor.side}:${pendingAnchor.oldLineNumber ?? "-"}:${pendingAnchor.newLineNumber ?? "-"}`
     : null;
-  const selectedChange = selectedChangeId ? changeDetailsById[selectedChangeId] ?? null : null;
   const changeTree = buildChangeTree(changes);
   const layoutStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;
 
@@ -425,22 +426,6 @@ export function App() {
       return changed ? nextState : current;
     });
   }, [changes, selectedChangeId]);
-
-  useEffect(() => {
-    if (!selectedChangeId) {
-      return;
-    }
-
-    const selectedFileSection = fileSectionRefs.current.get(selectedChangeId);
-    if (!selectedFileSection || typeof selectedFileSection.scrollIntoView !== "function") {
-      return;
-    }
-
-    selectedFileSection.scrollIntoView({
-      block: "start",
-      behavior: "smooth"
-    });
-  }, [selectedChangeId, changeDetailsById]);
 
   function renderChangeTree(nodes: ChangeTreeNode[], depth = 0) {
     return nodes.map((node) => {
@@ -615,70 +600,41 @@ export function App() {
 
         <section className="review-pane">
           {loading ? <div className="empty-state">Loading review data…</div> : null}
-          {!loading && changes.length > 0 ? (
-            <div className="review-file-list">
-              {changes.map((changeSummary) => {
-                const change = changeDetailsById[changeSummary.changeId];
-                const comments = commentsByChangeId[changeSummary.changeId] ?? EMPTY_COMMENTS;
-                const isActive = selectedChangeId === changeSummary.changeId;
-
-                return (
-                  <article
-                    key={changeSummary.changeId}
-                    ref={(node) => {
-                      if (node) {
-                        fileSectionRefs.current.set(changeSummary.changeId, node);
-                      } else {
-                        fileSectionRefs.current.delete(changeSummary.changeId);
-                      }
-                    }}
-                    className={`review-file-section ${isActive ? "review-file-section-active" : ""}`}
-                    data-change-id={changeSummary.changeId}
-                  >
-                    <div className="file-header">
-                      <h2>{changeSummary.newPath ?? changeSummary.oldPath ?? "(unknown)"}</h2>
-                      <p>
-                        {changeSummary.changeType}
-                        {changeSummary.isBinary ? " · binary" : ""}
-                      </p>
-                    </div>
-                    {change ? (
-                      <DiffViewer
-                        change={change}
-                        comments={comments}
-                        mode={viewMode}
-                        selectedAnchorKey={pendingAnchor?.changeId === change.changeId ? selectedAnchorKey : null}
-                        draftComment={pendingAnchor?.changeId === change.changeId ? draftComment : ""}
-                        editingCommentId={editingCommentId}
-                        editingBody={editingBody}
-                        submitting={submitting}
-                        pendingCommentActionId={pendingCommentActionId}
-                        onSelectLine={(anchor) => {
-                          setSelectedChangeId(change.changeId);
-                          resetEditingComment();
-                          setPendingAnchor({
-                            changeId: change.changeId,
-                            ...anchor
-                          });
-                        }}
-                        onDraftCommentChange={setDraftComment}
-                        onSubmitComment={() => void submitComment()}
-                        onCancelNewComment={resetNewComment}
-                        onBeginEdit={beginEditingComment}
-                        onCancelEdit={resetEditingComment}
-                        onChangeEditingBody={setEditingBody}
-                        onSaveEdit={() => void submitCommentEdit()}
-                        onDelete={(commentId) => void removeComment(commentId)}
-                      />
-                    ) : (
-                      <div className="empty-state">Loading diff…</div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
+          {!loading && selectedChange ? (
+            <>
+              <div className="file-header">
+                <h2>{selectedChange.newPath ?? selectedChange.oldPath ?? "(unknown)"}</h2>
+                <p>
+                  {selectedChange.changeType}
+                  {selectedChange.isBinary ? " · binary" : ""}
+                </p>
+              </div>
+              <DiffViewer
+                change={selectedChange}
+                comments={comments}
+                mode={viewMode}
+                selectedAnchorKey={selectedAnchorKey}
+                draftComment={draftComment}
+                editingCommentId={editingCommentId}
+                editingBody={editingBody}
+                submitting={submitting}
+                pendingCommentActionId={pendingCommentActionId}
+                onSelectLine={(anchor) => {
+                  resetEditingComment();
+                  setPendingAnchor(anchor);
+                }}
+                onDraftCommentChange={setDraftComment}
+                onSubmitComment={() => void submitComment()}
+                onCancelNewComment={resetNewComment}
+                onBeginEdit={beginEditingComment}
+                onCancelEdit={resetEditingComment}
+                onChangeEditingBody={setEditingBody}
+                onSaveEdit={() => void submitCommentEdit()}
+                onDelete={(commentId) => void removeComment(commentId)}
+              />
+            </>
           ) : null}
-          {!loading && changes.length === 0 ? <div className="empty-state">No changed files were found.</div> : null}
+          {!loading && !selectedChange ? <div className="empty-state">No changed files were found.</div> : null}
         </section>
       </main>
     </div>

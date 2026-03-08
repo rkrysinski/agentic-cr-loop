@@ -8,12 +8,6 @@ afterEach(() => {
 
 describe("App", () => {
   it("renders changed files as a filesystem tree", async () => {
-    const scrollIntoViewMock = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoViewMock
-    });
-
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -83,44 +77,6 @@ describe("App", () => {
         });
       }
 
-      if (url === "/api/changes/change-2") {
-        return jsonResponse({
-          changeId: "change-2",
-          changeType: "modified",
-          oldPath: "src/client/styles.css",
-          newPath: "src/client/styles.css",
-          isBinary: false,
-          diffFingerprint: "fp-2",
-          hunks: []
-        });
-      }
-
-      if (url === "/api/comments?changeId=change-2") {
-        return jsonResponse({
-          current: [],
-          outdated: []
-        });
-      }
-
-      if (url === "/api/changes/change-3") {
-        return jsonResponse({
-          changeId: "change-3",
-          changeType: "added",
-          oldPath: null,
-          newPath: "README.md",
-          isBinary: false,
-          diffFingerprint: "fp-3",
-          hunks: []
-        });
-      }
-
-      if (url === "/api/comments?changeId=change-3") {
-        return jsonResponse({
-          current: [],
-          outdated: []
-        });
-      }
-
       throw new Error(`Unhandled fetch: ${url}`);
     });
 
@@ -129,9 +85,6 @@ describe("App", () => {
     render(<App />);
 
     const folderButton = await screen.findByRole("button", { name: "src/client" });
-    await screen.findByRole("heading", { level: 2, name: "src/client/App.tsx" });
-    await screen.findByRole("heading", { level: 2, name: "src/client/styles.css" });
-    await screen.findByRole("heading", { level: 2, name: "README.md" });
     const resizeHandle = screen.getByRole("separator", { name: "Resize changed files panel" });
     expect(folderButton).toHaveAttribute("aria-expanded", "true");
     expect(resizeHandle).toHaveAttribute("aria-valuenow", "448");
@@ -150,18 +103,9 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "src/client" }));
     expect(await screen.findByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
-
-    scrollIntoViewMock.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: /styles\.css/ }));
-    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
   });
 
   it("opens inline comments from line clicks while supporting edit and delete actions", async () => {
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: vi.fn()
-    });
-
     let commentsState = {
       current: [
         {
@@ -288,7 +232,7 @@ describe("App", () => {
 
     const { container } = render(<App />);
 
-    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "tracked.txt" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("Old note")).toBeInTheDocument());
     expect(screen.getByText("Current note")).toBeInTheDocument();
     expect(container.querySelectorAll(".comment-badge")).toHaveLength(0);
