@@ -13,6 +13,7 @@ type DiffViewerProps = {
   change: FileChange;
   comments: CommentsResponse;
   mode: "unified" | "side-by-side";
+  hideRemovedCode: boolean;
   selectedAnchorKey: string | null;
   draftComment: string;
   editingCommentId: string | null;
@@ -60,6 +61,7 @@ export function DiffViewer({
   change,
   comments,
   mode,
+  hideRemovedCode,
   selectedAnchorKey,
   draftComment,
   editingCommentId,
@@ -99,6 +101,7 @@ export function DiffViewer({
                   const currentComments = getCommentsForLine(comments.current, hunk.header, line);
                   const outdatedComments = getCommentsForLine(comments.outdated, hunk.header, line);
                   const showThread = shouldShowThread(anchorKey, selectedAnchorKey, currentComments, outdatedComments);
+                  const hideLineRow = hideRemovedCode && line.kind === "removed";
                   const rowInteractionProps =
                     commentableSide === null
                       ? undefined
@@ -113,19 +116,21 @@ export function DiffViewer({
                         );
 
                   return [
-                    <tr
-                      key={`${hunk.header}-${index}`}
-                      className={`diff-row diff-row-${line.kind} ${
-                        anchorKey && selectedAnchorKey === anchorKey ? "diff-row-selected" : ""
-                      } ${
-                        commentableSide ? "diff-row-clickable" : ""
-                      }`}
-                      {...rowInteractionProps}
-                    >
-                      <td className={`gutter gutter-old gutter-${line.kind}`}>{line.oldLineNumber ?? ""}</td>
-                      <td className={`gutter gutter-new gutter-${line.kind}`}>{line.newLineNumber ?? ""}</td>
-                      <td className={`code-cell code-cell-${line.kind}`}>{line.text || " "}</td>
-                    </tr>,
+                    hideLineRow ? null : (
+                      <tr
+                        key={`${hunk.header}-${index}`}
+                        className={`diff-row diff-row-${line.kind} ${
+                          anchorKey && selectedAnchorKey === anchorKey ? "diff-row-selected" : ""
+                        } ${
+                          commentableSide ? "diff-row-clickable" : ""
+                        }`}
+                        {...rowInteractionProps}
+                      >
+                        <td className={`gutter gutter-old gutter-${line.kind}`}>{line.oldLineNumber ?? ""}</td>
+                        <td className={`gutter gutter-new gutter-${line.kind}`}>{line.newLineNumber ?? ""}</td>
+                        <td className={`code-cell code-cell-${line.kind}`}>{line.text || " "}</td>
+                      </tr>
+                    ),
                     showThread && commentableSide ? (
                       <tr key={`${hunk.header}-${index}-thread`} className="inline-thread-row">
                         <td colSpan={2} className="inline-thread-gutter-spacer" aria-hidden="true" />

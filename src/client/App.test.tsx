@@ -274,6 +274,98 @@ describe("App", () => {
     fireEvent.click(within(outdatedCard).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByText("Old note")).not.toBeInTheDocument());
   });
+
+  it("offers a unified-only toggle to hide removed code", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/repo") {
+        return jsonResponse({
+          repoPath: "/repo",
+          baseRef: "HEAD",
+          changeCount: 1,
+          viewModeDefault: "unified"
+        });
+      }
+
+      if (url === "/api/changes") {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: {
+              current: 0,
+              outdated: 0
+            }
+          }
+        ]);
+      }
+
+      if (url === "/api/changes/change-1") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: [
+            {
+              header: "@@ -1,2 +1,2 @@",
+              lines: [
+                { kind: "removed", oldLineNumber: 1, newLineNumber: null, text: "before", commentableSide: "old" },
+                { kind: "added", oldLineNumber: null, newLineNumber: 1, text: "after", commentableSide: "new" },
+                { kind: "context", oldLineNumber: 2, newLineNumber: 2, text: "stay", commentableSide: null }
+              ]
+            }
+          ]
+        });
+      }
+
+      if (url === "/api/comments?changeId=change-1") {
+        return jsonResponse({
+          current: [],
+          outdated: []
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
+    const topbarActions = document.querySelector(".topbar-actions");
+    const reviewControls = () => document.querySelector(".review-controls");
+
+    expect(topbarActions?.children).toHaveLength(2);
+    const toggle = await screen.findByRole("checkbox", { name: "Hide removed code" });
+    expect(toggle).not.toBeChecked();
+    expect(reviewControls()).not.toBeNull();
+    expect(screen.getByText("before")).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(screen.queryByText("before")).not.toBeInTheDocument();
+    expect(screen.getByText("after")).toBeInTheDocument();
+    expect(topbarActions?.children).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
+    expect(screen.queryByRole("checkbox", { name: "Hide removed code" })).not.toBeInTheDocument();
+    expect(reviewControls()).toBeNull();
+    expect(topbarActions?.children).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Unified" }));
+    const toggleAfterReturn = screen.getByRole("checkbox", { name: "Hide removed code" });
+    expect(toggleAfterReturn).toBeChecked();
+    expect(reviewControls()).not.toBeNull();
+    expect(screen.queryByText("before")).not.toBeInTheDocument();
+  });
 });
 
 function jsonResponse(body: unknown, status = 200): Response {

@@ -93,6 +93,13 @@ p {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0.75rem;
+}
+
+.topbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
 }
@@ -103,6 +110,22 @@ p {
   padding: 0.25rem;
   border-radius: 999px;
   background: rgba(22, 33, 42, 0.08);
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(40, 57, 72, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #334150;
+  white-space: nowrap;
+}
+
+.filter-toggle input {
+  margin: 0;
 }
 
 .layout {
@@ -466,11 +489,19 @@ p {
   border-bottom: 1px solid var(--crucible-border-soft);
 }
 
+.file-header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .file-header h2 {
   margin-bottom: 0.2rem;
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--crucible-text);
+  min-width: 0;
 }
 
 .file-header p {
@@ -479,6 +510,12 @@ p {
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.review-controls {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .review-pane {
@@ -835,6 +872,17 @@ textarea {
 
   .topbar {
     flex-direction: column;
+  }
+
+  .topbar-controls,
+  .topbar-actions,
+  .review-controls {
+    justify-content: flex-start;
+  }
+
+  .file-header-main {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
 }

@@ -167,6 +167,7 @@ export function App() {
   const [selectedChange, setSelectedChange] = useState<FileChange | null>(null);
   const [comments, setComments] = useState<CommentsResponse>(EMPTY_COMMENTS);
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
+  const [hideRemovedCode, setHideRemovedCode] = useState(false);
   const [pendingAnchor, setPendingAnchor] = useState<PendingAnchor | null>(null);
   const [draftComment, setDraftComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -514,13 +515,15 @@ export function App() {
             {repo ? `${repo.repoPath} · ${repo.changeCount} changed file(s) · base ${repo.baseRef}` : "Loading repository"}
           </p>
         </div>
-        <div className="topbar-actions">
-          <button type="button" onClick={() => void refreshAll()}>
-            Refresh
-          </button>
-          <a className="button-link" href="/api/export/comments.md" target="_blank" rel="noreferrer">
-            Export Markdown
-          </a>
+        <div className="topbar-controls">
+          <div className="topbar-actions">
+            <button type="button" onClick={() => void refreshAll()}>
+              Refresh
+            </button>
+            <a className="button-link" href="/api/export/comments.md" target="_blank" rel="noreferrer">
+              Export Markdown
+            </a>
+          </div>
           <div className="view-toggle" role="group" aria-label="View mode">
             <button type="button" className={viewMode === "unified" ? "active" : ""} onClick={() => setViewMode("unified")}>
               Unified
@@ -603,7 +606,21 @@ export function App() {
           {!loading && selectedChange ? (
             <>
               <div className="file-header">
-                <h2>{selectedChange.newPath ?? selectedChange.oldPath ?? "(unknown)"}</h2>
+                <div className="file-header-main">
+                  <h2>{selectedChange.newPath ?? selectedChange.oldPath ?? "(unknown)"}</h2>
+                  {viewMode === "unified" ? (
+                    <div className="review-controls">
+                      <label className="filter-toggle">
+                        <input
+                          type="checkbox"
+                          checked={hideRemovedCode}
+                          onChange={(event) => setHideRemovedCode(event.target.checked)}
+                        />
+                        <span>Hide removed code</span>
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
                 <p>
                   {selectedChange.changeType}
                   {selectedChange.isBinary ? " · binary" : ""}
@@ -613,6 +630,7 @@ export function App() {
                 change={selectedChange}
                 comments={comments}
                 mode={viewMode}
+                hideRemovedCode={hideRemovedCode}
                 selectedAnchorKey={selectedAnchorKey}
                 draftComment={draftComment}
                 editingCommentId={editingCommentId}

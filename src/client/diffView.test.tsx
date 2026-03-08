@@ -90,6 +90,7 @@ describe("DiffViewer", () => {
         change={change}
         comments={comments}
         mode="unified"
+        hideRemovedCode={false}
         selectedAnchorKey={selectedAnchorKey}
         draftComment="Draft comment"
         editingCommentId={null}
@@ -127,6 +128,7 @@ describe("DiffViewer", () => {
         change={change}
         comments={comments}
         mode="side-by-side"
+        hideRemovedCode={false}
         selectedAnchorKey={selectedAnchorKey}
         draftComment="Draft comment"
         editingCommentId={null}
@@ -164,5 +166,53 @@ describe("DiffViewer", () => {
       newLineNumber: 1,
       hunkHeader: "@@ -1,2 +1,2 @@"
     });
+  });
+
+  it("hides removed rows in unified mode while preserving existing threads", () => {
+    const selectedAnchorKey = getAnchorKey(change.hunks[0].header, change.hunks[0].lines[0]);
+    const commentsWithRemovedThread: CommentsResponse = {
+      current: [
+        {
+          commentId: "removed-current",
+          fileId: "change-1",
+          side: "old",
+          oldLineNumber: 1,
+          newLineNumber: null,
+          hunkHeader: "@@ -1,2 +1,2 @@",
+          body: "Removed note",
+          createdAt: "2026-03-10T10:00:00.000Z",
+          diffFingerprint: "fp"
+        }
+      ],
+      outdated: []
+    };
+
+    const { container } = render(
+      <DiffViewer
+        change={change}
+        comments={commentsWithRemovedThread}
+        mode="unified"
+        hideRemovedCode
+        selectedAnchorKey={selectedAnchorKey}
+        draftComment=""
+        editingCommentId={null}
+        editingBody=""
+        submitting={false}
+        pendingCommentActionId={null}
+        onSelectLine={vi.fn()}
+        onDraftCommentChange={vi.fn()}
+        onSubmitComment={vi.fn()}
+        onCancelNewComment={vi.fn()}
+        onBeginEdit={vi.fn()}
+        onCancelEdit={vi.fn()}
+        onChangeEditingBody={vi.fn()}
+        onSaveEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("before")).not.toBeInTheDocument();
+    expect(screen.getByText("Removed note")).toBeInTheDocument();
+    expect(container.querySelectorAll(".diff-row-removed")).toHaveLength(0);
   });
 });
