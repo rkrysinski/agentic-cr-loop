@@ -208,55 +208,67 @@ export function DiffViewer({
                   </tr>,
                   showLeftThread || showRightThread ? (
                     <tr key={`${row.key}-thread`} className="inline-thread-row side-inline-thread-row">
-                      <td colSpan={6} className="inline-thread-cell">
-                        <div className="side-inline-thread-grid">
-                          <div className="side-inline-thread-lane">
-                            {showLeftThread && row.left?.commentableSide ? (
-                              <InlineThread
-                                line={row.left}
-                                currentComments={leftCurrentComments}
-                                outdatedComments={leftOutdatedComments}
-                                isComposerOpen={selectedAnchorKey === leftAnchorKey}
-                                draftComment={draftComment}
-                                editingCommentId={editingCommentId}
-                                editingBody={editingBody}
-                                submitting={submitting}
-                                pendingCommentActionId={pendingCommentActionId}
-                                onDraftCommentChange={onDraftCommentChange}
-                                onSubmitComment={onSubmitComment}
-                                onCancelNewComment={onCancelNewComment}
-                                onBeginEdit={onBeginEdit}
-                                onCancelEdit={onCancelEdit}
-                                onChangeEditingBody={onChangeEditingBody}
-                                onSaveEdit={onSaveEdit}
-                                onDelete={onDelete}
-                              />
-                            ) : null}
-                          </div>
-                          <div className="side-inline-thread-lane">
-                            {showRightThread && row.right?.commentableSide ? (
-                              <InlineThread
-                                line={row.right}
-                                currentComments={rightCurrentComments}
-                                outdatedComments={rightOutdatedComments}
-                                isComposerOpen={selectedAnchorKey === rightAnchorKey}
-                                draftComment={draftComment}
-                                editingCommentId={editingCommentId}
-                                editingBody={editingBody}
-                                submitting={submitting}
-                                pendingCommentActionId={pendingCommentActionId}
-                                onDraftCommentChange={onDraftCommentChange}
-                                onSubmitComment={onSubmitComment}
-                                onCancelNewComment={onCancelNewComment}
-                                onBeginEdit={onBeginEdit}
-                                onCancelEdit={onCancelEdit}
-                                onChangeEditingBody={onChangeEditingBody}
-                                onSaveEdit={onSaveEdit}
-                                onDelete={onDelete}
-                              />
-                            ) : null}
-                          </div>
-                        </div>
+                      <td
+                        className="gutter gutter-old gutter-context side-inline-thread-gutter-spacer lane-left"
+                        aria-hidden="true"
+                      />
+                      <td
+                        className="gutter gutter-new gutter-context side-inline-thread-gutter-spacer lane-left"
+                        aria-hidden="true"
+                      />
+                      <td className="code-cell code-cell-context inline-thread-cell side-inline-thread-code-cell lane-left">
+                        {showLeftThread && row.left?.commentableSide ? (
+                          <InlineThread
+                            line={row.left}
+                            currentComments={leftCurrentComments}
+                            outdatedComments={leftOutdatedComments}
+                            isComposerOpen={selectedAnchorKey === leftAnchorKey}
+                            draftComment={draftComment}
+                            editingCommentId={editingCommentId}
+                            editingBody={editingBody}
+                            submitting={submitting}
+                            pendingCommentActionId={pendingCommentActionId}
+                            onDraftCommentChange={onDraftCommentChange}
+                            onSubmitComment={onSubmitComment}
+                            onCancelNewComment={onCancelNewComment}
+                            onBeginEdit={onBeginEdit}
+                            onCancelEdit={onCancelEdit}
+                            onChangeEditingBody={onChangeEditingBody}
+                            onSaveEdit={onSaveEdit}
+                            onDelete={onDelete}
+                          />
+                        ) : null}
+                      </td>
+                      <td
+                        className="gutter gutter-old gutter-context side-inline-thread-gutter-spacer lane-right"
+                        aria-hidden="true"
+                      />
+                      <td
+                        className="gutter gutter-new gutter-context side-inline-thread-gutter-spacer lane-right"
+                        aria-hidden="true"
+                      />
+                      <td className="code-cell code-cell-context inline-thread-cell side-inline-thread-code-cell lane-right">
+                        {showRightThread && row.right?.commentableSide ? (
+                          <InlineThread
+                            line={row.right}
+                            currentComments={rightCurrentComments}
+                            outdatedComments={rightOutdatedComments}
+                            isComposerOpen={selectedAnchorKey === rightAnchorKey}
+                            draftComment={draftComment}
+                            editingCommentId={editingCommentId}
+                            editingBody={editingBody}
+                            submitting={submitting}
+                            pendingCommentActionId={pendingCommentActionId}
+                            onDraftCommentChange={onDraftCommentChange}
+                            onSubmitComment={onSubmitComment}
+                            onCancelNewComment={onCancelNewComment}
+                            onBeginEdit={onBeginEdit}
+                            onCancelEdit={onCancelEdit}
+                            onChangeEditingBody={onChangeEditingBody}
+                            onSaveEdit={onSaveEdit}
+                            onDelete={onDelete}
+                          />
+                        ) : null}
                       </td>
                     </tr>
                   ) : null
@@ -284,7 +296,13 @@ function SideCell({
   onSelectLine: DiffViewerProps["onSelectLine"];
 }) {
   if (!line) {
-    return <td className={`side-cell empty-cell lane-${lane}`} colSpan={3} />;
+    return (
+      <>
+        <td className={`gutter gutter-old gutter-context lane-${lane} empty-gutter`} aria-hidden="true" />
+        <td className={`gutter gutter-new gutter-context lane-${lane} empty-gutter`} aria-hidden="true" />
+        <td className={`code-cell code-cell-context side-cell empty-cell lane-${lane}`} aria-hidden="true" />
+      </>
+    );
   }
 
   const anchorKey = getAnchorKey(hunkHeader, line);

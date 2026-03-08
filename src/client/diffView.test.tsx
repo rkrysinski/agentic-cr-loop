@@ -149,6 +149,13 @@ describe("DiffViewer", () => {
     expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(6);
     expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.getByText("Outdated", { selector: ".comment-status" })).toBeInTheDocument();
+    expect(
+      Array.from(container.querySelectorAll(".side-table .diff-row")).every((row) => row.querySelectorAll("td").length === 6)
+    ).toBe(true);
+
+    const sideThreadCells = container.querySelectorAll(".side-inline-thread-row td");
+    expect(sideThreadCells).toHaveLength(6);
+    expect(Array.from(sideThreadCells).map((cell) => cell.getAttribute("colspan"))).toEqual([null, null, null, null, null, null]);
 
     fireEvent.click(screen.getByText("after"));
     expect(onSelectLine).toHaveBeenCalledWith({
