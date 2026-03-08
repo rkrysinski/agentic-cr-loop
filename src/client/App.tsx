@@ -17,7 +17,7 @@ const EMPTY_COMMENTS: CommentsResponse = {
   outdated: []
 };
 
-const DEFAULT_SIDEBAR_WIDTH = 448;
+const DEFAULT_SIDEBAR_WIDTH = 360;
 const MIN_SIDEBAR_WIDTH = 360;
 const MAX_SIDEBAR_WIDTH = 920;
 const KEYBOARD_RESIZE_STEP = 32;
@@ -571,27 +571,22 @@ export function App() {
 
       <main ref={layoutRef} className={`layout ${isSidebarCollapsed ? "layout-sidebar-collapsed" : ""}`} style={layoutStyle}>
         <aside className={`sidebar-widget ${isSidebarCollapsed ? "sidebar-widget-collapsed" : ""}`}>
-          <div id="changed-files-panel" className="sidebar" aria-hidden={isSidebarCollapsed}>
-            <div className="sidebar-header">
-              <h2>Changed files</h2>
-            </div>
+          <div className="sidebar-header">
+            {!isSidebarCollapsed ? <h2>Changed files</h2> : <span className="sidebar-header-spacer" aria-hidden="true" />}
+            <button
+              type="button"
+              className="sidebar-header-toggle"
+              aria-controls="changed-files-panel"
+              aria-expanded={!isSidebarCollapsed}
+              aria-label={isSidebarCollapsed ? "Show changed files" : "Hide changed files"}
+              onClick={() => setIsSidebarCollapsed((current) => !current)}
+            >
+              <span aria-hidden="true">{isSidebarCollapsed ? ">" : "<"}</span>
+            </button>
+          </div>
+          <div id="changed-files-panel" className="sidebar-body" aria-hidden={isSidebarCollapsed}>
             <ul className="change-list change-tree">{renderChangeTree(changeTree.children)}</ul>
           </div>
-          <button
-            type="button"
-            className="sidebar-toggle"
-            aria-controls="changed-files-panel"
-            aria-expanded={!isSidebarCollapsed}
-            aria-label={isSidebarCollapsed ? "Show changed files" : "Hide changed files"}
-            onClick={() => setIsSidebarCollapsed((current) => !current)}
-          >
-            <span className={`sidebar-toggle-icon ${isSidebarCollapsed ? "sidebar-toggle-icon-collapsed" : ""}`} aria-hidden="true">
-              <svg viewBox="0 0 20 20" focusable="false">
-                <rect x="2.5" y="3" width="5" height="14" rx="1.5" />
-                <path d={isSidebarCollapsed ? "M10 6.5L14 10L10 13.5" : "M14 6.5L10 10L14 13.5"} />
-              </svg>
-            </span>
-          </button>
         </aside>
         <div
           className={`sidebar-resizer ${isResizingSidebar ? "sidebar-resizer-active" : ""}`}
