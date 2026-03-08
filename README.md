@@ -71,14 +71,14 @@ npm run dev -- --repo /absolute/path/to/repository
 
 What this does:
 
-- Starts the backend API server on `http://127.0.0.1:3000`
-- Starts the Vite frontend dev server on `http://127.0.0.1:5173`
+- Starts the backend API server on `http://localhost:3000`
+- Starts the Vite frontend dev server on `http://localhost:5173`
 - Proxies `/api/*` calls from Vite to the backend
 
 Open this URL in your browser:
 
 ```text
-http://127.0.0.1:5173
+http://localhost:5173
 ```
 
 Optional:
@@ -110,7 +110,7 @@ npm start -- --repo /absolute/path/to/repository
 By default, the production server runs on:
 
 ```text
-http://127.0.0.1:3000
+http://localhost:3000
 ```
 
 You can override the port:
