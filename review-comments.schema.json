@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/review-comments.schema.json",
+  "title": "Review Comments File",
+  "description": "Machine-readable schema for .local-code-review/<head-short-id>.json files. The top-level object is keyed by repository-relative file path. Each value is an ordered array of review comments for that file.",
+  "type": "object",
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1,
+    "description": "Repository-relative file path, for example src/client/App.tsx."
+  },
+  "additionalProperties": {
+    "type": "array",
+    "description": "Ordered list of comments for the file named by the property key.",
+    "items": {
+      "$ref": "#/$defs/comment"
+    }
+  },
+  "$defs": {
+    "comment": {
+      "title": "Review Comment",
+      "description": "Single comment anchored to one side of a diff at one line number.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "line", "body", "diffFingerprint"],
+      "properties": {
+        "side": {
+          "type": "string",
+          "enum": ["old", "new"],
+          "description": "Diff side that owns the line number. Use old for removed/pre-change lines and new for added/post-change lines."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based line number on the selected diff side."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable review comment text."
+        },
+        "diffFingerprint": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fingerprint of the file diff version the comment was written against. If it does not match the current diff, the app will classify the comment as outdated."
+        }
+      },
+      "examples": [
+        {
+          "side": "new",
+          "line": 42,
+          "body": "Consider extracting this branch into a helper.",
+          "diffFingerprint": "abc123..."
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "src/client/App.tsx": [
+        {
+          "side": "new",
+          "line": 42,
+          "body": "Consider extracting this branch into a helper.",
+          "diffFingerprint": "abc123..."
+        }
+      ],
+      "src/server/reviewService.ts": [
+        {
+          "side": "old",
+          "line": 87,
+          "body": "This validation path was stricter before the refactor.",
+          "diffFingerprint": "def456..."
+        }
+      ]
+    }
+  ]
+}

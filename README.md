@@ -235,6 +235,10 @@ This means:
 
 Each review file is a plain JSON object keyed by repository-relative file path.
 
+Machine-readable schema:
+
+- [review-comments.schema.json](/Users/romankrysinski/work/repositories/code-review/review-comments.schema.json)
+
 Example:
 
 ```json
