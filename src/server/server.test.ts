@@ -1,10 +1,9 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
+import { REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { startServer } from "./server.js";
-import { createTempGitRepo } from "./testUtils.js";
+import { createTempGitRepo, runGit } from "./testUtils.js";
 
 let repoPath: string;
 
@@ -19,6 +18,8 @@ afterEach(async () => {
 describe("server API", () => {
   it("lists tracked and untracked changes and supports editing and deleting comments", async () => {
     const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
+    const headShortId = runGit(repoPath, ["rev-parse", "--short=12", "HEAD"]).trim();
+    const sessionFileName = getReviewSessionFileName(headShortId);
 
     const changesResponse = await invokeRoute(app, "get", "/api/changes");
     expect(changesResponse.statusCode).toBe(200);
@@ -61,7 +62,7 @@ describe("server API", () => {
     expect(commentsResponse.body.outdated).toHaveLength(0);
 
     const storedSession = JSON.parse(
-      await fs.readFile(path.join(repoPath, REVIEW_STORAGE_DIRECTORY, "comments.json"), "utf8")
+      await fs.readFile(path.join(repoPath, REVIEW_STORAGE_DIRECTORY, sessionFileName), "utf8")
     ) as { comments: Array<{ body: string }> };
     expect(storedSession.comments).toHaveLength(1);
     expect(storedSession.comments[0].body).toBe("Updated wording");
@@ -70,7 +71,7 @@ describe("server API", () => {
     expect(refreshedChangesResponse.statusCode).toBe(200);
     expect(
       refreshedChangesResponse.body.some((change: { newPath: string | null; oldPath: string | null }) =>
-        [change.newPath, change.oldPath].includes(`${REVIEW_STORAGE_DIRECTORY}/comments.json`)
+        [change.newPath, change.oldPath].includes(`${REVIEW_STORAGE_DIRECTORY}/${sessionFileName}`)
       )
     ).toBe(false);
 

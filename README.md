@@ -220,8 +220,10 @@ The export includes:
 Comments are stored inside the reviewed repository under:
 
 ```text
-<repo-root>/.local-code-review/comments.json
+<repo-root>/.local-code-review/<head-short-id>.json
 ```
+
+The file name is the current `HEAD` commit's short id, using a 12-character abbreviation such as `b58557fe1d0.json`.
 
 This means:
 

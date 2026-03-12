@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CommentStore, REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
+import { CommentStore, REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
 import { renderCommentsMarkdown } from "./exporter.js";
 import { runGit } from "./git.js";
@@ -20,16 +20,11 @@ export class ReviewService {
   }
 
   async validateRepository(): Promise<void> {
-    const topLevel = (await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim();
-    if (!topLevel) {
-      throw new Error("Invalid Git repository");
-    }
-    await runGit(topLevel, ["rev-parse", "--verify", "HEAD"]);
-    this.repoPath = topLevel;
-    this.commentStore = new CommentStore(topLevel);
+    await this.syncReviewSession();
   }
 
   async getRepoInfo(): Promise<RepoResponse> {
+    await this.syncReviewSession();
     const changes = await this.getChanges();
 
     return {
@@ -41,6 +36,7 @@ export class ReviewService {
   }
 
   async getChangeSummaries(): Promise<ChangeSummary[]> {
+    await this.syncReviewSession();
     const changes = await this.getChanges();
     const comments = await this.commentStore.list();
 
@@ -61,11 +57,13 @@ export class ReviewService {
   }
 
   async getChange(changeId: string, context: DiffContextValue = SUMMARY_CONTEXT): Promise<FileChange | null> {
+    await this.syncReviewSession();
     const changes = await this.getChanges(context);
     return changes.find((change) => change.changeId === changeId) ?? null;
   }
 
   async getComments(changeId: string): Promise<CommentsResponse> {
+    await this.syncReviewSession();
     const change = await this.getChange(changeId, SUMMARY_CONTEXT);
     if (!change) {
       throw new Error("Unknown changeId");
@@ -76,6 +74,7 @@ export class ReviewService {
   }
 
   async createComment(request: CreateCommentRequest): Promise<ReviewComment> {
+    await this.syncReviewSession();
     const change = await this.getChange(request.changeId, "full");
     if (!change) {
       throw new Error("Unknown changeId");
@@ -106,14 +105,17 @@ export class ReviewService {
   }
 
   async updateComment(commentId: string, body: string): Promise<ReviewComment | null> {
+    await this.syncReviewSession();
     return this.commentStore.update(commentId, body.trim());
   }
 
   async deleteComment(commentId: string): Promise<boolean> {
+    await this.syncReviewSession();
     return this.commentStore.delete(commentId);
   }
 
   async exportMarkdown(): Promise<string> {
+    await this.syncReviewSession();
     const changes = await this.getChanges();
     const comments = await this.commentStore.list();
     const matchedFileIds = new Set<string>();
@@ -141,6 +143,22 @@ export class ReviewService {
       }));
 
     return renderCommentsMarkdown(this.repoPath, [...files, ...orphanedFiles]);
+  }
+
+  private async syncReviewSession(): Promise<void> {
+    const topLevel = (await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim();
+    if (!topLevel) {
+      throw new Error("Invalid Git repository");
+    }
+
+    await runGit(topLevel, ["rev-parse", "--verify", "HEAD"]);
+    const headShortId = (await runGit(topLevel, ["rev-parse", "--short=12", "HEAD"])).trim();
+    if (!headShortId) {
+      throw new Error("Invalid Git repository");
+    }
+
+    this.repoPath = topLevel;
+    this.commentStore = new CommentStore(topLevel, getReviewSessionFileName(headShortId));
   }
 
   private async getChanges(context: DiffContextValue = SUMMARY_CONTEXT): Promise<FileChange[]> {

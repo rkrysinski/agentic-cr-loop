@@ -9,10 +9,17 @@ type SessionFile = {
 };
 
 export const REVIEW_STORAGE_DIRECTORY = ".local-code-review";
-const SESSION_FILE_NAME = "comments.json";
+
+export function getReviewSessionFileName(reviewBaseShortId: string): string {
+  return `${reviewBaseShortId}.json`;
+}
 
 export class CommentStore {
-  constructor(private readonly repoPath: string, private readonly storageDir = path.join(repoPath, REVIEW_STORAGE_DIRECTORY)) {}
+  constructor(
+    private readonly repoPath: string,
+    private readonly sessionFileName = getReviewSessionFileName("HEAD"),
+    private readonly storageDir = path.join(repoPath, REVIEW_STORAGE_DIRECTORY)
+  ) {}
 
   async list(): Promise<ReviewComment[]> {
     const session = await this.read();
@@ -66,7 +73,7 @@ export class CommentStore {
 
   private async getSessionFilePath(): Promise<string> {
     await fs.mkdir(this.storageDir, { recursive: true });
-    return path.join(this.storageDir, SESSION_FILE_NAME);
+    return path.join(this.storageDir, this.sessionFileName);
   }
 
   private async read(): Promise<SessionFile> {

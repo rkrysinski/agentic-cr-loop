@@ -42,7 +42,7 @@ A single source of truth prevents view-specific behavior drift and ensures that 
 ### Decision 4: Review state is stored in a repository-local metadata directory
 
 Decision:
-Persist comments and review session metadata in a repository-local `.local-code-review` directory at the Git top-level.
+Persist comments and review session metadata in a repository-local `.local-code-review` directory at the Git top-level, with one JSON file per `HEAD` short id.
 
 Rationale:
 This prevents the review tool from creating new working-directory changes inside the repository being reviewed and keeps the application read-only with respect to project files.
