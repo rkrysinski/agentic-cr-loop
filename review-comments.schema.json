@@ -41,8 +41,10 @@
         },
         "diffFingerprint": {
           "type": "string",
-          "minLength": 1,
-          "description": "Fingerprint of the file diff version the comment was written against. If it does not match the current diff, the app will classify the comment as outdated."
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase SHA-256 hex digest that identifies the exact diff version for this file. For tracked text files, it is computed from a normalized per-file `git diff HEAD --find-renames --patch --binary --no-color` representation that includes file metadata and added/removed lines, but excludes hunk headers and context lines. For untracked text files, it is computed from the file path, a synthetic hunk header, and normalized added lines. For untracked binary files, it is computed from the file path and file bytes. If it does not match the current fingerprint, the comment is treated as outdated."
         }
       },
       "examples": [
@@ -50,7 +52,7 @@
           "side": "new",
           "line": 42,
           "body": "Consider extracting this branch into a helper.",
-          "diffFingerprint": "abc123..."
+          "diffFingerprint": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
         }
       ]
     }
@@ -62,7 +64,7 @@
           "side": "new",
           "line": 42,
           "body": "Consider extracting this branch into a helper.",
-          "diffFingerprint": "abc123..."
+          "diffFingerprint": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
         }
       ],
       "src/server/reviewService.ts": [
@@ -70,7 +72,7 @@
           "side": "old",
           "line": 87,
           "body": "This validation path was stricter before the refactor.",
-          "diffFingerprint": "def456..."
+          "diffFingerprint": "60303ae22b9988617223a3e8b5d8cf1d81512e547f065f1d0f0a1a7d7e4f7d7f"
         }
       ]
     }
