@@ -91,7 +91,7 @@ Example:
 npm run dev -- --repo ~/work/my-project --port 3100
 ```
 
-If you change the backend port in dev mode, update the Vite proxy configuration in [vite.config.ts](/Users/romankrysinski/work/repositories/code-review/vite.config.ts) or keep using port `3000`.
+If you change the backend port in dev mode, update the Vite proxy configuration in [vite.config.ts](./vite.config.ts) or keep using port `3000`.
 
 ## Running A Production Build
 
@@ -225,7 +225,17 @@ Comments are stored inside the reviewed repository under:
 
 The file name is the current `HEAD` commit's short id, using a 12-character abbreviation such as `b58557fe1d0.json`.
 
-Each review file is a plain JSON object keyed by repository-relative file path:
+This means:
+
+- Comments persist across app restarts
+- Review metadata travels with the repository checkout
+- The app ignores `.local-code-review/` when listing reviewable changes
+
+## Comment File Schema
+
+Each review file is a plain JSON object keyed by repository-relative file path.
+
+Example:
 
 ```json
 {
@@ -240,18 +250,29 @@ Each review file is a plain JSON object keyed by repository-relative file path:
 }
 ```
 
-Only four fields are stored per comment:
+Schema:
+
+- Top-level object:
+  repository-relative file path -> array of comments for that file
+- Comment object:
+  - `side`: `"old"` or `"new"`
+  - `line`: positive integer line number on that side
+  - `body`: comment text
+  - `diffFingerprint`: fingerprint of the diff version the comment was created against
+
+Field semantics:
 
 - `side`: `old` or `new`
 - `line`: the line number on that side
 - `body`: the comment text
-- `diffFingerprint`: the diff version the comment was written against
+- `diffFingerprint`: used to decide whether the comment is still `current` or has become `outdated`
 
-This means:
+Notes:
 
-- Comments persist across app restarts
-- Review metadata travels with the repository checkout
-- The app ignores `.local-code-review/` when listing reviewable changes
+- File paths are relative to the Git repository root.
+- Comment arrays preserve review order within a file.
+- The on-disk file does not store runtime-only fields such as `commentId`.
+- A coding agent can create a valid file by following this structure directly; no extra metadata is required.
 
 ## How Comment Validity Works
 
@@ -296,7 +317,7 @@ Main endpoints:
 - `DELETE /api/comments/:commentId`
 - `GET /api/export/comments.md`
 
-The shared request and response types live in [src/shared/api.ts](/Users/romankrysinski/work/repositories/code-review/src/shared/api.ts).
+The shared request and response types live in [src/shared/api.ts](./src/shared/api.ts).
 
 ## Limitations And Known Behavior
 
@@ -345,8 +366,8 @@ If the diff changed after the comment was created, the comment will move to the 
 
 Useful entrypoints:
 
-- [package.json](/Users/romankrysinski/work/repositories/code-review/package.json)
-- [src/server/index.ts](/Users/romankrysinski/work/repositories/code-review/src/server/index.ts)
-- [src/server/server.ts](/Users/romankrysinski/work/repositories/code-review/src/server/server.ts)
-- [src/server/reviewService.ts](/Users/romankrysinski/work/repositories/code-review/src/server/reviewService.ts)
-- [src/client/App.tsx](/Users/romankrysinski/work/repositories/code-review/src/client/App.tsx)
+- [package.json](./package.json)
+- [src/server/index.ts](./src/server/index.ts)
+- [src/server/server.ts](./src/server/server.ts)
+- [src/server/reviewService.ts](./src/server/reviewService.ts)
+- [src/client/App.tsx](./src/client/App.tsx)
