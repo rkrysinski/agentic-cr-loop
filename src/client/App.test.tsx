@@ -111,26 +111,20 @@ describe("App", () => {
       current: [
         {
           commentId: "current",
-          fileId: "change-1",
+          path: "tracked.txt",
           side: "new",
-          oldLineNumber: null,
-          newLineNumber: 1,
-          hunkHeader: "@@ -1,2 +1,2 @@",
+          lineNumber: 1,
           body: "Current note",
-          createdAt: "2026-03-10T10:00:00.000Z",
           diffFingerprint: "fp"
         }
       ],
       outdated: [
         {
           commentId: "outdated",
-          fileId: "change-1",
+          path: "tracked.txt",
           side: "new",
-          oldLineNumber: null,
-          newLineNumber: 1,
-          hunkHeader: "@@ -1,2 +1,2 @@",
+          lineNumber: 1,
           body: "Old note",
-          createdAt: "2026-03-10T09:00:00.000Z",
           diffFingerprint: "stale"
         }
       ]
@@ -192,13 +186,10 @@ describe("App", () => {
       if (url.pathname === "/api/comments" && init?.method === "POST") {
         return jsonResponse({
           commentId: "created",
-          fileId: "change-1",
+          path: "tracked.txt",
           side: "new",
-          oldLineNumber: null,
-          newLineNumber: 1,
-          hunkHeader: "@@ -1,2 +1,2 @@",
+          lineNumber: 1,
           body: "saved",
-          createdAt: "2026-03-10T11:00:00.000Z",
           diffFingerprint: "fp"
         }, 201);
       }

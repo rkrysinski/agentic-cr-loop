@@ -72,26 +72,20 @@ const comments: CommentsResponse = {
   current: [
     {
       commentId: "current",
-      fileId: "change-1",
+      path: "tracked.txt",
       side: "new",
-      oldLineNumber: null,
-      newLineNumber: 1,
-      hunkHeader: "@@ -1,2 +1,2 @@",
+      lineNumber: 1,
       body: "Current",
-      createdAt: "2026-03-10T10:00:00.000Z",
       diffFingerprint: "fp"
     }
   ],
   outdated: [
     {
       commentId: "outdated",
-      fileId: "change-1",
+      path: "tracked.txt",
       side: "new",
-      oldLineNumber: null,
-      newLineNumber: 1,
-      hunkHeader: "@@ -1,2 +1,2 @@",
+      lineNumber: 1,
       body: "Outdated",
-      createdAt: "2026-03-10T09:00:00.000Z",
       diffFingerprint: "stale"
     }
   ]
@@ -111,7 +105,7 @@ describe("pairHunkLines", () => {
 describe("DiffViewer", () => {
   it("opens the inline composer from line clicks and renders existing inline threads", () => {
     const onSelectLine = vi.fn();
-    const selectedAnchorKey = getAnchorKey(change.hunks[0].header, change.hunks[0].lines[1]);
+    const selectedAnchorKey = getAnchorKey(change.hunks[0].lines[1], "new");
     const { container, rerender } = render(
       <DiffViewer
         change={change}
@@ -145,17 +139,13 @@ describe("DiffViewer", () => {
     fireEvent.click(screen.getByText("before"));
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "old",
-      oldLineNumber: 1,
-      newLineNumber: null,
-      hunkHeader: "@@ -1,2 +1,2 @@"
+      lineNumber: 1
     });
 
     fireEvent.click(screen.getByText("stay"));
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "new",
-      oldLineNumber: 2,
-      newLineNumber: 2,
-      hunkHeader: "@@ -1,2 +1,2 @@"
+      lineNumber: 2
     });
 
     rerender(
@@ -197,23 +187,19 @@ describe("DiffViewer", () => {
     fireEvent.click(screen.getByText("after"));
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "new",
-      oldLineNumber: null,
-      newLineNumber: 1,
-      hunkHeader: "@@ -1,2 +1,2 @@"
+      lineNumber: 1
     });
 
     fireEvent.click(screen.getAllByText("stay")[0]);
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "old",
-      oldLineNumber: 2,
-      newLineNumber: 2,
-      hunkHeader: "@@ -1,2 +1,2 @@"
+      lineNumber: 2
     });
   });
 
   it("renders syntax tokens for supported file types while keeping line selection working", () => {
     const onSelectLine = vi.fn();
-    const selectedAnchorKey = getAnchorKey(syntaxChange.hunks[0].header, syntaxChange.hunks[0].lines[1]);
+    const selectedAnchorKey = getAnchorKey(syntaxChange.hunks[0].lines[1], "new");
     const { container, rerender } = render(
       <DiffViewer
         change={syntaxChange}
@@ -245,9 +231,7 @@ describe("DiffViewer", () => {
     fireEvent.click(screen.getAllByText("const")[0]);
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "old",
-      oldLineNumber: 1,
-      newLineNumber: null,
-      hunkHeader: "@@ -1,1 +1,1 @@"
+      lineNumber: 1
     });
 
     rerender(
@@ -277,9 +261,7 @@ describe("DiffViewer", () => {
     fireEvent.click(screen.getAllByText("const")[1]);
     expect(onSelectLine).toHaveBeenCalledWith({
       side: "new",
-      oldLineNumber: null,
-      newLineNumber: 1,
-      hunkHeader: "@@ -1,1 +1,1 @@"
+      lineNumber: 1
     });
   });
 
@@ -313,18 +295,15 @@ describe("DiffViewer", () => {
   });
 
   it("hides removed rows in unified mode while preserving existing threads", () => {
-    const selectedAnchorKey = getAnchorKey(change.hunks[0].header, change.hunks[0].lines[0]);
+    const selectedAnchorKey = getAnchorKey(change.hunks[0].lines[0], "old");
     const commentsWithRemovedThread: CommentsResponse = {
       current: [
         {
           commentId: "removed-current",
-          fileId: "change-1",
+          path: "tracked.txt",
           side: "old",
-          oldLineNumber: 1,
-          newLineNumber: null,
-          hunkHeader: "@@ -1,2 +1,2 @@",
+          lineNumber: 1,
           body: "Removed note",
-          createdAt: "2026-03-10T10:00:00.000Z",
           diffFingerprint: "fp"
         }
       ],

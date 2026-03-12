@@ -5,9 +5,7 @@ import { DiffSyntaxLine } from "./codeSyntax.js";
 
 type CommentAnchor = {
   side: "old" | "new";
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
-  hunkHeader: string;
+  lineNumber: number;
 };
 
 type DiffViewerProps = {
@@ -101,9 +99,9 @@ export function DiffViewer({
               <tbody>
                 {hunk.lines.flatMap((line, index) => {
                   const commentableSide = getCommentableSide(line, "new");
-                  const anchorKey = getAnchorKey(hunk.header, line, commentableSide);
-                  const currentComments = getCommentsForLine(comments.current, hunk.header, line);
-                  const outdatedComments = getCommentsForLine(comments.outdated, hunk.header, line);
+                  const anchorKey = getAnchorKey(line, commentableSide);
+                  const currentComments = getCommentsForUnifiedLine(comments.current, line);
+                  const outdatedComments = getCommentsForUnifiedLine(comments.outdated, line);
                   const showThread = shouldShowThread(anchorKey, selectedAnchorKey, currentComments, outdatedComments);
                   const hideLineRow = hideRemovedCode && line.kind === "removed";
                   const rowInteractionProps =
@@ -112,9 +110,7 @@ export function DiffViewer({
                       : getLineInteractionProps(
                           {
                             side: commentableSide,
-                            oldLineNumber: line.oldLineNumber,
-                            newLineNumber: line.newLineNumber,
-                            hunkHeader: hunk.header
+                            lineNumber: getLineNumber(line, commentableSide)
                           },
                           onSelectLine
                         );
@@ -182,12 +178,12 @@ export function DiffViewer({
           <table className="diff-table side-table">
             <tbody>
               {pairHunkLines(hunk).flatMap((row) => {
-                const leftAnchorKey = row.left ? getAnchorKey(hunk.header, row.left, "old") : null;
-                const rightAnchorKey = row.right ? getAnchorKey(hunk.header, row.right, "new") : null;
-                const leftCurrentComments = row.left ? getCommentsForLine(comments.current, hunk.header, row.left) : [];
-                const rightCurrentComments = row.right ? getCommentsForLine(comments.current, hunk.header, row.right) : [];
-                const leftOutdatedComments = row.left ? getCommentsForLine(comments.outdated, hunk.header, row.left) : [];
-                const rightOutdatedComments = row.right ? getCommentsForLine(comments.outdated, hunk.header, row.right) : [];
+                const leftAnchorKey = row.left ? getAnchorKey(row.left, "old") : null;
+                const rightAnchorKey = row.right ? getAnchorKey(row.right, "new") : null;
+                const leftCurrentComments = row.left ? getCommentsForSideLine(comments.current, row.left, "old") : [];
+                const rightCurrentComments = row.right ? getCommentsForSideLine(comments.current, row.right, "new") : [];
+                const leftOutdatedComments = row.left ? getCommentsForSideLine(comments.outdated, row.left, "old") : [];
+                const rightOutdatedComments = row.right ? getCommentsForSideLine(comments.outdated, row.right, "new") : [];
                 const showLeftThread = shouldShowThread(
                   leftAnchorKey,
                   selectedAnchorKey,
@@ -207,7 +203,6 @@ export function DiffViewer({
                       line={row.left}
                       lane="left"
                       filePath={syntaxFilePath}
-                      hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
                     />
@@ -215,7 +210,6 @@ export function DiffViewer({
                       line={row.right}
                       lane="right"
                       filePath={syntaxFilePath}
-                      hunkHeader={hunk.header}
                       selectedAnchorKey={selectedAnchorKey}
                       onSelectLine={onSelectLine}
                     />
@@ -302,14 +296,12 @@ function SideCell({
   line,
   lane,
   filePath,
-  hunkHeader,
   selectedAnchorKey,
   onSelectLine
 }: {
   line: DiffLine | null;
   lane: "left" | "right";
   filePath: string;
-  hunkHeader: string;
   selectedAnchorKey: string | null;
   onSelectLine: DiffViewerProps["onSelectLine"];
 }) {
@@ -324,16 +316,14 @@ function SideCell({
   }
 
   const commentableSide = getCommentableSide(line, lane === "left" ? "old" : "new");
-  const anchorKey = getAnchorKey(hunkHeader, line, commentableSide);
+  const anchorKey = getAnchorKey(line, commentableSide);
   const cellInteractionProps =
     commentableSide === null
       ? undefined
       : getLineInteractionProps(
           {
             side: commentableSide,
-            oldLineNumber: line.oldLineNumber,
-            newLineNumber: line.newLineNumber,
-            hunkHeader
+            lineNumber: getLineNumber(line, commentableSide)
           },
           onSelectLine
         );
@@ -376,7 +366,7 @@ function InlineThread({
   onSaveEdit,
   onDelete
 }: InlineThreadProps) {
-  const lineNumber = anchorSide === "old" ? line.oldLineNumber : line.newLineNumber;
+  const lineNumber = getLineNumber(line, anchorSide);
 
   return (
     <div className="inline-thread-panel">
@@ -470,7 +460,7 @@ function InlineCommentCard({
     <article className={`comment-card comment-card-inline ${outdated ? "comment-card-muted" : ""}`}>
       <div className="comment-card-header">
         <p className="comment-anchor">
-          {comment.side} line {comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber}
+          {comment.side} line {comment.lineNumber}
         </p>
         {outdated ? <span className="comment-status">Outdated</span> : null}
       </div>
@@ -484,7 +474,6 @@ function InlineCommentCard({
       ) : (
         <p className="comment-body">{comment.body}</p>
       )}
-      <p className="comment-date">{new Date(comment.createdAt).toLocaleString()}</p>
       <div className="comment-actions comment-card-actions">
         {isEditing ? (
           <>
@@ -558,13 +547,16 @@ export function pairHunkLines(hunk: DiffHunk): SideBySideRow[] {
   return rows;
 }
 
-function getCommentsForLine(comments: ReviewComment[], hunkHeader: string, line: DiffLine): ReviewComment[] {
-  void hunkHeader;
+function getCommentsForUnifiedLine(comments: ReviewComment[], line: DiffLine): ReviewComment[] {
   return comments.filter(
     (comment) =>
-      comment.oldLineNumber === line.oldLineNumber &&
-      comment.newLineNumber === line.newLineNumber
+      matchesCommentToLine(comment, line, "old") ||
+      matchesCommentToLine(comment, line, "new")
   );
+}
+
+function getCommentsForSideLine(comments: ReviewComment[], line: DiffLine, side: ReviewComment["side"]): ReviewComment[] {
+  return comments.filter((comment) => matchesCommentToLine(comment, line, side));
 }
 
 function getCommentableSide(line: DiffLine, preferredContextSide: "old" | "new"): "old" | "new" | null {
@@ -603,7 +595,6 @@ function getLineInteractionProps(anchor: CommentAnchor, onSelectLine: DiffViewer
 }
 
 export function getAnchorKey(
-  hunkHeader: string,
   line: Pick<DiffLine, "oldLineNumber" | "newLineNumber" | "commentableSide">,
   sideOverride?: "old" | "new" | null
 ): string | null {
@@ -612,5 +603,26 @@ export function getAnchorKey(
     return null;
   }
 
-  return `${hunkHeader}:${side}:${line.oldLineNumber ?? "-"}:${line.newLineNumber ?? "-"}`;
+  return `${side}:${getLineNumber(line, side)}`;
+}
+
+function matchesCommentToLine(
+  comment: ReviewComment,
+  line: Pick<DiffLine, "oldLineNumber" | "newLineNumber">,
+  side: ReviewComment["side"]
+): boolean {
+  const lineNumber = side === "old" ? line.oldLineNumber : line.newLineNumber;
+  return lineNumber !== null && comment.side === side && comment.lineNumber === lineNumber;
+}
+
+function getLineNumber(
+  line: Pick<DiffLine, "oldLineNumber" | "newLineNumber">,
+  side: ReviewComment["side"]
+): number {
+  const lineNumber = side === "old" ? line.oldLineNumber : line.newLineNumber;
+  if (lineNumber === null) {
+    throw new Error(`Missing ${side} line number`);
+  }
+
+  return lineNumber;
 }

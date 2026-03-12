@@ -70,7 +70,9 @@ export async function startServer(
       if (
         typeof body.changeId !== "string" ||
         (body.side !== "old" && body.side !== "new") ||
-        typeof body.hunkHeader !== "string" ||
+        typeof body.lineNumber !== "number" ||
+        !Number.isInteger(body.lineNumber) ||
+        body.lineNumber <= 0 ||
         typeof body.body !== "string" ||
         body.body.trim().length === 0
       ) {
@@ -82,9 +84,7 @@ export async function startServer(
         await reviewService.createComment({
           changeId: body.changeId,
           side: body.side,
-          oldLineNumber: body.oldLineNumber ?? null,
-          newLineNumber: body.newLineNumber ?? null,
-          hunkHeader: body.hunkHeader,
+          lineNumber: body.lineNumber,
           body: body.body
         })
       );

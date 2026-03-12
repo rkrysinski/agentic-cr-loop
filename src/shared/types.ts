@@ -25,13 +25,10 @@ export type FileChange = {
 
 export type ReviewComment = {
   commentId: string;
-  fileId: string;
+  path: string;
   side: "old" | "new";
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
-  hunkHeader: string;
+  lineNumber: number;
   body: string;
-  createdAt: string;
   diffFingerprint: string;
 };
 

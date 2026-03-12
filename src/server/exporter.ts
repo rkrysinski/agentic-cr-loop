@@ -1,21 +1,18 @@
-import type { FileChange, ReviewComment } from "../shared/types.js";
+import type { ReviewComment } from "../shared/types.js";
 
 type ExportFile = {
-  change: FileChange | null;
   path: string;
-  current: ReviewComment[];
-  outdated: ReviewComment[];
+  comments: Array<{
+    comment: ReviewComment;
+    status: "current" | "outdated";
+  }>;
 };
 
-export function renderCommentsMarkdown(repoPath: string, files: ExportFile[]): string {
-  void repoPath;
+export function renderCommentsMarkdown(files: ExportFile[]): string {
   const lines: string[] = [];
 
   for (const file of [...files].sort((left, right) => left.path.localeCompare(right.path))) {
-    const comments = [
-      ...file.current.map((comment) => ({ comment, status: "current" as const })),
-      ...file.outdated.map((comment) => ({ comment, status: "outdated" as const }))
-    ].sort(compareCommentExportOrder);
+    const comments = [...file.comments].sort(compareCommentExportOrder);
 
     if (comments.length === 0) {
       continue;
@@ -26,8 +23,7 @@ export function renderCommentsMarkdown(repoPath: string, files: ExportFile[]): s
 
     for (const { comment, status } of comments) {
       void status;
-      const lineNumber = comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber;
-      lines.push(`NOTE ${comment.commentId} LINE ${lineNumber ?? "n/a"}`);
+      lines.push(`NOTE ${comment.commentId} LINE ${comment.lineNumber}`);
       lines.push(comment.body);
       lines.push("END NOTE");
       lines.push("");
@@ -48,13 +44,9 @@ function compareCommentExportOrder(
     return leftLine - rightLine;
   }
 
-  if (left.comment.createdAt !== right.comment.createdAt) {
-    return left.comment.createdAt.localeCompare(right.comment.createdAt);
-  }
-
-  return left.comment.commentId.localeCompare(right.comment.commentId);
+  return 0;
 }
 
 function exportLineNumber(comment: ReviewComment): number {
-  return comment.side === "old" ? comment.oldLineNumber ?? Number.MAX_SAFE_INTEGER : comment.newLineNumber ?? Number.MAX_SAFE_INTEGER;
+  return comment.lineNumber;
 }

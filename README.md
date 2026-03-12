@@ -225,6 +225,28 @@ Comments are stored inside the reviewed repository under:
 
 The file name is the current `HEAD` commit's short id, using a 12-character abbreviation such as `b58557fe1d0.json`.
 
+Each review file is a plain JSON object keyed by repository-relative file path:
+
+```json
+{
+  "src/client/App.tsx": [
+    {
+      "side": "new",
+      "line": 42,
+      "body": "Consider splitting this component.",
+      "diffFingerprint": "abc123..."
+    }
+  ]
+}
+```
+
+Only four fields are stored per comment:
+
+- `side`: `old` or `new`
+- `line`: the line number on that side
+- `body`: the comment text
+- `diffFingerprint`: the diff version the comment was written against
+
 This means:
 
 - Comments persist across app restarts

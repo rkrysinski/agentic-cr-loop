@@ -45,15 +45,15 @@ Decision:
 Persist comments and review session metadata in a repository-local `.local-code-review` directory at the Git top-level, with one JSON file per `HEAD` short id.
 
 Rationale:
-This prevents the review tool from creating new working-directory changes inside the repository being reviewed and keeps the application read-only with respect to project files.
+The storage location is predictable, easy to inspect, and easy for external tools or coding agents to write directly.
 
 ### Decision 5: Comments are anchored to changed diff lines
 
 Decision:
-Allow comments only on changed lines and store each comment with file identity, side (`old` or `new`), line numbers, and hunk context.
+Allow comments only on changed lines and store each comment with the minimal anchor: side (`old` or `new`), that side's line number, body, and diff fingerprint.
 
 Rationale:
-This matches the requirement precisely and provides enough information to render the same comment in unified and side-by-side modes without ambiguity.
+This keeps the file schema small while still preserving enough information to classify comments as current or outdated and render them in both diff modes.
 
 ### Decision 6: Text export is deterministic Markdown
 
@@ -135,8 +135,10 @@ Responsibilities:
 - Detect anchors that no longer match the current diff.
 
 Implementation notes:
-- Store one session file per repository path hash.
-- Each comment records `commentId`, `fileId`, `side`, `oldLineNumber`, `newLineNumber`, `hunkHeader`, `body`, `createdAt`, and `diffFingerprint`.
+- Store one session file per `HEAD` short id.
+- Use a plain JSON object keyed by repository-relative file path.
+- Each stored comment records only `side`, `line`, `body`, and `diffFingerprint`.
+- Derive runtime-only fields such as `commentId` in memory instead of persisting them.
 - If the current file diff fingerprint no longer matches the stored fingerprint, mark the comment as outdated instead of silently moving it.
 
 #### Exporter
@@ -228,13 +230,10 @@ type FileChange = {
 
 type ReviewComment = {
   commentId: string
-  fileId: string
+  path: string
   side: "old" | "new"
-  oldLineNumber: number | null
-  newLineNumber: number | null
-  hunkHeader: string
+  lineNumber: number
   body: string
-  createdAt: string
   diffFingerprint: string
 }
 ```

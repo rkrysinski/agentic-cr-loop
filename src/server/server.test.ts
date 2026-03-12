@@ -37,9 +37,7 @@ describe("server API", () => {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
-        oldLineNumber: line.oldLineNumber,
-        newLineNumber: line.newLineNumber,
-        hunkHeader: detailResponse.body.hunks[0].header,
+        lineNumber: line.newLineNumber,
         body: "Check wording"
       }
     });
@@ -63,9 +61,13 @@ describe("server API", () => {
 
     const storedSession = JSON.parse(
       await fs.readFile(path.join(repoPath, REVIEW_STORAGE_DIRECTORY, sessionFileName), "utf8")
-    ) as { comments: Array<{ body: string }> };
-    expect(storedSession.comments).toHaveLength(1);
-    expect(storedSession.comments[0].body).toBe("Updated wording");
+    ) as Record<string, Array<{ body: string; line: number; side: string }>>;
+    expect(storedSession["tracked.txt"]).toHaveLength(1);
+    expect(storedSession["tracked.txt"]?.[0]).toMatchObject({
+      body: "Updated wording",
+      line: 1,
+      side: "new"
+    });
 
     const refreshedChangesResponse = await invokeRoute(app, "get", "/api/changes");
     expect(refreshedChangesResponse.statusCode).toBe(200);
@@ -102,9 +104,7 @@ describe("server API", () => {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
-        oldLineNumber: line.oldLineNumber,
-        newLineNumber: line.newLineNumber,
-        hunkHeader: detailResponse.body.hunks[0].header,
+        lineNumber: line.newLineNumber,
         body: "Will go stale"
       }
     });
@@ -143,9 +143,7 @@ describe("server API", () => {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
-        oldLineNumber: line.oldLineNumber,
-        newLineNumber: line.newLineNumber,
-        hunkHeader: fullDetailResponse.body.hunks[0].header,
+        lineNumber: line.newLineNumber,
         body: "Still current"
       }
     });
@@ -173,9 +171,7 @@ describe("server API", () => {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
-        oldLineNumber: line.oldLineNumber,
-        newLineNumber: line.newLineNumber,
-        hunkHeader: detailResponse.body.hunks[0].header,
+        lineNumber: line.newLineNumber,
         body: "Persist in export"
       }
     });

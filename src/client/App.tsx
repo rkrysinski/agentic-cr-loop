@@ -7,9 +7,7 @@ import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
 
 type PendingAnchor = {
   side: "old" | "new";
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
-  hunkHeader: string;
+  lineNumber: number;
 };
 
 const EMPTY_COMMENTS: CommentsResponse = {
@@ -266,9 +264,7 @@ export function App() {
       await createComment({
         changeId: selectedChange.changeId,
         side: pendingAnchor.side,
-        oldLineNumber: pendingAnchor.oldLineNumber,
-        newLineNumber: pendingAnchor.newLineNumber,
-        hunkHeader: pendingAnchor.hunkHeader,
+        lineNumber: pendingAnchor.lineNumber,
         body: draftComment
       });
       resetNewComment();
@@ -344,7 +340,7 @@ export function App() {
   }
 
   const selectedAnchorKey = pendingAnchor
-    ? `${pendingAnchor.hunkHeader}:${pendingAnchor.side}:${pendingAnchor.oldLineNumber ?? "-"}:${pendingAnchor.newLineNumber ?? "-"}`
+    ? `${pendingAnchor.side}:${pendingAnchor.lineNumber}`
     : null;
   const changeTree = buildChangeTree(changes);
   const layoutStyle = { "--sidebar-width": `${sidebarWidth}px` } as CSSProperties;

@@ -31,9 +31,7 @@ export type CommentsResponse = {
 export type CreateCommentRequest = {
   changeId: string;
   side: ReviewComment["side"];
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
-  hunkHeader: string;
+  lineNumber: number;
   body: string;
 };
 

@@ -84,8 +84,7 @@ export class ReviewService {
       hunk.lines.some(
         (line) =>
           (line.commentableSide === request.side || (line.kind === "context" && (request.side === "old" || request.side === "new"))) &&
-          line.oldLineNumber === request.oldLineNumber &&
-          line.newLineNumber === request.newLineNumber
+          getLineNumberForSide(line, request.side) === request.lineNumber
       )
     );
 
@@ -94,11 +93,9 @@ export class ReviewService {
     }
 
     return this.commentStore.create({
-      fileId: fileIdentity(change),
+      path: fileIdentity(change),
       side: request.side,
-      oldLineNumber: request.oldLineNumber,
-      newLineNumber: request.newLineNumber,
-      hunkHeader: request.hunkHeader,
+      lineNumber: request.lineNumber,
       body: request.body.trim(),
       diffFingerprint: change.diffFingerprint
     });
@@ -121,28 +118,33 @@ export class ReviewService {
     const matchedFileIds = new Set<string>();
     const files = changes
       .map((change) => ({
-        change,
         path: change.newPath ?? change.oldPath ?? "(unknown)",
-        ...classifyCommentsForChange(comments, change)
+        comments: comments
+          .filter((comment) => comment.path === fileIdentity(change))
+          .map((comment) => ({
+            comment,
+            status: comment.diffFingerprint === change.diffFingerprint ? ("current" as const) : ("outdated" as const)
+          }))
       }))
       .filter((file) => {
-        const hasComments = file.current.length > 0 || file.outdated.length > 0;
+        const hasComments = file.comments.length > 0;
         if (hasComments) {
-          matchedFileIds.add(fileIdentity(file.change));
+          matchedFileIds.add(file.path);
         }
         return hasComments;
       });
 
-    const orphanedFiles = Array.from(groupCommentsByFileId(comments).entries())
+    const orphanedFiles = Array.from(groupCommentsByFilePath(comments).entries())
       .filter(([fileId]) => !matchedFileIds.has(fileId))
       .map(([fileId, groupedComments]) => ({
-        change: null,
         path: fileId,
-        current: [],
-        outdated: groupedComments
+        comments: groupedComments.map((comment) => ({
+          comment,
+          status: "outdated" as const
+        }))
       }));
 
-    return renderCommentsMarkdown(this.repoPath, [...files, ...orphanedFiles]);
+    return renderCommentsMarkdown([...files, ...orphanedFiles]);
   }
 
   private async syncReviewSession(): Promise<void> {
@@ -210,20 +212,20 @@ function getGitUnifiedContext(context: DiffContextValue): number {
 }
 
 function classifyCommentsForChange(comments: ReviewComment[], change: FileChange): CommentsResponse {
-  const filtered = comments.filter((comment) => comment.fileId === fileIdentity(change));
+  const filtered = comments.filter((comment) => comment.path === fileIdentity(change));
   return {
     current: filtered.filter((comment) => comment.diffFingerprint === change.diffFingerprint),
     outdated: filtered.filter((comment) => comment.diffFingerprint !== change.diffFingerprint)
   };
 }
 
-function groupCommentsByFileId(comments: ReviewComment[]): Map<string, ReviewComment[]> {
+function groupCommentsByFilePath(comments: ReviewComment[]): Map<string, ReviewComment[]> {
   const grouped = new Map<string, ReviewComment[]>();
 
   for (const comment of comments) {
-    const list = grouped.get(comment.fileId) ?? [];
+    const list = grouped.get(comment.path) ?? [];
     list.push(comment);
-    grouped.set(comment.fileId, list);
+    grouped.set(comment.path, list);
   }
 
   return grouped;
@@ -243,6 +245,13 @@ function isInternalReviewPath(filePath: string | null): boolean {
 
 function fileIdentity(change: Pick<FileChange, "newPath" | "oldPath">): string {
   return displayPath(change);
+}
+
+function getLineNumberForSide(
+  line: Pick<import("../shared/types.js").DiffLine, "oldLineNumber" | "newLineNumber">,
+  side: ReviewComment["side"]
+): number | null {
+  return side === "old" ? line.oldLineNumber : line.newLineNumber;
 }
 
 function isBinaryBuffer(buffer: Buffer): boolean {

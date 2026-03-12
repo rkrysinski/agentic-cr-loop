@@ -3,42 +3,38 @@ import { renderCommentsMarkdown } from "./exporter.js";
 
 describe("renderCommentsMarkdown", () => {
   it("renders comments in stable file and line order", () => {
-    const markdown = renderCommentsMarkdown("/repo", [
+    const markdown = renderCommentsMarkdown([
       {
-        change: null,
         path: "b.ts",
-        current: [
+        comments: [
           {
-            commentId: "2",
-            fileId: "b",
-            side: "new",
-            oldLineNumber: null,
-            newLineNumber: 10,
-            hunkHeader: "@@ -1,1 +1,1 @@",
-            body: "Second",
-            createdAt: "2026-03-10T10:00:00.000Z",
-            diffFingerprint: "fp"
+            status: "current",
+            comment: {
+              commentId: "2",
+              path: "b.ts",
+              side: "new",
+              lineNumber: 10,
+              body: "Second",
+              diffFingerprint: "fp"
+            }
           }
-        ],
-        outdated: []
+        ]
       },
       {
-        change: null,
         path: "a.ts",
-        current: [
+        comments: [
           {
-            commentId: "1",
-            fileId: "a",
-            side: "old",
-            oldLineNumber: 3,
-            newLineNumber: null,
-            hunkHeader: "@@ -3,1 +3,0 @@",
-            body: "First",
-            createdAt: "2026-03-10T09:00:00.000Z",
-            diffFingerprint: "fp"
+            status: "current",
+            comment: {
+              commentId: "1",
+              path: "a.ts",
+              side: "old",
+              lineNumber: 3,
+              body: "First",
+              diffFingerprint: "fp"
+            }
           }
-        ],
-        outdated: []
+        ]
       }
     ]);
 
