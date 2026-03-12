@@ -457,6 +457,83 @@ describe("App", () => {
     expect(screen.queryByText("bottom")).not.toBeInTheDocument();
     expect(screen.getByText("after")).toBeInTheDocument();
   });
+
+  it("reloads the selected diff when refresh keeps the same file selected", async () => {
+    let detailRequestCount = 0;
+    let commentsRequestCount = 0;
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repo") {
+        return jsonResponse({
+          repoPath: "/repo",
+          baseRef: "HEAD",
+          changeCount: 1,
+          viewModeDefault: "unified"
+        });
+      }
+
+      if (url.pathname === "/api/changes" && !url.search) {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: {
+              current: 0,
+              outdated: 0
+            }
+          }
+        ]);
+      }
+
+      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+        detailRequestCount += 1;
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: [
+            {
+              header: "@@ -1 +1 @@",
+              lines: [{ kind: "added", oldLineNumber: null, newLineNumber: 1, text: "after", commentableSide: "new" }]
+            }
+          ]
+        });
+      }
+
+      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
+        commentsRequestCount += 1;
+        return jsonResponse({
+          current: [],
+          outdated: []
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("after")).toBeInTheDocument());
+    expect(detailRequestCount).toBe(1);
+    expect(commentsRequestCount).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => expect(detailRequestCount).toBe(2));
+    await waitFor(() => expect(commentsRequestCount).toBe(2));
+    await waitFor(() => expect(screen.getByText("after")).toBeInTheDocument());
+    expect(screen.queryByText("Loading review data…")).not.toBeInTheDocument();
+  });
 });
 
 function parseRequestUrl(input: RequestInfo | URL): URL {

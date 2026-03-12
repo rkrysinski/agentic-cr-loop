@@ -188,6 +188,7 @@ export function App() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [diffContext, setDiffContext] = useState<DiffContextValue>(DEFAULT_DIFF_CONTEXT);
+  const [selectedChangeRefreshKey, setSelectedChangeRefreshKey] = useState(0);
 
   useEffect(() => {
     void refreshAll();
@@ -226,7 +227,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedChangeId, diffContext]);
+  }, [selectedChangeId, diffContext, selectedChangeRefreshKey]);
 
   async function refreshAll() {
     try {
@@ -237,10 +238,14 @@ export function App() {
         selectedChangeId && nextChanges.some((change) => change.changeId === selectedChangeId)
           ? selectedChangeId
           : nextChanges[0]?.changeId ?? null;
+      const shouldRefreshSelectedChange = nextSelectedChangeId !== null && nextSelectedChangeId === selectedChangeId;
       setRepo(repoInfo);
       setChanges(nextChanges);
       setViewMode(repoInfo.viewModeDefault);
       setSelectedChangeId(nextSelectedChangeId);
+      if (shouldRefreshSelectedChange) {
+        setSelectedChangeRefreshKey((current) => current + 1);
+      }
       resetNewComment();
       resetEditingComment();
       if (!nextSelectedChangeId) {
