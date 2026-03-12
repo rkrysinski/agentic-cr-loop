@@ -39,10 +39,10 @@ Parse Git patch output into a normalized in-memory diff model, then render unifi
 Rationale:
 A single source of truth prevents view-specific behavior drift and ensures that comment anchors remain consistent regardless of how the diff is displayed.
 
-### Decision 4: Review state is stored outside the repository
+### Decision 4: Review state is stored in a repository-local metadata directory
 
 Decision:
-Persist comments and review session metadata in the user's local application data directory, keyed by canonical repository path.
+Persist comments and review session metadata in a repository-local `.local-code-review` directory at the Git top-level.
 
 Rationale:
 This prevents the review tool from creating new working-directory changes inside the repository being reviewed and keeps the application read-only with respect to project files.
@@ -130,7 +130,7 @@ Implementation notes:
 #### Comment Store
 
 Responsibilities:
-- Persist review session data outside the repository.
+- Persist review session data inside the repository under `.local-code-review/`.
 - Return comments by file and line anchor.
 - Detect anchors that no longer match the current diff.
 
@@ -306,4 +306,4 @@ These limits preserve the simple local-review scope described in the requirement
 
 ## Version Changes
 
-- 1.0: Defined a local-first single-user web application architecture using Git CLI diff generation, a shared normalized diff model for unified and side-by-side rendering, out-of-repository local comment storage, and deterministic Markdown export. This keeps setup simple, prevents the tool from dirtying the reviewed repository, and improves maintainability by separating repository access, diff parsing, comment persistence, and presentation.
+- 1.0: Defined a local-first single-user web application architecture using Git CLI diff generation, a shared normalized diff model for unified and side-by-side rendering, repository-local comment storage under `.local-code-review`, and deterministic Markdown export. This keeps setup simple and improves maintainability by separating repository access, diff parsing, comment persistence, and presentation.

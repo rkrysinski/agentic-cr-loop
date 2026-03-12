@@ -2,16 +2,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ReviewComment } from "../shared/types.js";
-import { sha256 } from "./hash.js";
-import { getAppDataDirectory } from "./platformPaths.js";
 
 type SessionFile = {
   repoPath: string;
   comments: ReviewComment[];
 };
 
+export const REVIEW_STORAGE_DIRECTORY = ".local-code-review";
+const SESSION_FILE_NAME = "comments.json";
+
 export class CommentStore {
-  constructor(private readonly repoPath: string, private readonly storageDir = path.join(getAppDataDirectory(), "sessions")) {}
+  constructor(private readonly repoPath: string, private readonly storageDir = path.join(repoPath, REVIEW_STORAGE_DIRECTORY)) {}
 
   async list(): Promise<ReviewComment[]> {
     const session = await this.read();
@@ -65,7 +66,7 @@ export class CommentStore {
 
   private async getSessionFilePath(): Promise<string> {
     await fs.mkdir(this.storageDir, { recursive: true });
-    return path.join(this.storageDir, `${sha256(this.repoPath)}.json`);
+    return path.join(this.storageDir, SESSION_FILE_NAME);
   }
 
   private async read(): Promise<SessionFile> {

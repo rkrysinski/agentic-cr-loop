@@ -12,7 +12,7 @@ It reads local changes relative to `HEAD`, renders them in unified and side-by-s
 - Renders diffs in unified and side-by-side modes from the same underlying diff model
 - Allows comments only on changed lines
 - Lets you edit and delete existing comments
-- Stores comments outside the reviewed repository
+- Stores comments in a repository-local metadata directory
 - Marks comments as outdated when the underlying diff changes
 - Exports review comments as Markdown
 
@@ -217,21 +217,17 @@ The export includes:
 
 ## Comment Storage
 
-Comments are stored outside the repository being reviewed.
+Comments are stored inside the reviewed repository under:
 
-Platform-specific base directories:
-
-- macOS: `~/Library/Application Support/local-review-tool`
-- Linux: `${XDG_DATA_HOME:-~/.local/share}/local-review-tool`
-- Windows: `%APPDATA%\\local-review-tool`
-
-Session files are written under a `sessions/` directory and are keyed by a hash of the canonical repository path.
+```text
+<repo-root>/.local-code-review/comments.json
+```
 
 This means:
 
-- The reviewed repository stays clean
 - Comments persist across app restarts
-- Different repositories get separate review sessions
+- Review metadata travels with the repository checkout
+- The app ignores `.local-code-review/` when listing reviewable changes
 
 ## How Comment Validity Works
 

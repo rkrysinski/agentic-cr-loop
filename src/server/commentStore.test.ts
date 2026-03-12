@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CommentStore } from "./commentStore.js";
+import { CommentStore, REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
 
 const createdDirectories: string[] = [];
 
@@ -11,11 +11,11 @@ afterEach(async () => {
 });
 
 describe("CommentStore", () => {
-  it("persists comments in a deterministic session file", async () => {
-    const storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
-    createdDirectories.push(storageDir);
+  it("persists comments in the repository-local review directory", async () => {
+    const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
+    createdDirectories.push(repoPath);
 
-    const store = new CommentStore("/tmp/repo", storageDir);
+    const store = new CommentStore(repoPath);
     const created = await store.create({
       fileId: "change-1",
       side: "new",
@@ -27,9 +27,11 @@ describe("CommentStore", () => {
     });
 
     const comments = await store.list();
+    const storageDir = path.join(repoPath, REVIEW_STORAGE_DIRECTORY);
     const sessionFiles = await fs.readdir(storageDir);
 
     expect(sessionFiles).toHaveLength(1);
+    expect(sessionFiles).toEqual(["comments.json"]);
     expect(comments).toHaveLength(1);
     expect(comments[0]).toMatchObject({
       commentId: created.commentId,
@@ -39,10 +41,10 @@ describe("CommentStore", () => {
   });
 
   it("updates and deletes stored comments", async () => {
-    const storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
-    createdDirectories.push(storageDir);
+    const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
+    createdDirectories.push(repoPath);
 
-    const store = new CommentStore("/tmp/repo", storageDir);
+    const store = new CommentStore(repoPath);
     const created = await store.create({
       fileId: "change-1",
       side: "new",

@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CommentStore } from "./commentStore.js";
+import { CommentStore, REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
 import { renderCommentsMarkdown } from "./exporter.js";
 import { runGit } from "./git.js";
@@ -11,9 +11,11 @@ const SUMMARY_CONTEXT: DiffContextValue = "0";
 const FULL_CONTEXT_LINES = 1_000_000;
 
 export class ReviewService {
-  readonly commentStore: CommentStore;
+  repoPath: string;
+  commentStore: CommentStore;
 
-  constructor(readonly repoPath: string) {
+  constructor(repoPath: string) {
+    this.repoPath = repoPath;
     this.commentStore = new CommentStore(repoPath);
   }
 
@@ -22,7 +24,9 @@ export class ReviewService {
     if (!topLevel) {
       throw new Error("Invalid Git repository");
     }
-    await runGit(this.repoPath, ["rev-parse", "--verify", "HEAD"]);
+    await runGit(topLevel, ["rev-parse", "--verify", "HEAD"]);
+    this.repoPath = topLevel;
+    this.commentStore = new CommentStore(topLevel);
   }
 
   async getRepoInfo(): Promise<RepoResponse> {
@@ -149,7 +153,7 @@ export class ReviewService {
       "--binary",
       "--no-color"
     ]);
-    const tracked = parseTrackedDiff(trackedPatch);
+    const tracked = parseTrackedDiff(trackedPatch).filter((change) => !isInternalReviewChange(change));
     const untracked = await this.readUntrackedChanges();
 
     return [...tracked, ...untracked].sort((left, right) => displayPath(left).localeCompare(displayPath(right)));
@@ -166,6 +170,9 @@ export class ReviewService {
       }
 
       const relativePath = entry.slice(3);
+      if (isInternalReviewPath(relativePath)) {
+        continue;
+      }
       const absolutePath = path.join(this.repoPath, relativePath);
       const content = await fs.readFile(absolutePath);
 
@@ -206,6 +213,14 @@ function groupCommentsByFileId(comments: ReviewComment[]): Map<string, ReviewCom
 
 function displayPath(change: Pick<FileChange, "newPath" | "oldPath">): string {
   return change.newPath ?? change.oldPath ?? "(unknown)";
+}
+
+function isInternalReviewChange(change: Pick<FileChange, "newPath" | "oldPath">): boolean {
+  return isInternalReviewPath(change.newPath) || isInternalReviewPath(change.oldPath);
+}
+
+function isInternalReviewPath(filePath: string | null): boolean {
+  return typeof filePath === "string" && (filePath === REVIEW_STORAGE_DIRECTORY || filePath.startsWith(`${REVIEW_STORAGE_DIRECTORY}/`));
 }
 
 function fileIdentity(change: Pick<FileChange, "newPath" | "oldPath">): string {

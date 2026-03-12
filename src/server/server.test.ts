@@ -2,21 +2,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
 import { startServer } from "./server.js";
 import { createTempGitRepo } from "./testUtils.js";
 
-let homeDir: string;
 let repoPath: string;
 
 beforeEach(async () => {
-  homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-home-"));
-  process.env.HOME = homeDir;
-  process.env.XDG_DATA_HOME = path.join(homeDir, ".local", "share");
   repoPath = await createTempGitRepo();
 });
 
 afterEach(async () => {
-  await fs.rm(homeDir, { recursive: true, force: true });
   await fs.rm(repoPath, { recursive: true, force: true });
 });
 
@@ -63,6 +59,20 @@ describe("server API", () => {
     expect(commentsResponse.body.current).toHaveLength(1);
     expect(commentsResponse.body.current[0].body).toBe("Updated wording");
     expect(commentsResponse.body.outdated).toHaveLength(0);
+
+    const storedSession = JSON.parse(
+      await fs.readFile(path.join(repoPath, REVIEW_STORAGE_DIRECTORY, "comments.json"), "utf8")
+    ) as { comments: Array<{ body: string }> };
+    expect(storedSession.comments).toHaveLength(1);
+    expect(storedSession.comments[0].body).toBe("Updated wording");
+
+    const refreshedChangesResponse = await invokeRoute(app, "get", "/api/changes");
+    expect(refreshedChangesResponse.statusCode).toBe(200);
+    expect(
+      refreshedChangesResponse.body.some((change: { newPath: string | null; oldPath: string | null }) =>
+        [change.newPath, change.oldPath].includes(`${REVIEW_STORAGE_DIRECTORY}/comments.json`)
+      )
+    ).toBe(false);
 
     const deleteResponse = await invokeRoute(app, "delete", "/api/comments/:commentId", {
       params: { commentId: (createResponse.body as { commentId: string }).commentId }
