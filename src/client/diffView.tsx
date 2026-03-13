@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { CommentsResponse } from "../shared/api.js";
 import type { DiffHunk, DiffLine, FileChange, ReviewComment } from "../shared/types.js";
 import { DiffSyntaxLine } from "./codeSyntax.js";
@@ -367,6 +367,15 @@ function InlineThread({
   onDelete
 }: InlineThreadProps) {
   const lineNumber = getLineNumber(line, anchorSide);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (!isComposerOpen) {
+      return;
+    }
+
+    composerTextareaRef.current?.focus();
+  }, [isComposerOpen]);
 
   return (
     <div className="inline-thread-panel">
@@ -407,6 +416,7 @@ function InlineThread({
             New comment on {anchorSide} line {lineNumber}
           </p>
           <textarea
+            ref={composerTextareaRef}
             aria-label={`Add comment for ${anchorSide} line ${lineNumber ?? "unknown"}`}
             value={draftComment}
             onChange={(event) => onDraftCommentChange(event.target.value)}

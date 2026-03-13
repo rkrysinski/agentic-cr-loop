@@ -240,10 +240,10 @@ describe("App", () => {
     expect(container.querySelector(".layout-sidebar-collapsed")).toBeNull();
 
     fireEvent.click(screen.getByText("after"));
-    expect(screen.getByLabelText("Add comment for new line 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add comment for new line 1")).toHaveFocus();
 
     fireEvent.click(screen.getByText("stay"));
-    expect(screen.getByLabelText("Add comment for new line 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add comment for new line 2")).toHaveFocus();
 
     fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
