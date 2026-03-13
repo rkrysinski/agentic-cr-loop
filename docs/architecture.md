@@ -4,6 +4,8 @@
 
 The application is a single-user local review tool for changes in a Git working directory. It reads local repository changes, renders them in unified and side-by-side diff formats, allows comments to be attached to changed lines, and exports all review comments as deterministic text that can be read by a human or passed to an AI agent.
 
+[Initial requirements](./requirements.md)
+
 ## Assumptions
 
 - The application is used by one reviewer on a local machine.
