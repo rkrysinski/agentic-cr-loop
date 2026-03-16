@@ -324,6 +324,33 @@ function IconFileText() {
   );
 }
 
+function IconClipboard() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </svg>
+  );
+}
+
+function IconTerminal() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}
+
+function IconX() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────
 
 export function App() {
@@ -350,6 +377,10 @@ export function App() {
   const [diffContext, setDiffContext] = useState<DiffContextValue>(DEFAULT_DIFF_CONTEXT);
   const [selectedChangeRefreshKey, setSelectedChangeRefreshKey] = useState(0);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [exportMode, setExportMode] = useState(false);
+  const [exportComments, setExportComments] = useState<Map<string, CommentsResponse>>(new Map());
+  const [exportLoading, setExportLoading] = useState(false);
+  const [copyConfirm, setCopyConfirm] = useState(false);
 
   useEffect(() => {
     void refreshAll();
@@ -503,6 +534,32 @@ export function App() {
   function resetNewComment() {
     setPendingAnchor(null);
     setDraftComment("");
+  }
+
+  async function enterExportMode() {
+    setExportMode(true);
+    const filesWithComments = changes.filter(
+      (c) => c.commentCounts.current > 0 || c.commentCounts.outdated > 0
+    );
+    if (filesWithComments.length === 0) {
+      return;
+    }
+    setExportLoading(true);
+    try {
+      const results = await Promise.all(filesWithComments.map((c) => getComments(c.changeId)));
+      const map = new Map<string, CommentsResponse>();
+      filesWithComments.forEach((c, i) => {
+        map.set(c.changeId, results[i]!);
+      });
+      setExportComments(map);
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
+  function exitExportMode() {
+    setExportMode(false);
+    setExportComments(new Map());
   }
 
   const selectedAnchorKey = pendingAnchor
@@ -678,6 +735,54 @@ export function App() {
   const repoName = repo?.repoPath ? (repo.repoPath.split("/").filter(Boolean).at(-1) ?? repo.repoPath) : "…";
   const statsAdded = changes.filter((c) => c.changeType !== "deleted").length;
   const statsDeleted = changes.filter((c) => c.changeType === "deleted").length;
+  const filesWithComments = changes.filter(
+    (c) => c.commentCounts.current > 0 || c.commentCounts.outdated > 0
+  );
+  const totalCommentCount = filesWithComments.reduce(
+    (sum, c) => sum + c.commentCounts.current + c.commentCounts.outdated,
+    0
+  );
+
+  function buildExportText(): string {
+    const today = new Date().toISOString().slice(0, 10);
+    const lines: string[] = [];
+    lines.push(`CODE REVIEW  ·  ${repoName}  ·  branch: ${repo?.baseRef ?? "HEAD"}  ·  ${today}`);
+    lines.push("━".repeat(50));
+    for (const change of filesWithComments) {
+      const path = getChangePath(change);
+      const fileComments = exportComments.get(change.changeId);
+      lines.push("", `FILE: ${path}`, "");
+      for (const c of fileComments?.current ?? []) {
+        lines.push(`[COMMENT · Line ${c.lineNumber} · side: ${c.side}]`);
+        lines.push(c.body);
+        lines.push("");
+      }
+      for (const c of fileComments?.outdated ?? []) {
+        lines.push(`[OUTDATED COMMENT · Line ${c.lineNumber} · side: ${c.side}]`);
+        lines.push(c.body);
+        lines.push("");
+      }
+    }
+    return lines.join("\n");
+  }
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(buildExportText()).then(() => {
+      setCopyConfirm(true);
+      setTimeout(() => setCopyConfirm(false), 1500);
+    });
+  }
+
+  function handleDownload() {
+    const text = buildExportText();
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "review_comments.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   // Build breadcrumb and line counts from selected file
   const selectedFilePath = selectedChange ? getChangePath(selectedChange) : null;
@@ -727,33 +832,52 @@ export function App() {
                 <span className="sidebar-branch-icon"><IconGitBranch /></span>
                 <span className="sidebar-branch-name">{repo?.baseRef ?? "HEAD"}</span>
               </div>
-              <div className="sidebar-stats-row">
-                <span className="sidebar-stats-label">// changed_files</span>
-                <div className="sidebar-stats-grp">
-                  {statsAdded > 0 ? <span className="sidebar-stat-add">+{statsAdded}</span> : null}
-                  {statsDeleted > 0 ? <span className="sidebar-stat-del">-{statsDeleted}</span> : null}
+              {!exportMode ? (
+                <div className="sidebar-stats-row">
+                  <span className="sidebar-stats-label">// changed_files</span>
+                  <div className="sidebar-stats-grp">
+                    {statsAdded > 0 ? <span className="sidebar-stat-add">+{statsAdded}</span> : null}
+                    {statsDeleted > 0 ? <span className="sidebar-stat-del">-{statsDeleted}</span> : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           ) : null}
 
-          {/* File tree */}
+          {/* File tree / export file list */}
           <div id="changed-files-panel" className="sidebar-body" aria-hidden={isSidebarCollapsed}>
-            <ul className="change-list change-tree">{renderChangeTree(changeTree.children)}</ul>
+            {exportMode ? (
+              <ul className="change-list">
+                {filesWithComments.map((change) => {
+                  const filePath = getChangePath(change);
+                  const fileName = filePath.split("/").at(-1) ?? filePath;
+                  const totalCount = change.commentCounts.current + change.commentCounts.outdated;
+                  return (
+                    <li key={change.changeId} className="change-tree-node">
+                      <div className="change-item change-tree-file">
+                        <span className="change-tree-file-row">
+                          <span className="change-tree-file-icon" aria-hidden="true"><IconFileText /></span>
+                          <span className="path-text">{fileName}</span>
+                          {totalCount > 0 ? (
+                            <span className="change-comment-count" aria-label={`${totalCount} comments`}>{totalCount}</span>
+                          ) : null}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <ul className="change-list change-tree">{renderChangeTree(changeTree.children)}</ul>
+            )}
           </div>
 
           {/* Footer */}
-          <div className="sidebar-footer">
-            <a
-              className="sidebar-export-btn"
-              href="/api/export/comments.md"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <IconExport />
-              export_comments
-            </a>
-          </div>
+          {exportMode ? (
+            <div className="sidebar-footer">
+              <span className="export-total-label">// {totalCommentCount} comment{totalCommentCount !== 1 ? "s" : ""} total</span>
+            </div>
+          ) : null}
         </aside>
 
         {/* ── Resizer ── */}
@@ -791,6 +915,72 @@ export function App() {
 
         {/* ── Main area ── */}
         <section className="review-pane">
+          {exportMode ? (
+            <>
+              {/* Export Header */}
+              <div className="export-header">
+                <span className="export-header-icon"><IconFileText /></span>
+                <span className="export-header-title">review_comments.txt</span>
+                <span className="export-header-subtitle">// {totalCommentCount} comment{totalCommentCount !== 1 ? "s" : ""} · {filesWithComments.length} file{filesWithComments.length !== 1 ? "s" : ""}</span>
+                <div className="export-header-spacer" />
+                <button type="button" className="export-copy-btn" onClick={handleCopy}>
+                  <IconClipboard />
+                  {copyConfirm ? "copied!" : "copy"}
+                </button>
+                <button type="button" className="export-download-btn" onClick={handleDownload}>
+                  <IconExport />
+                  save .txt
+                </button>
+                <button type="button" className="export-close-btn" aria-label="Close export" onClick={exitExportMode}>
+                  <IconX />
+                </button>
+              </div>
+
+              {/* Export Content */}
+              <div className="export-content">
+                <div className="export-tip-bar">
+                  <span className="export-tip-icon"><IconTerminal /></span>
+                  <span className="export-tip-text">// paste directly into your AI assistant as context for code review</span>
+                </div>
+                <div className="export-text-area">
+                  {exportLoading ? (
+                    <span className="export-loading-text">// loading comments…</span>
+                  ) : (
+                    <>
+                      <span className="export-hdr-line">CODE REVIEW  ·  {repoName}  ·  branch: {repo?.baseRef ?? "HEAD"}  ·  {new Date().toISOString().slice(0, 10)}</span>
+                      <div className="export-divider" />
+                      {filesWithComments.length === 0 ? (
+                        <span className="export-empty-text">// no comments found</span>
+                      ) : null}
+                      {filesWithComments.map((change, idx) => {
+                        const path = getChangePath(change);
+                        const fileComments = exportComments.get(change.changeId);
+                        return (
+                          <div key={change.changeId} className="export-file-section">
+                            {idx > 0 ? <div className="export-divider" /> : null}
+                            <span className="export-file-hdr">FILE: {path}</span>
+                            {fileComments?.current.map((c) => (
+                              <div key={c.commentId} className="export-comment-card">
+                                <span className="export-comment-meta">[COMMENT · Line {c.lineNumber} · side: {c.side}]</span>
+                                <span className="export-comment-body">{c.body}</span>
+                              </div>
+                            ))}
+                            {fileComments?.outdated.map((c) => (
+                              <div key={c.commentId} className="export-comment-card export-comment-card-outdated">
+                                <span className="export-comment-meta export-comment-meta-outdated">[OUTDATED · Line {c.lineNumber} · side: {c.side}]</span>
+                                <span className="export-comment-body export-comment-body-outdated">{c.body}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
           {/* Toolbar — controls row */}
           <div className="main-toolbar">
             <div className="view-toggle" role="group" aria-label="View mode">
@@ -871,6 +1061,15 @@ export function App() {
               <IconRefresh />
               <span>refresh</span>
             </button>
+
+            <button
+              type="button"
+              className="toolbar-pill-btn toolbar-pill-btn-labeled"
+              onClick={() => void enterExportMode()}
+            >
+              <IconExport />
+              <span>export_comments</span>
+            </button>
           </div>
 
           {/* File header — breadcrumb + line counts */}
@@ -926,6 +1125,8 @@ export function App() {
           {!loading && !selectedChange ? (
             <div className="empty-state">// no changed files found</div>
           ) : null}
+            </>
+          )}
         </section>
       </main>
     </div>
