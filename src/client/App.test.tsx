@@ -88,7 +88,7 @@ describe("App", () => {
     expect(screen.getByRole("combobox", { name: "Diff context" })).toHaveValue("full");
     const resizeHandle = screen.getByRole("separator", { name: "Resize changed files panel" });
     expect(folderButton).toHaveAttribute("aria-expanded", "true");
-    expect(resizeHandle).toHaveAttribute("aria-valuenow", "360");
+    expect(resizeHandle).toHaveAttribute("aria-valuenow", "240");
     expect(screen.getByRole("button", { name: /App\.tsx/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /styles\.css/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /README\.md/ })).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("App", () => {
     expect(screen.queryByText(/modified · 2/)).not.toBeInTheDocument();
 
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
-    expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "392");
+    expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "272");
 
     fireEvent.click(folderButton);
     expect(screen.getByRole("button", { name: "src/client" })).toHaveAttribute("aria-expanded", "false");
@@ -245,7 +245,7 @@ describe("App", () => {
     fireEvent.click(screen.getByText("stay"));
     expect(screen.getByLabelText("Add comment for new line 2")).toHaveFocus();
 
-    fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
+    fireEvent.click(screen.getByRole("button", { name: "side_by_side" }));
     expect(screen.getByText("Old note")).toBeInTheDocument();
     expect(container.querySelectorAll(".line-clickable-cell")).toHaveLength(12);
 
@@ -335,30 +335,22 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
-    const topbarActions = document.querySelector(".topbar-actions");
-    const reviewControls = () => document.querySelector(".review-controls");
 
-    expect(topbarActions?.children).toHaveLength(3);
-    const toggle = await screen.findByRole("checkbox", { name: "Hide removed code" });
-    expect(toggle).not.toBeChecked();
-    expect(reviewControls()).not.toBeNull();
+    const toggle = await screen.findByRole("button", { name: "hide_removed" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByText("before")).toBeInTheDocument();
 
     fireEvent.click(toggle);
-    expect(toggle).toBeChecked();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText("before")).not.toBeInTheDocument();
     expect(screen.getByText("after")).toBeInTheDocument();
-    expect(topbarActions?.children).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole("button", { name: "Side by side" }));
-    expect(screen.queryByRole("checkbox", { name: "Hide removed code" })).not.toBeInTheDocument();
-    expect(reviewControls()).toBeNull();
-    expect(topbarActions?.children).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "side_by_side" }));
+    expect(screen.queryByRole("button", { name: "hide_removed" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Unified" }));
-    const toggleAfterReturn = screen.getByRole("checkbox", { name: "Hide removed code" });
-    expect(toggleAfterReturn).toBeChecked();
-    expect(reviewControls()).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "unified" }));
+    const toggleAfterReturn = screen.getByRole("button", { name: "hide_removed" });
+    expect(toggleAfterReturn).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText("before")).not.toBeInTheDocument();
   });
 
