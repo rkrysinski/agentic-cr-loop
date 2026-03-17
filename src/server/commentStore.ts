@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ReviewComment } from "../shared/types.js";
-import { sha256 } from "./hash.js";
+import { randomUUID } from "node:crypto";
 
 type StoredComment = {
+  id: string;
   side: ReviewComment["side"];
   line: number;
   body: string;
@@ -11,6 +12,8 @@ type StoredComment = {
 };
 
 type StoredCommentsFile = Record<string, StoredComment[]>;
+type RawStoredComment = Omit<StoredComment, "id"> & { id?: string };
+type RawStoredCommentsFile = Record<string, RawStoredComment[]>;
 
 type LegacySessionFile = {
   comments: Array<{
@@ -31,7 +34,7 @@ export function getReviewSessionFileName(reviewBaseShortId: string): string {
 
 export class CommentStore {
   constructor(
-    private readonly repoPath: string,
+    repoPath: string,
     private readonly sessionFileName = getReviewSessionFileName("HEAD"),
     private readonly storageDir = path.join(repoPath, REVIEW_STORAGE_DIRECTORY)
   ) {}
@@ -47,6 +50,7 @@ export class CommentStore {
     const storedComments = await this.read();
     const commentsForPath = storedComments[input.path] ?? [];
     const storedComment: StoredComment = {
+      id: createCommentId(),
       side: input.side,
       line: input.lineNumber,
       body: input.body,
@@ -59,7 +63,6 @@ export class CommentStore {
 
     return toReviewComment({
       path: input.path,
-      index: commentsForPath.length - 1,
       comment: storedComment
     });
   }
@@ -80,7 +83,6 @@ export class CommentStore {
     await this.write(storedComments);
     return toReviewComment({
       path: record.path,
-      index: record.index,
       comment: updated
     });
   }
@@ -114,7 +116,12 @@ export class CommentStore {
 
     try {
       const content = await fs.readFile(sessionPath, "utf8");
-      return normalizeStoredComments(JSON.parse(content) as unknown);
+      const normalized = normalizeStoredComments(JSON.parse(content) as unknown);
+      if (normalized.didUpgrade) {
+        await this.write(normalized.comments);
+      }
+
+      return normalized.comments;
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return {};
@@ -132,19 +139,18 @@ export class CommentStore {
   }
 }
 
-function flattenStoredComments(storedComments: StoredCommentsFile): Array<{ path: string; index: number; comment: StoredComment }> {
+function flattenStoredComments(storedComments: StoredCommentsFile): Array<{ path: string; comment: StoredComment }> {
   return Object.entries(storedComments).flatMap(([path, comments]) =>
-    comments.map((comment, index) => ({
+    comments.map((comment) => ({
       path,
-      index,
       comment
     }))
   );
 }
 
-function toReviewComment(entry: { path: string; index: number; comment: StoredComment }): ReviewComment {
+function toReviewComment(entry: { path: string; comment: StoredComment }): ReviewComment {
   return {
-    commentId: getCommentId(entry.path, entry.index),
+    commentId: entry.comment.id,
     path: entry.path,
     side: entry.comment.side,
     lineNumber: entry.comment.line,
@@ -153,8 +159,8 @@ function toReviewComment(entry: { path: string; index: number; comment: StoredCo
   };
 }
 
-function getCommentId(filePath: string, index: number): string {
-  return sha256(`${filePath}\n${index}`).slice(0, 12);
+function createCommentId(): string {
+  return randomUUID().replace(/-/g, "").slice(0, 12);
 }
 
 function findStoredComment(
@@ -163,7 +169,7 @@ function findStoredComment(
 ): { path: string; index: number; comment: StoredComment } | null {
   for (const [filePath, comments] of Object.entries(storedComments)) {
     for (const [index, comment] of comments.entries()) {
-      if (getCommentId(filePath, index) === commentId) {
+      if (comment.id === commentId) {
         return {
           path: filePath,
           index,
@@ -176,38 +182,62 @@ function findStoredComment(
   return null;
 }
 
-function normalizeStoredComments(value: unknown): StoredCommentsFile {
+function normalizeStoredComments(value: unknown): { comments: StoredCommentsFile; didUpgrade: boolean } {
   if (isLegacySessionFile(value)) {
-    return value.comments.reduce<StoredCommentsFile>((accumulator, comment) => {
-      const lineNumber = comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber;
-      if (typeof lineNumber !== "number") {
-        return accumulator;
-      }
+    return {
+      comments: value.comments.reduce<StoredCommentsFile>((accumulator, comment) => {
+        const lineNumber = comment.side === "old" ? comment.oldLineNumber : comment.newLineNumber;
+        if (typeof lineNumber !== "number") {
+          return accumulator;
+        }
 
-      const commentsForPath = accumulator[comment.fileId] ?? [];
-      commentsForPath.push({
-        side: comment.side,
-        line: lineNumber,
-        body: comment.body,
-        diffFingerprint: comment.diffFingerprint
-      });
-      accumulator[comment.fileId] = commentsForPath;
-      return accumulator;
-    }, {});
+        const commentsForPath = accumulator[comment.fileId] ?? [];
+        commentsForPath.push({
+          id: createCommentId(),
+          side: comment.side,
+          line: lineNumber,
+          body: comment.body,
+          diffFingerprint: comment.diffFingerprint
+        });
+        accumulator[comment.fileId] = commentsForPath;
+        return accumulator;
+      }, {}),
+      didUpgrade: true
+    };
   }
 
   if (!isStoredCommentsFile(value)) {
     throw new Error("Invalid comments file");
   }
 
-  return value;
+  let didUpgrade = false;
+  const comments: StoredCommentsFile = {};
+
+  for (const [filePath, storedComments] of Object.entries(value)) {
+    comments[filePath] = storedComments.map((comment) => {
+      const id = typeof comment.id === "string" && comment.id.length > 0 ? comment.id : createCommentId();
+      if (id !== comment.id) {
+        didUpgrade = true;
+      }
+
+      return {
+        ...comment,
+        id
+      };
+    });
+  }
+
+  return {
+    comments,
+    didUpgrade
+  };
 }
 
 function isLegacySessionFile(value: unknown): value is LegacySessionFile {
   return typeof value === "object" && value !== null && Array.isArray((value as { comments?: unknown }).comments);
 }
 
-function isStoredCommentsFile(value: unknown): value is StoredCommentsFile {
+function isStoredCommentsFile(value: unknown): value is RawStoredCommentsFile {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
@@ -219,6 +249,7 @@ function isStoredCommentsFile(value: unknown): value is StoredCommentsFile {
         (comment) =>
           typeof comment === "object" &&
           comment !== null &&
+          (typeof (comment as { id?: unknown }).id === "string" || (comment as { id?: unknown }).id === undefined) &&
           ((comment as { side?: unknown }).side === "old" || (comment as { side?: unknown }).side === "new") &&
           typeof (comment as { line?: unknown }).line === "number" &&
           typeof (comment as { body?: unknown }).body === "string" &&

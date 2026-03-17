@@ -35,6 +35,7 @@ Each file is a JSON object keyed by repository-relative file path:
 {
   "src/client/App.tsx": [
     {
+      "id": "1a2b3c4d5e6f",
       "side": "new",
       "line": 42,
       "body": "Consider splitting this component.",
@@ -45,6 +46,7 @@ Each file is a JSON object keyed by repository-relative file path:
 ```
 
 Fields:
+- `id` — stable comment identifier used by the update/delete API
 - `side` — `"old"` (removed/pre-change lines) or `"new"` (added/post-change lines)
 - `line` — 1-based line number on that diff side
 - `body` — comment text (non-empty)

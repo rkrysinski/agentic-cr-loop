@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getChangePath } from "../shared/changePaths.js";
+import type { ChangeSummary, CommentsResponse, CreateCommentRequest, DiffContextValue, RepoResponse } from "../shared/api.js";
+import type { FileChange, ReviewComment } from "../shared/types.js";
 import { CommentStore, REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
 import { renderCommentsMarkdown } from "./exporter.js";
 import { runGit } from "./git.js";
-import type { ChangeSummary, CommentsResponse, CreateCommentRequest, DiffContextValue, RepoResponse } from "../shared/api.js";
-import type { FileChange, ReviewComment } from "../shared/types.js";
 
 const SUMMARY_CONTEXT: DiffContextValue = "0";
 const FULL_CONTEXT_LINES = 1_000_000;
@@ -118,9 +119,9 @@ export class ReviewService {
     const matchedFileIds = new Set<string>();
     const files = changes
       .map((change) => ({
-        path: displayPath(change),
+        path: getChangePath(change),
         comments: comments
-          .filter((comment) => comment.path === displayPath(change))
+          .filter((comment) => comment.path === getChangePath(change))
           .map((comment) => ({
             comment,
             status: comment.diffFingerprint === change.diffFingerprint ? ("current" as const) : ("outdated" as const)
@@ -203,7 +204,7 @@ function getGitUnifiedContext(context: DiffContextValue): number {
 }
 
 function classifyCommentsForChange(comments: ReviewComment[], change: FileChange): CommentsResponse {
-  const filtered = comments.filter((comment) => comment.path === displayPath(change));
+  const filtered = comments.filter((comment) => comment.path === getChangePath(change));
   return {
     current: filtered.filter((comment) => comment.diffFingerprint === change.diffFingerprint),
     outdated: filtered.filter((comment) => comment.diffFingerprint !== change.diffFingerprint)
@@ -223,7 +224,7 @@ function groupCommentsByFilePath(comments: ReviewComment[]): Map<string, ReviewC
 }
 
 function displayPath(change: Pick<FileChange, "newPath" | "oldPath">): string {
-  return change.newPath ?? change.oldPath ?? "(unknown)";
+  return getChangePath(change);
 }
 
 function isInternalReviewChange(change: Pick<FileChange, "newPath" | "oldPath">): boolean {

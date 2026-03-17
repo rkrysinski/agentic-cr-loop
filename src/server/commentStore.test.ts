@@ -38,6 +38,7 @@ describe("CommentStore", () => {
     expect(storedFile).toEqual({
       "tracked.txt": [
         {
+          id: expect.stringMatching(/^[0-9a-f]{12}$/),
           side: "new",
           line: 4,
           body: "Looks good",
@@ -79,6 +80,39 @@ describe("CommentStore", () => {
     await expect(store.list()).resolves.toHaveLength(0);
   });
 
+  it("keeps surviving comment ids stable after deleting an earlier comment", async () => {
+    const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
+    createdDirectories.push(repoPath);
+    const sessionFileName = getReviewSessionFileName("b58557fe1d0");
+
+    const store = new CommentStore(repoPath, sessionFileName);
+    await store.create({
+      path: "tracked.txt",
+      side: "new",
+      lineNumber: 4,
+      body: "First",
+      diffFingerprint: "fingerprint-1"
+    });
+    const second = await store.create({
+      path: "tracked.txt",
+      side: "new",
+      lineNumber: 5,
+      body: "Second",
+      diffFingerprint: "fingerprint-1"
+    });
+
+    const [firstListed] = await store.list();
+    await store.delete(firstListed!.commentId);
+
+    await expect(store.list()).resolves.toMatchObject([
+      {
+        commentId: second.commentId,
+        body: "Second",
+        lineNumber: 5
+      }
+    ]);
+  });
+
   it("reads legacy comment files and normalizes them to the simplified schema", async () => {
     const repoPath = await fs.mkdtemp(path.join(os.tmpdir(), "comment-store-"));
     createdDirectories.push(repoPath);
@@ -111,6 +145,7 @@ describe("CommentStore", () => {
 
     await expect(store.list()).resolves.toMatchObject([
       {
+        commentId: expect.stringMatching(/^[0-9a-f]{12}$/),
         path: "tracked.txt",
         side: "new",
         lineNumber: 4,

@@ -24,6 +24,11 @@
       "additionalProperties": false,
       "required": ["side", "line", "body", "diffFingerprint"],
       "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 12,
+          "description": "Stable identifier used by the API for updating and deleting this comment. New files written by the tool include it; older files may omit it and are upgraded automatically on read."
+        },
         "side": {
           "type": "string",
           "enum": ["old", "new"],
@@ -49,6 +54,7 @@
       },
       "examples": [
         {
+          "id": "1a2b3c4d5e6f",
           "side": "new",
           "line": 42,
           "body": "Consider extracting this branch into a helper.",
@@ -61,6 +67,7 @@
     {
       "src/client/App.tsx": [
         {
+          "id": "1a2b3c4d5e6f",
           "side": "new",
           "line": 42,
           "body": "Consider extracting this branch into a helper.",
@@ -69,6 +76,7 @@
       ],
       "src/server/reviewService.ts": [
         {
+          "id": "7f8e9d0c1b2a",
           "side": "old",
           "line": 87,
           "body": "This validation path was stricter before the refactor.",

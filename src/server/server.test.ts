@@ -61,9 +61,10 @@ describe("server API", () => {
 
     const storedSession = JSON.parse(
       await fs.readFile(path.join(repoPath, REVIEW_STORAGE_DIRECTORY, sessionFileName), "utf8")
-    ) as Record<string, Array<{ body: string; line: number; side: string }>>;
+    ) as Record<string, Array<{ id: string; body: string; line: number; side: string }>>;
     expect(storedSession["tracked.txt"]).toHaveLength(1);
     expect(storedSession["tracked.txt"]?.[0]).toMatchObject({
+      id: expect.stringMatching(/^[0-9a-f]{12}$/),
       body: "Updated wording",
       line: 1,
       side: "new"
@@ -182,6 +183,7 @@ describe("server API", () => {
     expect(exportResponse.headers["content-type"]).toBe("text/markdown");
     expect(exportResponse.body).toContain("REVIEW tracked.txt");
     expect(exportResponse.body).toContain("NOTE");
+    expect(exportResponse.body).toContain("SIDE new LINE 1 STATUS outdated");
     expect(exportResponse.body).toContain("Persist in export");
     expect(exportResponse.body).toContain("END NOTE");
   });

@@ -1,5 +1,7 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { getChangePath } from "../shared/changePaths.js";
+import { renderReviewCommentsText, type ReviewExportFile } from "../shared/export.js";
 import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
 import { DiffViewer } from "./diffView.js";
 import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoResponse } from "../shared/api.js";
@@ -33,7 +35,6 @@ type ChangeTreeFileNode = {
   kind: "file";
   key: string;
   name: string;
-  path: string;
   change: ChangeSummary;
 };
 
@@ -41,7 +42,6 @@ type ChangeTreeDirectoryNode = {
   kind: "directory";
   key: string;
   name: string;
-  path: string;
   children: ChangeTreeNode[];
 };
 
@@ -53,10 +53,6 @@ type MutableChangeTreeDirectory = {
   directories: Map<string, MutableChangeTreeDirectory>;
   files: ChangeTreeFileNode[];
 };
-
-function getChangePath(change: ChangeSummary): string {
-  return change.newPath ?? change.oldPath ?? "(unknown)";
-}
 
 function buildChangeTree(changes: ChangeSummary[]): ChangeTreeDirectoryNode {
   const root: MutableChangeTreeDirectory = {
@@ -75,7 +71,6 @@ function buildChangeTree(changes: ChangeSummary[]): ChangeTreeDirectoryNode {
         kind: "file",
         key: path,
         name: path,
-        path,
         change
       });
       continue;
@@ -103,7 +98,6 @@ function buildChangeTree(changes: ChangeSummary[]): ChangeTreeDirectoryNode {
       kind: "file",
       key: path,
       name: fileName,
-      path,
       change
     });
   }
@@ -121,7 +115,6 @@ function finalizeDirectory(directory: MutableChangeTreeDirectory): ChangeTreeDir
     kind: "directory",
     key: directory.path || "__root__",
     name: directory.name,
-    path: directory.path,
     children: [...directories, ...files]
   };
 }
@@ -731,27 +724,30 @@ export function App() {
     0
   );
 
+  function getExportFiles(): ReviewExportFile[] {
+    return filesWithComments.map((change) => ({
+      path: getChangePath(change),
+      comments: [
+        ...(exportComments.get(change.changeId)?.current ?? []).map((comment) => ({
+          comment,
+          status: "current" as const
+        })),
+        ...(exportComments.get(change.changeId)?.outdated ?? []).map((comment) => ({
+          comment,
+          status: "outdated" as const
+        }))
+      ]
+    }));
+  }
+
   function buildExportText(): string {
-    const today = new Date().toISOString().slice(0, 10);
-    const lines: string[] = [];
-    lines.push(`CODE REVIEW  ·  ${repoName}  ·  branch: ${repo?.baseRef ?? "HEAD"}  ·  ${today}`);
-    lines.push("━".repeat(50));
-    for (const change of filesWithComments) {
-      const path = getChangePath(change);
-      const fileComments = exportComments.get(change.changeId);
-      lines.push("", `FILE: ${path}`, "");
-      for (const c of fileComments?.current ?? []) {
-        lines.push(`[COMMENT · Line ${c.lineNumber} · side: ${c.side}]`);
-        lines.push(c.body);
-        lines.push("");
+    return renderReviewCommentsText(getExportFiles(), {
+      header: {
+        repoName,
+        baseRef: repo?.baseRef ?? "HEAD",
+        date: new Date().toISOString().slice(0, 10)
       }
-      for (const c of fileComments?.outdated ?? []) {
-        lines.push(`[OUTDATED COMMENT · Line ${c.lineNumber} · side: ${c.side}]`);
-        lines.push(c.body);
-        lines.push("");
-      }
-    }
-    return lines.join("\n");
+    });
   }
 
   function handleCopy() {

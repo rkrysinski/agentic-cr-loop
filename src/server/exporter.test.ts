@@ -39,7 +39,7 @@ describe("renderCommentsMarkdown", () => {
     ]);
 
     expect(markdown.indexOf("REVIEW a.ts")).toBeLessThan(markdown.indexOf("REVIEW b.ts"));
-    expect(markdown).toContain("NOTE 1 LINE 3\nFirst\nEND NOTE");
-    expect(markdown).toContain("NOTE 2 LINE 10\nSecond\nEND NOTE");
+    expect(markdown).toContain("NOTE 1 SIDE old LINE 3 STATUS current\nFirst\nEND NOTE");
+    expect(markdown).toContain("NOTE 2 SIDE new LINE 10 STATUS current\nSecond\nEND NOTE");
   });
 });

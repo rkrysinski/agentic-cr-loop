@@ -139,8 +139,8 @@ Responsibilities:
 Implementation notes:
 - Store one session file per `HEAD` short id.
 - Use a plain JSON object keyed by repository-relative file path.
-- Each stored comment records only `side`, `line`, `body`, and `diffFingerprint`.
-- Derive runtime-only fields such as `commentId` in memory instead of persisting them.
+- Each stored comment records a stable `id` plus `side`, `line`, `body`, and `diffFingerprint`.
+- Preserve stored comment ids across edits and deletions so API references stay stable.
 - If the current file diff fingerprint no longer matches the stored fingerprint, mark the comment as outdated instead of silently moving it.
 
 #### Exporter

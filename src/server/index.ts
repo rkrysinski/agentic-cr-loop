@@ -1,17 +1,3 @@
-import { parseServerOptions } from "./args.js";
-import { startServer } from "./server.js";
+import { logFatalError, runServer } from "./runServer.js";
 
-async function main() {
-  const options = parseServerOptions(process.argv.slice(2));
-  const { server, port } = await startServer(options);
-
-  server.listen(port, "localhost", () => {
-    console.log(`Review tool listening on http://localhost:${port}`);
-  });
-}
-
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(message);
-  process.exitCode = 1;
-});
+runServer().catch(logFatalError);

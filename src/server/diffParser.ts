@@ -1,4 +1,5 @@
-import type { DiffHunk, DiffLine, FileChange } from "../shared/types.js";
+import { getChangePath } from "../shared/changePaths.js";
+import type { DiffLine, FileChange } from "../shared/types.js";
 import { sha256 } from "./hash.js";
 
 type ParseState = {
@@ -294,5 +295,5 @@ function normalizeDiffLine(line: DiffLine): string {
 }
 
 function displayPath(change: Pick<FileChange, "newPath" | "oldPath">): string {
-  return change.newPath ?? change.oldPath ?? "(unknown)";
+  return getChangePath(change);
 }
