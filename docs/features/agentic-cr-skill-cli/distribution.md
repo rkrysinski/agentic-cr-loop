@@ -2,7 +2,9 @@
 
 ## Package Name
 
-`agentic-code-review`
+`crloop`
+
+See [docs/decisions/naming.md](../../decisions/naming.md) for the rationale behind this name and the repository name (`agentic-cr-loop`).
 
 ## Distribution Channel
 
@@ -10,14 +12,14 @@ npm registry. Users install without cloning the repository:
 
 ```bash
 # Install globally
-npm install -g agentic-code-review
+npm install -g crloop
 
 # Or run without installing
-npx agentic-code-review serve --repo ./my-project
+npx crloop serve --repo ./my-project
 
 # Or install as a project dev dependency
-npm install --save-dev agentic-code-review
-npx agentic-code-review serve --repo .
+npm install --save-dev crloop
+npx crloop serve --repo .
 ```
 
 ## End-User Requirements
@@ -30,13 +32,13 @@ npx agentic-code-review serve --repo .
 
 ```json
 {
-  "name": "agentic-code-review",
+  "name": "crloop",
   "version": "1.0.0",
   "private": false,
   "type": "module",
-  "description": "Local code review tool for AI agent workflows",
+  "description": "Agentic code review loop — human and agent review together",
   "bin": {
-    "agentic-code-review": "dist/server/server/cli.js"
+    "crloop": "dist/server/server/cli.js"
   },
   "files": [
     "dist/server",
@@ -57,9 +59,9 @@ npx agentic-code-review serve --repo .
 
 | Field | Value | Purpose |
 |---|---|---|
-| `name` | `agentic-code-review` | npm package name |
+| `name` | `crloop` | npm package name |
 | `private` | `false` | Allows publishing (currently `true`) |
-| `bin` | `{ "agentic-code-review": "dist/server/server/cli.js" }` | Registers the CLI command |
+| `bin` | `{ "crloop": "dist/server/server/cli.js" }` | Registers the CLI command |
 | `files` | `["dist/server", "dist/client", "skill"]` | Whitelist of files included in the tarball |
 | `prepublishOnly` | `npm run build && npm test` | Ensures build and tests pass before publishing |
 
@@ -68,7 +70,7 @@ npx agentic-code-review serve --repo .
 The `files` field controls what npm includes in the tarball:
 
 ```
-agentic-code-review/
+crloop/
   package.json
   dist/
     server/              ← compiled TypeScript (Express server + CLI)
@@ -126,7 +128,7 @@ npm pack --dry-run
 
 # Create a local tarball and inspect it
 npm pack
-tar tzf agentic-code-review-1.0.0.tgz
+tar tzf crloop-1.0.0.tgz
 ```
 
 ## What npm Handles Automatically
@@ -134,7 +136,7 @@ tar tzf agentic-code-review-1.0.0.tgz
 - Downloads the tarball from the registry
 - Installs production `dependencies` only (express, react, react-dom, react-syntax-highlighter)
 - Skips `devDependencies` (typescript, vite, vitest, testing libs)
-- Links the `bin` entry so `agentic-code-review` is on PATH
+- Links the `bin` entry so `crloop` is on PATH
 - Generates a `.cmd` wrapper on Windows for cross-platform support
 
 ## Install Experience
@@ -142,18 +144,18 @@ tar tzf agentic-code-review-1.0.0.tgz
 ### Global install
 
 ```bash
-npm install -g agentic-code-review
+npm install -g crloop
 
 # Then use from any directory:
-agentic-code-review serve --repo /path/to/project
-agentic-code-review changes
+crloop serve --repo /path/to/project
+crloop changes
 ```
 
 ### npx (no install)
 
 ```bash
-npx agentic-code-review serve --repo .
-npx agentic-code-review changes
+npx crloop serve --repo .
+npx crloop changes
 ```
 
 npm downloads the package on first use and caches it. Subsequent calls reuse the cache.
@@ -162,10 +164,10 @@ npm downloads the package on first use and caches it. Subsequent calls reuse the
 
 ```bash
 cd my-project
-npm install --save-dev agentic-code-review
+npm install --save-dev crloop
 
 # Use via npx or npm scripts:
-npx agentic-code-review serve --repo .
+npx crloop serve --repo .
 ```
 
 Or add to the project's `package.json` scripts:
@@ -173,7 +175,7 @@ Or add to the project's `package.json` scripts:
 ```json
 {
   "scripts": {
-    "review": "agentic-code-review serve --repo ."
+    "review": "crloop serve --repo ."
   }
 }
 ```
@@ -187,13 +189,13 @@ The `skill/SKILL.md` file is included in the published package. Users can copy i
 npm root -g
 
 # Copy skill to agent skill directory (example for Claude Code)
-cp $(npm root -g)/agentic-code-review/skill/SKILL.md ~/.claude/skills/agentic-code-review/SKILL.md
+cp $(npm root -g)/crloop/skill/SKILL.md ~/.claude/skills/crloop/SKILL.md
 ```
 
 Or the CLI could provide a convenience command (future):
 
 ```bash
-agentic-code-review skill --install
+crloop skill --install
 ```
 
 ## Versioning
@@ -208,8 +210,8 @@ Standard npm semver:
 
 ```bash
 # Global install
-npm update -g agentic-code-review
+npm update -g crloop
 
 # Project dependency
-npm update agentic-code-review
+npm update crloop
 ```
