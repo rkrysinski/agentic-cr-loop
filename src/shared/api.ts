@@ -7,7 +7,6 @@ export type DiffContextValue = (typeof DIFF_CONTEXT_VALUES)[number];
 export type RepoResponse = {
   repoPath: string;
   baseRef: "HEAD";
-  changeCount: number;
   viewModeDefault: Extract<ViewMode, "unified">;
 };
 

@@ -218,14 +218,6 @@ function IconChevronDown() {
   );
 }
 
-function IconChevronUp() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m18 15-6-6-6 6" />
-    </svg>
-  );
-}
-
 function IconMoon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -433,7 +425,6 @@ export function App() {
       const shouldRefreshSelectedChange = nextSelectedChangeId !== null && nextSelectedChangeId === selectedChangeId;
       setRepo(repoInfo);
       setChanges(nextChanges);
-      setViewMode(repoInfo.viewModeDefault);
       setSelectedChangeId(nextSelectedChangeId);
       if (shouldRefreshSelectedChange) {
         setSelectedChangeRefreshKey((current) => current + 1);
@@ -538,9 +529,6 @@ export function App() {
 
   async function enterExportMode() {
     setExportMode(true);
-    const filesWithComments = changes.filter(
-      (c) => c.commentCounts.current > 0 || c.commentCounts.outdated > 0
-    );
     if (filesWithComments.length === 0) {
       return;
     }
@@ -733,8 +721,8 @@ export function App() {
 
   // Sidebar derived values
   const repoName = repo?.repoPath ? (repo.repoPath.split("/").filter(Boolean).at(-1) ?? repo.repoPath) : "…";
-  const statsAdded = changes.filter((c) => c.changeType !== "deleted").length;
   const statsDeleted = changes.filter((c) => c.changeType === "deleted").length;
+  const statsAdded = changes.length - statsDeleted;
   const filesWithComments = changes.filter(
     (c) => c.commentCounts.current > 0 || c.commentCounts.outdated > 0
   );
@@ -785,18 +773,23 @@ export function App() {
   }
 
   // Build breadcrumb and line counts from selected file
-  const selectedFilePath = selectedChange ? getChangePath(selectedChange) : null;
-  const breadcrumbParts = selectedFilePath ? selectedFilePath.split("/") : null;
+  const breadcrumbParts = selectedChange ? getChangePath(selectedChange).split("/") : null;
   const breadcrumbLabel = breadcrumbParts
     ? breadcrumbParts.slice(0, -1).join(" / ") + (breadcrumbParts.length > 1 ? " / " : "")
     : null;
   const breadcrumbFile = breadcrumbParts?.at(-1) ?? null;
-  const linesAdded = selectedChange
-    ? selectedChange.hunks.reduce((sum, h) => sum + h.lines.filter((l) => l.kind === "added").length, 0)
-    : 0;
-  const linesRemoved = selectedChange
-    ? selectedChange.hunks.reduce((sum, h) => sum + h.lines.filter((l) => l.kind === "removed").length, 0)
-    : 0;
+  const { linesAdded, linesRemoved } = useMemo(() => {
+    if (!selectedChange) return { linesAdded: 0, linesRemoved: 0 };
+    let added = 0;
+    let removed = 0;
+    for (const h of selectedChange.hunks) {
+      for (const l of h.lines) {
+        if (l.kind === "added") added++;
+        else if (l.kind === "removed") removed++;
+      }
+    }
+    return { linesAdded: added, linesRemoved: removed };
+  }, [selectedChange]);
 
   return (
     <div className="app-shell" data-theme={theme}>
@@ -967,7 +960,7 @@ export function App() {
                             ))}
                             {fileComments?.outdated.map((c) => (
                               <div key={c.commentId} className="export-comment-card export-comment-card-outdated">
-                                <span className="export-comment-meta export-comment-meta-outdated">[OUTDATED · Line {c.lineNumber} · side: {c.side}]</span>
+                                <span className="export-comment-meta export-comment-meta-outdated">[OUTDATED COMMENT · Line {c.lineNumber} · side: {c.side}]</span>
                                 <span className="export-comment-body export-comment-body-outdated">{c.body}</span>
                               </div>
                             ))}
@@ -1084,9 +1077,6 @@ export function App() {
               <div className="fh-spacer" />
               {linesAdded > 0 ? <span className="fh-badge fh-badge-added">+{linesAdded}</span> : null}
               {linesRemoved > 0 ? <span className="fh-badge fh-badge-removed">-{linesRemoved}</span> : null}
-              <button type="button" className="fh-collapse-btn" aria-label="Collapse file">
-                <IconChevronUp />
-              </button>
             </div>
           ) : null}
 

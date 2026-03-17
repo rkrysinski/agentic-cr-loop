@@ -25,20 +25,17 @@ export class ReviewService {
 
   async getRepoInfo(): Promise<RepoResponse> {
     await this.syncReviewSession();
-    const changes = await this.getChanges();
 
     return {
       repoPath: this.repoPath,
       baseRef: "HEAD",
-      changeCount: changes.length,
       viewModeDefault: "unified"
     };
   }
 
   async getChangeSummaries(): Promise<ChangeSummary[]> {
     await this.syncReviewSession();
-    const changes = await this.getChanges();
-    const comments = await this.commentStore.list();
+    const [changes, comments] = await Promise.all([this.getChanges(), this.commentStore.list()]);
 
     return changes.map((change) => {
       const classified = classifyCommentsForChange(comments, change);
@@ -64,18 +61,22 @@ export class ReviewService {
 
   async getComments(changeId: string): Promise<CommentsResponse> {
     await this.syncReviewSession();
-    const change = await this.getChange(changeId, SUMMARY_CONTEXT);
+    const [changes, comments] = await Promise.all([
+      this.getChanges(SUMMARY_CONTEXT),
+      this.commentStore.list()
+    ]);
+    const change = changes.find((c) => c.changeId === changeId);
     if (!change) {
       throw new Error("Unknown changeId");
     }
 
-    const comments = await this.commentStore.list();
     return classifyCommentsForChange(comments, change);
   }
 
   async createComment(request: CreateCommentRequest): Promise<ReviewComment> {
     await this.syncReviewSession();
-    const change = await this.getChange(request.changeId, "full");
+    const changes = await this.getChanges("full");
+    const change = changes.find((c) => c.changeId === request.changeId);
     if (!change) {
       throw new Error("Unknown changeId");
     }
@@ -93,7 +94,7 @@ export class ReviewService {
     }
 
     return this.commentStore.create({
-      path: fileIdentity(change),
+      path: displayPath(change),
       side: request.side,
       lineNumber: request.lineNumber,
       body: request.body.trim(),
@@ -113,14 +114,13 @@ export class ReviewService {
 
   async exportMarkdown(): Promise<string> {
     await this.syncReviewSession();
-    const changes = await this.getChanges();
-    const comments = await this.commentStore.list();
+    const [changes, comments] = await Promise.all([this.getChanges(), this.commentStore.list()]);
     const matchedFileIds = new Set<string>();
     const files = changes
       .map((change) => ({
-        path: change.newPath ?? change.oldPath ?? "(unknown)",
+        path: displayPath(change),
         comments: comments
-          .filter((comment) => comment.path === fileIdentity(change))
+          .filter((comment) => comment.path === displayPath(change))
           .map((comment) => ({
             comment,
             status: comment.diffFingerprint === change.diffFingerprint ? ("current" as const) : ("outdated" as const)
@@ -153,7 +153,6 @@ export class ReviewService {
       throw new Error("Invalid Git repository");
     }
 
-    await runGit(topLevel, ["rev-parse", "--verify", "HEAD"]);
     const headShortId = (await runGit(topLevel, ["rev-parse", "--short=12", "HEAD"])).trim();
     if (!headShortId) {
       throw new Error("Invalid Git repository");
@@ -181,29 +180,21 @@ export class ReviewService {
 
   private async readUntrackedChanges(): Promise<FileChange[]> {
     const statusOutput = await runGit(this.repoPath, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
-    const entries = statusOutput.split("\0").filter(Boolean);
-    const changes: FileChange[] = [];
+    const untrackedPaths = statusOutput
+      .split("\0")
+      .filter((entry) => entry.startsWith("?? "))
+      .map((entry) => entry.slice(3))
+      .filter((relativePath) => !isInternalReviewPath(relativePath));
 
-    for (const entry of entries) {
-      if (!entry.startsWith("?? ")) {
-        continue;
-      }
-
-      const relativePath = entry.slice(3);
-      if (isInternalReviewPath(relativePath)) {
-        continue;
-      }
-      const absolutePath = path.join(this.repoPath, relativePath);
-      const content = await fs.readFile(absolutePath);
-
-      if (isBinaryBuffer(content)) {
-        changes.push(createBinaryUntrackedChange(relativePath, content));
-      } else {
-        changes.push(createUntrackedChange(relativePath, content.toString("utf8")));
-      }
-    }
-
-    return changes;
+    return Promise.all(
+      untrackedPaths.map(async (relativePath) => {
+        const absolutePath = path.join(this.repoPath, relativePath);
+        const content = await fs.readFile(absolutePath);
+        return isBinaryBuffer(content)
+          ? createBinaryUntrackedChange(relativePath, content)
+          : createUntrackedChange(relativePath, content.toString("utf8"));
+      })
+    );
   }
 }
 
@@ -212,7 +203,7 @@ function getGitUnifiedContext(context: DiffContextValue): number {
 }
 
 function classifyCommentsForChange(comments: ReviewComment[], change: FileChange): CommentsResponse {
-  const filtered = comments.filter((comment) => comment.path === fileIdentity(change));
+  const filtered = comments.filter((comment) => comment.path === displayPath(change));
   return {
     current: filtered.filter((comment) => comment.diffFingerprint === change.diffFingerprint),
     outdated: filtered.filter((comment) => comment.diffFingerprint !== change.diffFingerprint)
@@ -241,10 +232,6 @@ function isInternalReviewChange(change: Pick<FileChange, "newPath" | "oldPath">)
 
 function isInternalReviewPath(filePath: string | null): boolean {
   return typeof filePath === "string" && (filePath === REVIEW_STORAGE_DIRECTORY || filePath.startsWith(`${REVIEW_STORAGE_DIRECTORY}/`));
-}
-
-function fileIdentity(change: Pick<FileChange, "newPath" | "oldPath">): string {
-  return displayPath(change);
 }
 
 function getLineNumberForSide(

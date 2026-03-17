@@ -433,9 +433,6 @@ function InlineThread({
         </section>
       ) : null}
 
-      {currentComments.length === 0 && outdatedComments.length === 0 && !isComposerOpen ? (
-        <div className="empty-panel compact-empty-panel">No comments for this line.</div>
-      ) : null}
     </div>
   );
 }

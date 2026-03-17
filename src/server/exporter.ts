@@ -21,8 +21,7 @@ export function renderCommentsMarkdown(files: ExportFile[]): string {
     lines.push(`REVIEW ${file.path}`);
     lines.push("");
 
-    for (const { comment, status } of comments) {
-      void status;
+    for (const { comment } of comments) {
       lines.push(`NOTE ${comment.commentId} LINE ${comment.lineNumber}`);
       lines.push(comment.body);
       lines.push("END NOTE");
@@ -34,19 +33,8 @@ export function renderCommentsMarkdown(files: ExportFile[]): string {
 }
 
 function compareCommentExportOrder(
-  left: { comment: ReviewComment; status: "current" | "outdated" },
-  right: { comment: ReviewComment; status: "current" | "outdated" }
+  left: { comment: ReviewComment },
+  right: { comment: ReviewComment }
 ): number {
-  const leftLine = exportLineNumber(left.comment);
-  const rightLine = exportLineNumber(right.comment);
-
-  if (leftLine !== rightLine) {
-    return leftLine - rightLine;
-  }
-
-  return 0;
-}
-
-function exportLineNumber(comment: ReviewComment): number {
-  return comment.lineNumber;
+  return left.comment.lineNumber - right.comment.lineNumber;
 }
