@@ -2,10 +2,16 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { getChangePath } from "../shared/changePaths.js";
 import { renderReviewCommentsText, type ReviewExportFile } from "../shared/export.js";
-import { createComment, deleteComment, getChange, getChanges, getComments, getRepo, updateComment } from "./api.js";
 import { DiffViewer } from "./diffView.js";
-import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoResponse } from "../shared/api.js";
+import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoInfoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
+import {
+  IconChevronDown, IconClipboard, IconColumns2, IconEyeOff, IconExport,
+  IconFileCode, IconFileText, IconFolderGit2, IconFolderOpen, IconGitBranch,
+  IconGitPullRequest, IconList, IconMoon, IconRefresh, IconSun, IconTerminal, IconX
+} from "./icons.js";
+import { useRepo } from "./RepoContext.js";
+import { RepoSelector } from "./RepoSelector.js";
 
 type PendingAnchor = {
   side: "old" | "new";
@@ -159,188 +165,12 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
   };
 }
 
-// ─── Icons ────────────────────────────────────────────────────
-
-function IconColumns2() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <path d="M12 3v18" />
-    </svg>
-  );
-}
-
-function IconList() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
-    </svg>
-  );
-}
-
-function IconEyeOff() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
-}
-
-function IconFileCode() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-      <path d="m10 13-2 2 2 2" />
-      <path d="m14 17 2-2-2-2" />
-    </svg>
-  );
-}
-
-function IconChevronDown() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function IconMoon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-    </svg>
-  );
-}
-
-function IconSun() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" />
-      <line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-
-function IconRefresh() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
-  );
-}
-
-function IconExport() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
-
-function IconGitPullRequest() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="18" cy="18" r="3" />
-      <circle cx="6" cy="6" r="3" />
-      <path d="M13 6h3a2 2 0 0 1 2 2v7" />
-      <line x1="6" y1="9" x2="6" y2="21" />
-    </svg>
-  );
-}
-
-function IconFolderGit2() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5" />
-      <circle cx="13" cy="12" r="2" />
-      <path d="M18 19c-2.8 0-5-2.2-5-5v8" />
-      <circle cx="20" cy="19" r="2" />
-    </svg>
-  );
-}
-
-function IconGitBranch() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="6" y1="3" x2="6" y2="15" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <path d="M18 9a9 9 0 0 1-9 9" />
-    </svg>
-  );
-}
-
-function IconFolderOpen() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.41.59l.99.99A2 2 0 0 0 12.73 5H18a2 2 0 0 1 2 2" />
-    </svg>
-  );
-}
-
-function IconFileText() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-      <path d="M10 9H8" />
-      <path d="M16 13H8" />
-      <path d="M16 17H8" />
-    </svg>
-  );
-}
-
-function IconClipboard() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-    </svg>
-  );
-}
-
-function IconTerminal() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
-    </svg>
-  );
-}
-
-function IconX() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
 // ─── App ──────────────────────────────────────────────────────
 
 export function App() {
+  const { apiClient } = useRepo();
   const layoutRef = useRef<HTMLElement | null>(null);
-  const [repo, setRepo] = useState<RepoResponse | null>(null);
+  const [repo, setRepo] = useState<RepoInfoResponse | null>(null);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
   const [selectedChange, setSelectedChange] = useState<FileChange | null>(null);
@@ -368,8 +198,12 @@ export function App() {
   const [copyConfirm, setCopyConfirm] = useState(false);
 
   useEffect(() => {
+    setChanges([]);
+    setSelectedChangeId(null);
+    setSelectedChange(null);
+    setComments(EMPTY_COMMENTS);
     void refreshAll();
-  }, []);
+  }, [apiClient]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedChangeId) {
@@ -381,7 +215,14 @@ export function App() {
     let cancelled = false;
     setLoading(true);
 
-    Promise.all([getChange(selectedChangeId, diffContext), getComments(selectedChangeId)])
+    if (!apiClient) {
+      setSelectedChange(null);
+      setComments(EMPTY_COMMENTS);
+      setLoading(false);
+      return;
+    }
+
+    Promise.all([apiClient.getChange(selectedChangeId, diffContext), apiClient.getComments(selectedChangeId)])
       .then(([change, nextComments]) => {
         if (cancelled) {
           return;
@@ -404,13 +245,17 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedChangeId, diffContext, selectedChangeRefreshKey]);
+  }, [apiClient, selectedChangeId, diffContext, selectedChangeRefreshKey]);
 
   async function refreshAll() {
+    if (!apiClient) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const [repoInfo, nextChanges] = await Promise.all([getRepo(), getChanges()]);
+      const [repoInfo, nextChanges] = await Promise.all([apiClient.getRepo(), apiClient.getChanges()]);
       const nextSelectedChangeId =
         selectedChangeId && nextChanges.some((change) => change.changeId === selectedChangeId)
           ? selectedChangeId
@@ -436,13 +281,13 @@ export function App() {
   }
 
   async function submitComment() {
-    if (!selectedChange || !pendingAnchor || draftComment.trim().length === 0) {
+    if (!selectedChange || !pendingAnchor || draftComment.trim().length === 0 || !apiClient) {
       return;
     }
 
     try {
       setSubmitting(true);
-      await createComment({
+      await apiClient.createComment({
         changeId: selectedChange.changeId,
         side: pendingAnchor.side,
         lineNumber: pendingAnchor.lineNumber,
@@ -460,20 +305,21 @@ export function App() {
   }
 
   async function refreshCommentsAndCounts(changeId: string) {
-    const [nextChanges, nextComments] = await Promise.all([getChanges(), getComments(changeId)]);
+    if (!apiClient) return;
+    const [nextChanges, nextComments] = await Promise.all([apiClient.getChanges(), apiClient.getComments(changeId)]);
     setChanges(nextChanges);
     setComments(nextComments);
   }
 
   async function submitCommentEdit() {
-    if (!editingCommentId || editingBody.trim().length === 0 || !selectedChangeId) {
+    if (!editingCommentId || editingBody.trim().length === 0 || !selectedChangeId || !apiClient) {
       return;
     }
 
     try {
       setPendingCommentActionId(editingCommentId);
-      await updateComment(editingCommentId, { body: editingBody });
-      const nextComments = await getComments(selectedChangeId);
+      await apiClient.updateComment(editingCommentId, { body: editingBody });
+      const nextComments = await apiClient.getComments(selectedChangeId);
       setComments(nextComments);
       resetEditingComment();
     } catch (nextError: unknown) {
@@ -484,13 +330,13 @@ export function App() {
   }
 
   async function removeComment(commentId: string) {
-    if (!selectedChangeId) {
+    if (!selectedChangeId || !apiClient) {
       return;
     }
 
     try {
       setPendingCommentActionId(commentId);
-      await deleteComment(commentId);
+      await apiClient.deleteComment(commentId);
       if (editingCommentId === commentId) {
         resetEditingComment();
       }
@@ -522,12 +368,12 @@ export function App() {
 
   async function enterExportMode() {
     setExportMode(true);
-    if (filesWithComments.length === 0) {
+    if (filesWithComments.length === 0 || !apiClient) {
       return;
     }
     setExportLoading(true);
     try {
-      const results = await Promise.all(filesWithComments.map((c) => getComments(c.changeId)));
+      const results = await Promise.all(filesWithComments.map((c) => apiClient.getComments(c.changeId)));
       const map = new Map<string, CommentsResponse>();
       filesWithComments.forEach((c, i) => {
         map.set(c.changeId, results[i]!);
@@ -699,7 +545,11 @@ export function App() {
               <span className="change-tree-file-icon" aria-hidden="true">
                 <IconFileCode />
               </span>
-              <span className="path-text">{segments.at(-1)}</span>
+              <span className="path-text">
+                {node.change.changeType === "renamed" && node.change.oldPath
+                  ? `${node.change.oldPath.split("/").at(-1)} → ${segments.at(-1)}`
+                  : segments.at(-1)}
+              </span>
               {node.change.commentCounts.current > 0 ? (
                 <span className="change-comment-count" aria-label={`${node.change.commentCounts.current} comments`}>
                   {node.change.commentCounts.current}
@@ -713,9 +563,10 @@ export function App() {
   }
 
   // Sidebar derived values
-  const repoName = repo?.repoPath ? (repo.repoPath.split("/").filter(Boolean).at(-1) ?? repo.repoPath) : "…";
+  const repoName = repo?.path ? (repo.path.split("/").filter(Boolean).at(-1) ?? repo.path) : "…";
+  const statsAdded = changes.filter((c) => c.changeType === "added" || c.changeType === "untracked").length;
+  const statsModified = changes.filter((c) => c.changeType === "modified" || c.changeType === "renamed").length;
   const statsDeleted = changes.filter((c) => c.changeType === "deleted").length;
-  const statsAdded = changes.length - statsDeleted;
   const filesWithComments = changes.filter(
     (c) => c.commentCounts.current > 0 || c.commentCounts.outdated > 0
   );
@@ -773,7 +624,11 @@ export function App() {
   const breadcrumbLabel = breadcrumbParts
     ? breadcrumbParts.slice(0, -1).join(" / ") + (breadcrumbParts.length > 1 ? " / " : "")
     : null;
-  const breadcrumbFile = breadcrumbParts?.at(-1) ?? null;
+  const breadcrumbFileRaw = breadcrumbParts?.at(-1) ?? null;
+  const breadcrumbFile =
+    selectedChange?.changeType === "renamed" && selectedChange.oldPath && breadcrumbFileRaw
+      ? `${selectedChange.oldPath.split("/").at(-1)} → ${breadcrumbFileRaw}`
+      : breadcrumbFileRaw;
   const { linesAdded, linesRemoved } = useMemo(() => {
     if (!selectedChange) return { linesAdded: 0, linesRemoved: 0 };
     let added = 0;
@@ -812,6 +667,9 @@ export function App() {
             </button>
           </div>
 
+          {/* Repo selector */}
+          {!isSidebarCollapsed ? <RepoSelector /> : null}
+
           {/* Repo / stats info */}
           {!isSidebarCollapsed ? (
             <div className="sidebar-info">
@@ -826,6 +684,7 @@ export function App() {
                   <span className="sidebar-stats-label">// changed_files</span>
                   <div className="sidebar-stats-grp">
                     {statsAdded > 0 ? <span className="sidebar-stat-add">+{statsAdded}</span> : null}
+                    {statsModified > 0 ? <span className="sidebar-stat-mod">~{statsModified}</span> : null}
                     {statsDeleted > 0 ? <span className="sidebar-stat-del">-{statsDeleted}</span> : null}
                   </div>
                 </div>
@@ -835,7 +694,7 @@ export function App() {
 
           {/* File tree / export file list */}
           <div id="changed-files-panel" className="sidebar-body" aria-hidden={isSidebarCollapsed}>
-            {exportMode ? (
+            {!apiClient ? null : exportMode ? (
               <ul className="change-list">
                 {filesWithComments.map((change) => {
                   const filePath = getChangePath(change);
@@ -904,7 +763,7 @@ export function App() {
 
         {/* ── Main area ── */}
         <section className="review-pane">
-          {exportMode ? (
+          {!apiClient ? null : exportMode ? (
             <>
               {/* Export Header */}
               <div className="export-header">

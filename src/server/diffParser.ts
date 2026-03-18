@@ -111,7 +111,7 @@ export function parseTrackedDiff(patch: string): FileChange[] {
       ...file,
       diffFingerprint: sha256(rawFingerprintLines.join("\n"))
     }))
-    .sort((left, right) => displayPath(left).localeCompare(displayPath(right)));
+    .sort((left, right) => getChangePath(left).localeCompare(getChangePath(right)));
 }
 
 export function createUntrackedChange(filePath: string, content: string): FileChange {
@@ -294,6 +294,3 @@ function normalizeDiffLine(line: DiffLine): string {
   return [line.kind, line.oldLineNumber ?? "-", line.newLineNumber ?? "-", line.text].join("|");
 }
 
-function displayPath(change: Pick<FileChange, "newPath" | "oldPath">): string {
-  return getChangePath(change);
-}

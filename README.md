@@ -1,69 +1,51 @@
-# Local Git Review Tool
+# crloop
 
-A single-user web app for reviewing Git working directory changes locally — browse diffs in unified or side-by-side view, attach comments to changed lines, and export them as Markdown. It runs entirely locally — no auth, no remote integrations, no Git writes.
+`crloop` is a local code review tool for your Git working directory. Browse diffs, annotate changed lines, export structured comments as Markdown — all in a browser UI running entirely on your machine.
 
-## Motivation
-
-After a decade of using proper code review tools like Crucible, I couldn't go back to reviewing code in a terminal or IDE. Neither gives you a good way to collect structured feedback.
-
-The second driver was AI agents. Agents write a lot of code, and I needed a way to review that code — and to feed structured comments back to them. Existing review tools weren't designed for that loop: agent generates code → you review it and annotate → agent reads your comments and iterates.
-
-This tool fills that gap. It gives you a familiar diff-and-comment UI, stores everything as plain text in a format agents can read directly, and lets you curate agent-generated comments before passing them back.
+Built for the AI agent workflow: agent writes code → you review and annotate → agent reads your comments and iterates.
 
 ## Requirements
 
-- `git` in `PATH`
-- Node.js and `npm`
-- A Git repository with at least one commit
+- Node.js 18+
+- git in PATH
+- A browser
 
 ## Installation
 
 ```bash
-git clone <this-repo>
-cd code-review
-npm install
+npm install -g crloop
 ```
 
 ## Usage
 
-### Development
+```bash
+crloop serve --repo /path/to/repo
+```
+
+Open `http://localhost:3000` in your browser.
+
+### Multiple repositories
 
 ```bash
-npm run dev -- --repo /path/to/repo
+crloop serve --repo /path/to/frontend --repo /path/to/backend
 ```
 
-Opens two servers: backend API on `http://localhost:3000`, frontend on `http://localhost:5173`. Open the frontend URL in your browser.
-
-Optional: `--port <number>` overrides the backend port (update `vite.config.ts` to match if you do).
-
-### Production
+### Manage repos in a running server
 
 ```bash
-npm run build
-npm start -- --repo /path/to/repo
+crloop add-repo /path/to/repo        # register a repo
+crloop repos                         # list registered repos
+crloop remove-repo <id>              # unregister a repo
 ```
 
-The backend serves the built frontend at `http://localhost:3000`.
-
-### Tests
+### Help
 
 ```bash
-npm test           # single run
-npm run test:watch # watch mode
+crloop --help
 ```
 
-## Comment Storage
+## Documentation
 
-Comments are saved inside the reviewed repository at:
-
-```
-<repo-root>/.local-code-review/<head-short-id>.json
-```
-
-They persist across restarts and travel with the checkout. See [docs/api.md](./docs/api.md) for the full schema.
-
-## Further Reading
-
-- [Architecture](./docs/architecture.md)
-- [API & comment storage](./docs/api.md)
-- [Comment file schema](./docs/review-comments.schema.json)
+- [Usage manual](./docs/usage.md) — full CLI reference, comment storage, workflows
+- [Development](./docs/development.md) — building and running from source
+- [API](./docs/api.md) — HTTP API and comment file schema

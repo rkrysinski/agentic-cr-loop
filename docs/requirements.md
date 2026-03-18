@@ -1,56 +1,85 @@
 # Requirements Specification
 
+Version 1.3
+
 ## Purpose
 
-The system MUST support review of changes captured in a Git working directory.
+A local code review tool for reviewing changes in Git working directories. The system produces review feedback consumable by both human reviewers and AI agents.
 
-The system MUST support review feedback that can be used by both a human reviewer and an AI agent.
+## Core Review
 
-## Requirements
+- **FR-01**: The system MUST be possible to run locally.
+- **FR-02**: The system MUST review changes between the current working directory state (staged, unstaged, and untracked files) and the most recent commit (HEAD).
+- **FR-03**: The system MUST include untracked text files in the reviewable change set, treating them as fully added files.
+- **FR-04**: The system MUST detect renamed files and present them with their old and new paths.
+- **FR-05**: The system MUST handle binary files by listing them in the change set but not allowing line-level comments on them.
 
-The system SHOULD remain simple in scope and operation.
+## Diff Display
 
-The system MUST be possible to run locally.
+- **FR-06**: The system MUST allow reviewed changes to be viewed in a side-by-side format.
+- **FR-07**: The system MUST allow reviewed changes to be viewed in a unified format.
+- **FR-08**: The system MUST allow the reviewer to control how many context lines are shown around changes (none, 3, 20, 100, or full file).
+- **FR-09**: The system MUST allow the reviewer to hide removed lines in the unified view.
+- **FR-10**: The system MUST apply syntax highlighting to diff content based on file extension.
 
-The system MUST allow a reviewer to review changes captured in a Git working directory.
+## Comment Management
 
-The system MUST allow reviewed changes to be viewed in a side-by-side format.
+- **FR-11**: The system MUST allow a reviewer to add a comment on a changed line.
+- **FR-12**: The system MUST allow a reviewer to edit an existing comment.
+- **FR-13**: The system MUST allow a reviewer to delete an existing comment.
+- **FR-14**: The system MUST detect when the content surrounding a commented line no longer matches the current diff and mark that comment as outdated.
+- **FR-15**: The system MUST store review comments locally within the reviewed repository, scoped to the commit they were created against.
+- **FR-16**: The system MUST carry forward comments from a prior commit to the current commit when the repository HEAD changes.
 
-The system MUST allow reviewed changes to be viewed in a unified format.
+## Comment Export
 
-The system MUST allow a reviewer to point to a changed line and provide a comment on that change.
+- **FR-17**: The system MUST allow the reviewer to export all review comments as structured text that includes, for each comment: file path, line number, diff side, comment body, and outdated status.
+- **FR-18**: The exported text MUST be plain text parseable by an AI agent without additional context.
+- **FR-19**: The system SHOULD provide a way to preview, copy to clipboard, and download the exported comments.
 
-The system MUST allow a reviewer to edit an existing comment.
+## File Navigation
 
-The system MUST allow a reviewer to delete an existing comment.
+- **FR-20**: The system MUST display changed files in a hierarchical file tree with collapsible folders.
+- **FR-21**: The system MUST show a comment count badge on each file that has comments.
+- **FR-22**: The system SHOULD allow the reviewer to collapse and resize the file list panel.
+- **FR-23**: The system MUST provide a manual refresh control to reload the change list and comment counts from the repository.
 
-The system MUST detect when a stored comment's diff anchor no longer matches the current diff and mark that comment as outdated.
+## Multi-Repository
 
-The system MUST provide all review comments in text form.
+- **FR-24**: The system MUST support multiple repositories in a single running server instance.
+- **FR-25**: The system MUST isolate all API resources per repository so that requests unambiguously target a single repo.
+- **FR-26**: The system MUST provide a way to list all registered repositories.
+- **FR-27**: The system MUST allow repositories to be registered at startup (zero, one, or many).
+- **FR-28**: The system MUST allow repositories to be registered at runtime without a server restart.
+- **FR-29**: The system MUST allow repositories to be unregistered at runtime without deleting stored comments.
+- **FR-30**: The system MUST assign each repository a stable, URL-safe identifier derived from its directory name when no explicit name is provided.
+- **FR-31**: The system MUST allow the user to provide a custom identifier when registering a repository.
+- **FR-32**: The system MUST reject duplicate repository identifiers at startup with a descriptive error.
+- **FR-33**: The system MUST preserve all existing single-repo behavior when exactly one repository is registered.
 
-The text form of review comments MUST be suitable as input for an AI agent to process.
+## Frontend — Repository Selection
 
-The system MUST allow the reviewer to control how many context lines are shown around changes (none, 3, 20, 100, or full file).
+- **FR-34**: The frontend MUST hide the repository selector when only one repository is registered.
+- **FR-35**: The frontend MUST show a repository selector when two or more repositories are registered.
+- **FR-36**: The frontend MUST show an empty state with instructions when zero repositories are registered.
+- **FR-37**: The frontend MUST persist the selected repository across page reloads.
 
-The system MUST allow the reviewer to hide removed lines in the unified view.
+## CLI
 
-The system SHOULD display changed files in a hierarchical file tree with collapsible folders.
+- **FR-38**: The CLI MUST allow the user to specify which repository to target when multiple repositories are registered.
+- **FR-39**: The CLI MUST use the sole registered repository automatically when exactly one is available.
+- **FR-40**: The CLI MUST provide commands for listing, registering, and unregistering repositories at runtime.
+- **FR-41**: The CLI MUST allow the user to specify the server URL to connect to.
 
-The system SHOULD show a comment count badge on each file that has comments.
+## Non-Functional
 
-The system SHOULD allow the reviewer to collapse and resize the file list panel.
-
-The system SHOULD apply syntax highlighting to diff content based on file extension.
-
-The system MUST handle binary files by listing them in the change set but not allowing line-level comments on them.
-
-The system MUST include untracked text files in the reviewable change set, treating them as fully added files.
-
-The system MUST detect renamed files and present them with their old and new paths.
-
-The system SHOULD provide a manual refresh control to reload the change list and comment counts from the repository.
+- **NFR-01**: The system MUST operate without requiring network access beyond localhost.
+- **NFR-02**: The system is designed for trusted, single-user, local use and does not require authentication.
+- **NFR-03**: The system SHOULD support dark and light display themes.
 
 ## Version Changes
 
-- 1.0: Added the initial requirements for local use, review of changes captured in a Git working directory, side-by-side and unified change views, line-level commenting, and text-form comment export for AI-agent processing.
-- 1.1: Added requirements derived from the implemented feature set: comment editing and deletion, outdated-comment detection, configurable diff context, hide-removed-lines option, hierarchical file tree with collapsible folders and comment badges, resizable and collapsible file panel, syntax highlighting, binary file handling, untracked file inclusion, rename detection, and manual refresh.
+- 1.0: Initial requirements for local use, Git working directory review, side-by-side and unified views, line-level commenting, and text export for AI-agent processing.
+- 1.1: Added comment editing/deletion, outdated-comment detection, configurable diff context, hide-removed-lines, file tree with comment badges, resizable file panel, syntax highlighting, binary file handling, untracked file inclusion, rename detection, and manual refresh.
+- 1.2: Added multi-repo support requirements: multiple repos per server, path-prefixed API routing, discovery endpoint, startup and runtime registration, frontend repo selector states, scoped API client, and CLI repo resolution.
+- 1.3: Quality overhaul — added requirement IDs (FR/NFR), grouped by category, rewrote implementation-detail requirements as behavior-focused (WHAT not HOW), removed internal architecture rules (scoped API client constraint), eliminated redundancies between Purpose and Requirements sections, filled completeness gaps (export UI, comment storage/migration, base reference, theme, CLI server targeting, security scope), promoted implemented SHOULD items to MUST (file tree, comment badges, syntax highlighting, manual refresh), tightened ambiguous requirements ("suitable for AI agent" → concrete export fields, "diff anchor" → "content surrounding a commented line"), removed unimplemented `CODE_REVIEW_REPO` env var from CLI requirement (deferred to future), merged frontend selector states 2 and 3 into single requirement.

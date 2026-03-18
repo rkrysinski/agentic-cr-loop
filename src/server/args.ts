@@ -1,20 +1,43 @@
 import path from "node:path";
 
 export type ServerOptions = {
-  repoPath: string;
+  repos: Array<{ id: string; path: string }>;
   port: number;
 };
 
+export function deriveRepoId(repoPath: string): string {
+  const base = path.basename(repoPath)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || "repo";
+}
+
 export function parseServerOptions(argv: string[]): ServerOptions {
-  let repoPath: string | null = null;
+  const rawRepos: Array<{ id: string; path: string }> = [];
   let port = 3000;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
 
     if (arg === "--repo") {
-      repoPath = argv[index + 1] ?? null;
+      const value = argv[index + 1] ?? null;
       index += 1;
+      if (!value) continue;
+
+      const colonIndex = value.indexOf(":");
+      let id: string;
+      let repoPath: string;
+
+      if (colonIndex > 0) {
+        id = value.slice(0, colonIndex);
+        repoPath = value.slice(colonIndex + 1);
+      } else {
+        repoPath = value;
+        id = deriveRepoId(path.basename(repoPath));
+      }
+
+      rawRepos.push({ id, path: path.resolve(repoPath) });
       continue;
     }
 
@@ -28,12 +51,16 @@ export function parseServerOptions(argv: string[]): ServerOptions {
     }
   }
 
-  if (!repoPath) {
-    throw new Error("Missing required --repo <path> argument");
+  const seen = new Map<string, string>();
+  for (const repo of rawRepos) {
+    if (seen.has(repo.id)) {
+      throw new Error(
+        `Duplicate repo id "${repo.id}" for paths: ${seen.get(repo.id)} and ${repo.path}. ` +
+          `Use name:/path syntax to assign unique ids.`
+      );
+    }
+    seen.set(repo.id, repo.path);
   }
 
-  return {
-    repoPath: path.resolve(repoPath),
-    port
-  };
+  return { repos: rawRepos, port };
 }

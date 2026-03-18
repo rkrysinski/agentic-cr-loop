@@ -89,6 +89,14 @@ export function DiffViewer({
     );
   }
 
+  if (change.changeType === "renamed" && change.hunks.length === 0) {
+    return (
+      <div className="renamed-state">
+        <p>Renamed from <code>{change.oldPath}</code> — no content changes.</p>
+      </div>
+    );
+  }
+
   if (mode === "unified") {
     return (
       <div className="diff-scroll">

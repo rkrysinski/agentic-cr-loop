@@ -1,8 +1,17 @@
 {
-  "name": "code-review",
+  "name": "crloop",
   "version": "1.0.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "description": "Agentic code review loop — human and agent review together",
+  "bin": {
+    "crloop": "dist/server/server/cli.js"
+  },
+  "files": [
+    "dist/server",
+    "dist/client",
+    "skill"
+  ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "npm run build:client && npm run build:server",
@@ -10,7 +19,8 @@
     "build:server": "tsc -p tsconfig.server.json",
     "start": "node dist/server/server/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "express": "^5.1.0",

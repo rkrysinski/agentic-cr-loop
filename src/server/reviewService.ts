@@ -5,8 +5,9 @@ import type { ChangeSummary, CommentsResponse, CreateCommentRequest, DiffContext
 import type { FileChange, ReviewComment } from "../shared/types.js";
 import { CommentStore, REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
-import { renderCommentsMarkdown } from "./exporter.js";
+import { renderReviewCommentsText } from "../shared/export.js";
 import { runGit } from "./git.js";
+import { ClientError } from "./errors.js";
 
 const SUMMARY_CONTEXT: DiffContextValue = "0";
 const FULL_CONTEXT_LINES = 1_000_000;
@@ -28,9 +29,8 @@ export class ReviewService {
     await this.syncReviewSession();
 
     return {
-      repoPath: this.repoPath,
-      baseRef: "HEAD",
-      viewModeDefault: "unified"
+      path: this.repoPath,
+      baseRef: "HEAD"
     };
   }
 
@@ -68,7 +68,7 @@ export class ReviewService {
     ]);
     const change = changes.find((c) => c.changeId === changeId);
     if (!change) {
-      throw new Error("Unknown changeId");
+      throw new ClientError("Unknown changeId");
     }
 
     return classifyCommentsForChange(comments, change);
@@ -79,7 +79,7 @@ export class ReviewService {
     const changes = await this.getChanges("full");
     const change = changes.find((c) => c.changeId === request.changeId);
     if (!change) {
-      throw new Error("Unknown changeId");
+      throw new ClientError("Unknown changeId");
     }
 
     const isValidAnchor = change.hunks.some((hunk) =>
@@ -91,11 +91,11 @@ export class ReviewService {
     );
 
     if (!isValidAnchor) {
-      throw new Error("Comment anchor is not commentable in the current diff");
+      throw new ClientError("Comment anchor is not commentable in the current diff");
     }
 
     return this.commentStore.create({
-      path: displayPath(change),
+      path: getChangePath(change),
       side: request.side,
       lineNumber: request.lineNumber,
       body: request.body.trim(),
@@ -113,7 +113,7 @@ export class ReviewService {
     return this.commentStore.delete(commentId);
   }
 
-  async exportMarkdown(): Promise<string> {
+  async exportComments(): Promise<string> {
     await this.syncReviewSession();
     const [changes, comments] = await Promise.all([this.getChanges(), this.commentStore.list()]);
     const matchedFileIds = new Set<string>();
@@ -145,7 +145,7 @@ export class ReviewService {
         }))
       }));
 
-    return renderCommentsMarkdown([...files, ...orphanedFiles]);
+    return renderReviewCommentsText([...files, ...orphanedFiles]);
   }
 
   private async syncReviewSession(): Promise<void> {
@@ -176,7 +176,7 @@ export class ReviewService {
     const tracked = parseTrackedDiff(trackedPatch).filter((change) => !isInternalReviewChange(change));
     const untracked = await this.readUntrackedChanges();
 
-    return [...tracked, ...untracked].sort((left, right) => displayPath(left).localeCompare(displayPath(right)));
+    return [...tracked, ...untracked].sort((left, right) => getChangePath(left).localeCompare(getChangePath(right)));
   }
 
   private async readUntrackedChanges(): Promise<FileChange[]> {
@@ -221,10 +221,6 @@ function groupCommentsByFilePath(comments: ReviewComment[]): Map<string, ReviewC
   }
 
   return grouped;
-}
-
-function displayPath(change: Pick<FileChange, "newPath" | "oldPath">): string {
-  return getChangePath(change);
 }
 
 function isInternalReviewChange(change: Pick<FileChange, "newPath" | "oldPath">): boolean {

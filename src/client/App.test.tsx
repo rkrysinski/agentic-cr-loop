@@ -1,26 +1,40 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App.js";
+import { RepoProvider } from "./RepoContext.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  try { localStorage.clear(); } catch { /* not available in this test env */ }
 });
+
+function renderApp() {
+  return render(
+    <RepoProvider>
+      <App />
+    </RepoProvider>
+  );
+}
 
 describe("App", () => {
   it("renders changed files as a filesystem tree", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = parseRequestUrl(input);
 
-      if (url.pathname === "/api/repo") {
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
+      }
+
+      if (url.pathname === "/api/repos/test/repo") {
         return jsonResponse({
-          repoPath: "/repo",
+          id: "test",
+          path: "/repo",
           baseRef: "HEAD",
-          changeCount: 3,
-          viewModeDefault: "unified"
+          changeCount: 3
         });
       }
 
-      if (url.pathname === "/api/changes" && !url.search) {
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -58,7 +72,7 @@ describe("App", () => {
         ]);
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -70,7 +84,7 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
         return jsonResponse({
           current: [],
           outdated: []
@@ -82,7 +96,7 @@ describe("App", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App />);
+    renderApp();
 
     const folderButton = await screen.findByRole("button", { name: "src/client" });
     expect(screen.getByRole("combobox", { name: "Diff context" })).toHaveValue("full");
@@ -133,16 +147,20 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = parseRequestUrl(input);
 
-      if (url.pathname === "/api/repo") {
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
+      }
+
+      if (url.pathname === "/api/repos/test/repo") {
         return jsonResponse({
-          repoPath: "/repo",
+          id: "test",
+          path: "/repo",
           baseRef: "HEAD",
-          changeCount: 1,
-          viewModeDefault: "unified"
+          changeCount: 1
         });
       }
 
-      if (url.pathname === "/api/changes" && !url.search) {
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -158,7 +176,7 @@ describe("App", () => {
         ]);
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -179,11 +197,11 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
         return jsonResponse(commentsState);
       }
 
-      if (url.pathname === "/api/comments" && init?.method === "POST") {
+      if (url.pathname === "/api/repos/test/comments" && init?.method === "POST") {
         return jsonResponse({
           commentId: "created",
           path: "tracked.txt",
@@ -194,26 +212,20 @@ describe("App", () => {
         }, 201);
       }
 
-      if (url.pathname === "/api/comments/current" && init?.method === "PATCH") {
+      if (url.pathname === "/api/repos/test/comments/current" && init?.method === "PATCH") {
         commentsState = {
           ...commentsState,
           current: commentsState.current.map((comment) =>
             comment.commentId === "current"
-              ? {
-                  ...comment,
-                  body: "Updated note"
-                }
+              ? { ...comment, body: "Updated note" }
               : comment
           )
         };
         return jsonResponse(commentsState.current[0]);
       }
 
-      if (url.pathname === "/api/comments/outdated" && init?.method === "DELETE") {
-        commentsState = {
-          ...commentsState,
-          outdated: []
-        };
+      if (url.pathname === "/api/repos/test/comments/outdated" && init?.method === "DELETE") {
+        commentsState = { ...commentsState, outdated: [] };
         return emptyResponse(204);
       }
 
@@ -222,7 +234,7 @@ describe("App", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    const { container } = render(<App />);
+    const { container } = renderApp();
 
     await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText("Old note")).toBeInTheDocument());
@@ -274,16 +286,15 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = parseRequestUrl(input);
 
-      if (url.pathname === "/api/repo") {
-        return jsonResponse({
-          repoPath: "/repo",
-          baseRef: "HEAD",
-          changeCount: 1,
-          viewModeDefault: "unified"
-        });
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
       }
 
-      if (url.pathname === "/api/changes" && !url.search) {
+      if (url.pathname === "/api/repos/test/repo") {
+        return jsonResponse({ id: "test", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -291,15 +302,12 @@ describe("App", () => {
             oldPath: "tracked.txt",
             newPath: "tracked.txt",
             isBinary: false,
-            commentCounts: {
-              current: 0,
-              outdated: 0
-            }
+            commentCounts: { current: 0, outdated: 0 }
           }
         ]);
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -320,11 +328,8 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
-        return jsonResponse({
-          current: [],
-          outdated: []
-        });
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
+        return jsonResponse({ current: [], outdated: [] });
       }
 
       throw new Error(`Unhandled fetch: ${url}`);
@@ -332,7 +337,7 @@ describe("App", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
 
@@ -358,16 +363,15 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = parseRequestUrl(input);
 
-      if (url.pathname === "/api/repo") {
-        return jsonResponse({
-          repoPath: "/repo",
-          baseRef: "HEAD",
-          changeCount: 1,
-          viewModeDefault: "unified"
-        });
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
       }
 
-      if (url.pathname === "/api/changes" && !url.search) {
+      if (url.pathname === "/api/repos/test/repo") {
+        return jsonResponse({ id: "test", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -375,15 +379,12 @@ describe("App", () => {
             oldPath: "tracked.txt",
             newPath: "tracked.txt",
             isBinary: false,
-            commentCounts: {
-              current: 0,
-              outdated: 0
-            }
+            commentCounts: { current: 0, outdated: 0 }
           }
         ]);
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -405,7 +406,7 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "0") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "0") {
         return jsonResponse({
           changeId: "change-1",
           changeType: "modified",
@@ -425,11 +426,8 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
-        return jsonResponse({
-          current: [],
-          outdated: []
-        });
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
+        return jsonResponse({ current: [], outdated: [] });
       }
 
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
@@ -437,7 +435,7 @@ describe("App", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => expect(screen.getByText("top")).toBeInTheDocument());
     const contextSelect = screen.getByRole("combobox", { name: "Diff context" });
@@ -457,16 +455,15 @@ describe("App", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = parseRequestUrl(input);
 
-      if (url.pathname === "/api/repo") {
-        return jsonResponse({
-          repoPath: "/repo",
-          baseRef: "HEAD",
-          changeCount: 1,
-          viewModeDefault: "unified"
-        });
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
       }
 
-      if (url.pathname === "/api/changes" && !url.search) {
+      if (url.pathname === "/api/repos/test/repo") {
+        return jsonResponse({ id: "test", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
         return jsonResponse([
           {
             changeId: "change-1",
@@ -474,15 +471,12 @@ describe("App", () => {
             oldPath: "tracked.txt",
             newPath: "tracked.txt",
             isBinary: false,
-            commentCounts: {
-              current: 0,
-              outdated: 0
-            }
+            commentCounts: { current: 0, outdated: 0 }
           }
         ]);
       }
 
-      if (url.pathname === "/api/changes/change-1" && url.searchParams.get("context") === "full") {
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
         detailRequestCount += 1;
         return jsonResponse({
           changeId: "change-1",
@@ -500,12 +494,9 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/api/comments" && url.searchParams.get("changeId") === "change-1") {
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
         commentsRequestCount += 1;
-        return jsonResponse({
-          current: [],
-          outdated: []
-        });
+        return jsonResponse({ current: [], outdated: [] });
       }
 
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
@@ -513,7 +504,7 @@ describe("App", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App />);
+    renderApp();
 
     await waitFor(() => expect(screen.getByText("after")).toBeInTheDocument());
     expect(detailRequestCount).toBe(1);

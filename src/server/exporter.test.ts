@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderCommentsMarkdown } from "./exporter.js";
+import { renderReviewCommentsText } from "../shared/export.js";
 
-describe("renderCommentsMarkdown", () => {
+describe("renderReviewCommentsText", () => {
   it("renders comments in stable file and line order", () => {
-    const markdown = renderCommentsMarkdown([
+    const output = renderReviewCommentsText([
       {
         path: "b.ts",
         comments: [
@@ -38,8 +38,8 @@ describe("renderCommentsMarkdown", () => {
       }
     ]);
 
-    expect(markdown.indexOf("REVIEW a.ts")).toBeLessThan(markdown.indexOf("REVIEW b.ts"));
-    expect(markdown).toContain("NOTE 1 SIDE old LINE 3 STATUS current\nFirst\nEND NOTE");
-    expect(markdown).toContain("NOTE 2 SIDE new LINE 10 STATUS current\nSecond\nEND NOTE");
+    expect(output.indexOf("REVIEW a.ts")).toBeLessThan(output.indexOf("REVIEW b.ts"));
+    expect(output).toContain("NOTE 1 SIDE old LINE 3 STATUS current\nFirst\nEND NOTE");
+    expect(output).toContain("NOTE 2 SIDE new LINE 10 STATUS current\nSecond\nEND NOTE");
   });
 });

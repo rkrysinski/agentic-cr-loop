@@ -1,13 +1,24 @@
-import type { FileChange, ReviewComment, ViewMode } from "./types.js";
+import type { FileChange, ReviewComment } from "./types.js";
 
 export const DIFF_CONTEXT_VALUES = ["0", "3", "20", "100", "full"] as const;
 
 export type DiffContextValue = (typeof DIFF_CONTEXT_VALUES)[number];
 
+export type RepoEntry = {
+  id: string;
+  path: string;
+};
+
+export type RepoInfoResponse = {
+  id: string;
+  path: string;
+  baseRef: string;
+  changeCount: number;
+};
+
 export type RepoResponse = {
-  repoPath: string;
+  path: string;
   baseRef: "HEAD";
-  viewModeDefault: Extract<ViewMode, "unified">;
 };
 
 export type ChangeSummary = {

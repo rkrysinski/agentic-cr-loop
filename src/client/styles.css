@@ -259,6 +259,11 @@ button, a, textarea, select, input {
   flex-shrink: 0;
 }
 
+/* When repo selector tabs are visible, tighten the gap above the info row */
+.repo-selector-tabs-wrapper + .sidebar-info {
+  padding-top: 8px;
+}
+
 .sidebar-repo-row {
   display: flex;
   align-items: center;
@@ -1494,6 +1499,7 @@ button {
 
 .empty-state,
 .binary-state,
+.renamed-state,
 .empty-panel {
   padding: 20px;
   color: var(--text-muted);
@@ -1771,6 +1777,390 @@ button {
 
 [data-theme="light"] .export-total-label {
   color: #999999;
+}
+
+/* ─── Repo Selector ──────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  --repo-tab-active-bg: #2d2d2d;
+  --repo-tab-active-text: #ffffff;
+  --repo-tab-inactive-text: #555555;
+  --repo-overflow-bg: #1e1e1e;
+  --repo-overflow-text: #777777;
+  --repo-overflow-chevron: #555555;
+  --repo-add-btn-bg: #222222;
+  --repo-add-btn-icon: #555555;
+  --repo-divider-color: #252525;
+  --repo-dropdown-bg: #1e1e1e;
+  --repo-dropdown-item-hover: #2d2d2d;
+  --repo-dropdown-text: #777777;
+}
+
+[data-theme="light"] {
+  --repo-tab-active-bg: #e0e0e0;
+  --repo-tab-active-text: #1a1a1a;
+  --repo-tab-inactive-text: #777777;
+  --repo-overflow-bg: #eeeeee;
+  --repo-overflow-text: #777777;
+  --repo-overflow-chevron: #aaaaaa;
+  --repo-add-btn-bg: #e0e0e0;
+  --repo-add-btn-icon: #888888;
+  --repo-divider-color: #e0e0e0;
+  --repo-dropdown-bg: #ffffff;
+  --repo-dropdown-item-hover: #f0f0f0;
+  --repo-dropdown-text: #666666;
+}
+
+.repo-selector-divider {
+  height: 1px;
+  background: var(--repo-divider-color);
+  margin: 10px 24px 8px;
+  flex-shrink: 0;
+}
+
+.repo-selector-tabs-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.repo-selector-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 24px;
+}
+
+.repo-tab {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--repo-tab-inactive-text);
+  border-radius: 16px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  transition: color 120ms ease, background 120ms ease;
+  flex-shrink: 0;
+}
+
+.repo-tab:hover {
+  color: var(--text-primary);
+}
+
+.repo-tab-active {
+  background: var(--repo-tab-active-bg);
+  color: var(--repo-tab-active-text);
+  font-weight: 600;
+}
+
+.repo-tab-active:hover {
+  color: var(--repo-tab-active-text);
+}
+
+.repo-selector-spacer {
+  flex: 1;
+}
+
+/* Overflow pill */
+
+.repo-overflow-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--repo-overflow-bg);
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--repo-overflow-text);
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+.repo-overflow-pill:hover {
+  color: var(--text-primary);
+}
+
+.repo-overflow-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--repo-overflow-chevron);
+  flex-shrink: 0;
+}
+
+.repo-overflow-chevron svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.repo-overflow-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 24px;
+  z-index: 200;
+  background: var(--repo-dropdown-bg);
+  border-radius: 8px;
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: calc(100% - 48px);
+}
+
+.repo-overflow-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--repo-tab-inactive-text);
+  text-align: left;
+  white-space: nowrap;
+  width: 100%;
+  transition: background 80ms ease;
+}
+
+.repo-overflow-item:hover {
+  background: var(--repo-dropdown-item-hover);
+  color: var(--text-primary);
+}
+
+/* Add button */
+
+.repo-selector-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  background: var(--repo-add-btn-bg);
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  color: var(--repo-add-btn-icon);
+  flex-shrink: 0;
+  transition: opacity 120ms ease;
+}
+
+.repo-selector-add-btn:hover {
+  opacity: 0.8;
+}
+
+.repo-selector-add-btn svg,
+.repo-selector-add-inline svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+
+/* ─── Zero-repo empty state ───────────────────────────────────── */
+
+.repo-selector-empty {
+  padding: 16px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.repo-selector-empty-text {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.repo-selector-empty-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  line-height: 1.8;
+}
+
+.repo-selector-empty-hint code {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.repo-selector-add-inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background: var(--repo-add-btn-bg);
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  color: var(--repo-add-btn-icon);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  transition: opacity 120ms ease;
+}
+
+.repo-selector-add-inline:hover {
+  opacity: 0.8;
+}
+
+/* ─── Add-repo modal ─────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme="light"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.modal-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .modal-panel {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.modal-close-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.modal-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.modal-input:focus {
+  border-color: var(--color-teal);
+}
+
+.modal-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--diff-removed-text);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.modal-add-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 6px 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.modal-add-btn:hover:not(:disabled) {
+  background: var(--bg-placeholder);
+}
+
+.modal-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

@@ -6,16 +6,67 @@ Shared request/response types: [`src/shared/api.ts`](../src/shared/api.ts)
 
 ## Endpoints
 
+### Registry
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/repo` | Repository info (path, base ref, change count) |
-| `GET` | `/api/changes` | List of changed files with comment counts |
-| `GET` | `/api/changes/:changeId` | Full diff for a file (`?context=0\|3\|20\|100\|full`) |
-| `GET` | `/api/comments?changeId=` | Current and outdated comments for a file |
-| `POST` | `/api/comments` | Create a comment |
-| `PATCH` | `/api/comments/:commentId` | Update a comment body |
-| `DELETE` | `/api/comments/:commentId` | Delete a comment (204) |
-| `GET` | `/api/export/comments.md` | Export all comments as Markdown |
+| `GET` | `/api/repos` | List all registered repos |
+| `POST` | `/api/repos` | Register a new repo at runtime |
+| `DELETE` | `/api/repos/:repoId` | Unregister a repo (204; stored comments are not deleted) |
+
+### Per-repo resources
+
+All resource routes are scoped under `/api/repos/:repoId/`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/repos/:repoId/repo` | Repository info (id, path, base ref, change count) |
+| `GET` | `/api/repos/:repoId/changes` | List of changed files with comment counts |
+| `GET` | `/api/repos/:repoId/changes/:changeId` | Full diff for a file (`?context=0\|3\|20\|100\|full`) |
+| `GET` | `/api/repos/:repoId/comments?changeId=` | Current and outdated comments for a file |
+| `POST` | `/api/repos/:repoId/comments` | Create a comment |
+| `PATCH` | `/api/repos/:repoId/comments/:commentId` | Update a comment body |
+| `DELETE` | `/api/repos/:repoId/comments/:commentId` | Delete a comment (204) |
+| `GET` | `/api/repos/:repoId/export/comments.txt` | Export all comments as plain text |
+
+### `GET /api/repos` response
+
+```json
+[
+  { "id": "frontend", "path": "/home/user/projects/frontend" },
+  { "id": "backend",  "path": "/home/user/projects/backend"  }
+]
+```
+
+### `POST /api/repos` request / response
+
+Request body:
+```json
+{ "path": "/home/user/projects/new-service", "id": "new-service" }
+```
+`id` is optional. If omitted, derived from the directory basename: lowercased, non-alphanumeric characters replaced by `-` (e.g. `/work/my_frontend` → `my-frontend`).
+
+Success (`201 Created`):
+```json
+{ "id": "new-service", "path": "/home/user/projects/new-service" }
+```
+
+Error responses:
+- `400` — path is not a valid git repository
+- `409` — a repo with this `repoId` is already registered
+
+### `GET /api/repos/:repoId/repo` response
+
+```json
+{
+  "id":          "frontend",
+  "path":        "/home/user/projects/frontend",
+  "baseRef":     "main",
+  "changeCount": 12
+}
+```
+
+`id` is new relative to the old flat `/api/repo` endpoint; `path`, `baseRef`, and `changeCount` are unchanged.
 
 ## Comment Storage
 

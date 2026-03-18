@@ -17,23 +17,23 @@ afterEach(async () => {
 
 describe("server API", () => {
   it("lists tracked and untracked changes and supports editing and deleting comments", async () => {
-    const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
     const headShortId = runGit(repoPath, ["rev-parse", "--short=12", "HEAD"]).trim();
     const sessionFileName = getReviewSessionFileName(headShortId);
 
-    const changesResponse = await invokeRoute(app, "get", "/api/changes");
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     expect(changesResponse.statusCode).toBe(200);
     expect(changesResponse.body.some((change: { changeType: string; newPath: string | null }) => change.changeType === "modified")).toBe(true);
     expect(changesResponse.body.some((change: { changeType: string; newPath: string | null }) => change.newPath === "untracked.txt")).toBe(true);
 
     const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
-    const detailResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+    const detailResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
       params: { changeId: trackedChange.changeId }
     });
     expect(detailResponse.statusCode).toBe(200);
     const line = detailResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
 
-    const createResponse = await invokeRoute(app, "post", "/api/comments", {
+    const createResponse = await invokeRoute(app, "post", "/api/repos/test/comments", {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
@@ -44,14 +44,14 @@ describe("server API", () => {
     expect(createResponse.statusCode).toBe(201);
     expect((createResponse.body as { body: string }).body).toBe("Check wording");
 
-    const updateResponse = await invokeRoute(app, "patch", "/api/comments/:commentId", {
+    const updateResponse = await invokeRoute(app, "patch", "/api/repos/test/comments/:commentId", {
       params: { commentId: (createResponse.body as { commentId: string }).commentId },
       body: { body: "Updated wording" }
     });
     expect(updateResponse.statusCode).toBe(200);
     expect((updateResponse.body as { body: string }).body).toBe("Updated wording");
 
-    const commentsResponse = await invokeRoute(app, "get", "/api/comments", {
+    const commentsResponse = await invokeRoute(app, "get", "/api/repos/test/comments", {
       query: { changeId: trackedChange.changeId }
     });
     expect(commentsResponse.statusCode).toBe(200);
@@ -70,7 +70,7 @@ describe("server API", () => {
       side: "new"
     });
 
-    const refreshedChangesResponse = await invokeRoute(app, "get", "/api/changes");
+    const refreshedChangesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     expect(refreshedChangesResponse.statusCode).toBe(200);
     expect(
       refreshedChangesResponse.body.some((change: { newPath: string | null; oldPath: string | null }) =>
@@ -78,12 +78,12 @@ describe("server API", () => {
       )
     ).toBe(false);
 
-    const deleteResponse = await invokeRoute(app, "delete", "/api/comments/:commentId", {
+    const deleteResponse = await invokeRoute(app, "delete", "/api/repos/test/comments/:commentId", {
       params: { commentId: (createResponse.body as { commentId: string }).commentId }
     });
     expect(deleteResponse.statusCode).toBe(204);
 
-    const afterDeleteResponse = await invokeRoute(app, "get", "/api/comments", {
+    const afterDeleteResponse = await invokeRoute(app, "get", "/api/repos/test/comments", {
       query: { changeId: trackedChange.changeId }
     });
     expect(afterDeleteResponse.statusCode).toBe(200);
@@ -92,16 +92,16 @@ describe("server API", () => {
   });
 
   it("marks comments outdated when the diff fingerprint changes", async () => {
-    const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
 
-    const changesResponse = await invokeRoute(app, "get", "/api/changes");
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
-    const detailResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+    const detailResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
       params: { changeId: trackedChange.changeId }
     });
     const line = detailResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
 
-    const createResponse = await invokeRoute(app, "post", "/api/comments", {
+    const createResponse = await invokeRoute(app, "post", "/api/repos/test/comments", {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
@@ -113,7 +113,7 @@ describe("server API", () => {
 
     await fs.writeFile(path.join(repoPath, "tracked.txt"), "another\nstay\n", "utf8");
 
-    const staleResponse = await invokeRoute(app, "get", "/api/comments", {
+    const staleResponse = await invokeRoute(app, "get", "/api/repos/test/comments", {
       query: { changeId: trackedChange.changeId }
     });
     expect(staleResponse.statusCode).toBe(200);
@@ -122,15 +122,15 @@ describe("server API", () => {
   });
 
   it("returns different detail context without changing comment currency", async () => {
-    const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
 
-    const changesResponse = await invokeRoute(app, "get", "/api/changes");
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
-    const fullDetailResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+    const fullDetailResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
       params: { changeId: trackedChange.changeId },
       query: { context: "full" }
     });
-    const noContextResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+    const noContextResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
       params: { changeId: trackedChange.changeId },
       query: { context: "0" }
     });
@@ -140,7 +140,7 @@ describe("server API", () => {
     expect(fullDetailResponse.body.hunks[0].lines.length).toBeGreaterThan(noContextResponse.body.hunks[0].lines.length);
 
     const line = fullDetailResponse.body.hunks[0].lines.find((entry: { kind: string }) => entry.kind === "context");
-    const createResponse = await invokeRoute(app, "post", "/api/comments", {
+    const createResponse = await invokeRoute(app, "post", "/api/repos/test/comments", {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
@@ -151,7 +151,7 @@ describe("server API", () => {
 
     expect(createResponse.statusCode).toBe(201);
 
-    const commentsResponse = await invokeRoute(app, "get", "/api/comments", {
+    const commentsResponse = await invokeRoute(app, "get", "/api/repos/test/comments", {
       query: { changeId: trackedChange.changeId }
     });
     expect(commentsResponse.statusCode).toBe(200);
@@ -160,15 +160,15 @@ describe("server API", () => {
   });
 
   it("exports orphaned stale comments even after a file leaves the diff", async () => {
-    const { app } = await startServer({ repoPath, port: 3000 }, { dev: true });
-    const changesResponse = await invokeRoute(app, "get", "/api/changes");
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
-    const detailResponse = await invokeRoute(app, "get", "/api/changes/:changeId", {
+    const detailResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
       params: { changeId: trackedChange.changeId }
     });
     const line = detailResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
 
-    await invokeRoute(app, "post", "/api/comments", {
+    await invokeRoute(app, "post", "/api/repos/test/comments", {
       body: {
         changeId: trackedChange.changeId,
         side: "new",
@@ -179,15 +179,98 @@ describe("server API", () => {
 
     await fs.writeFile(path.join(repoPath, "tracked.txt"), "before\nstay\n", "utf8");
 
-    const exportResponse = await invokeRoute(app, "get", "/api/export/comments.md");
-    expect(exportResponse.headers["content-type"]).toBe("text/markdown");
+    const exportResponse = await invokeRoute(app, "get", "/api/repos/test/export/comments.txt");
+    expect(exportResponse.headers["content-type"]).toBe("text/plain");
     expect(exportResponse.body).toContain("REVIEW tracked.txt");
     expect(exportResponse.body).toContain("NOTE");
     expect(exportResponse.body).toContain("SIDE new LINE 1 STATUS outdated");
     expect(exportResponse.body).toContain("Persist in export");
     expect(exportResponse.body).toContain("END NOTE");
   });
+
+  it("GET /api/repos returns array with registered repo", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: "test" })]));
+  });
+
+  it("returns 404 for unknown repoId", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/nonexistent/changes");
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("POST /api/repos with a valid second repo path returns 201 and repo appears in GET /api/repos", async () => {
+    const secondRepoPath = await createTempGitRepo();
+    try {
+      const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+      const postResponse = await invokeRoute(app, "post", "/api/repos", {
+        body: { path: secondRepoPath, id: "second" }
+      });
+      expect(postResponse.statusCode).toBe(201);
+      expect(postResponse.body).toMatchObject({ id: "second", path: secondRepoPath });
+
+      const listResponse = await invokeRoute(app, "get", "/api/repos");
+      expect(listResponse.body).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "test" }),
+          expect.objectContaining({ id: "second" })
+        ])
+      );
+    } finally {
+      await fs.rm(secondRepoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("POST /api/repos with already-registered id returns 409", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos", {
+      body: { path: repoPath, id: "test" }
+    });
+    expect(response.statusCode).toBe(409);
+  });
+
+  it("POST /api/repos with a non-git path returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos", {
+      body: { path: "/tmp", id: "notgit" }
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("DELETE /api/repos/:repoId removes repo; subsequent request returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const deleteResponse = await invokeRoute(app, "delete", "/api/repos/:repoId", {
+      params: { repoId: "test" }
+    });
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
+    expect(changesResponse.statusCode).toBe(404);
+  });
+
+  it("DELETE /api/repos/:repoId with nonexistent id returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "delete", "/api/repos/:repoId", {
+      params: { repoId: "nonexistent" }
+    });
+    expect(response.statusCode).toBe(404);
+  });
 });
+
+// ── Route invocation helper ──────────────────────────────────
+
+type AnyLayer = {
+  route?: {
+    path?: string;
+    methods?: Record<string, boolean>;
+    stack: Array<{ handle: Function }>;
+  };
+  handle?: {
+    stack?: AnyLayer[];
+  };
+};
 
 async function invokeRoute(
   app: import("express").Express,
@@ -199,10 +282,47 @@ async function invokeRoute(
     body?: unknown;
   } = {}
 ): Promise<{ statusCode: number; body: unknown; headers: Record<string, string> }> {
-  const layer = app.router.stack.find(
-    (entry: { route?: { path?: string; methods?: Record<string, boolean>; stack: Array<{ handle: Function }> } }) =>
-      entry.route?.path === pathPattern && entry.route.methods?.[method]
+  const allLayers = (app as unknown as { router: { stack: AnyLayer[] } }).router.stack;
+
+  let layer: AnyLayer | undefined;
+  let params = { ...options.params };
+  let isNestedRoute = false;
+
+  // Try exact match on top-level routes first
+  layer = allLayers.find(
+    (entry) => entry.route?.path === pathPattern && entry.route.methods?.[method]
   );
+
+  // If not found, try to resolve as /api/repos/{repoId}/{relPath}
+  if (!layer) {
+    const match = /^\/api\/repos\/([^/:][^/]*)((?:\/[^/]+)*)$/.exec(pathPattern);
+    if (match) {
+      const repoId = match[1]!;
+      const relPath = match[2] || undefined;
+      params = { repoId, ...params };
+
+      if (!relPath) {
+        // Top-level route like DELETE /api/repos/:repoId
+        layer = allLayers.find(
+          (entry) => entry.route?.path === "/api/repos/:repoId" && entry.route.methods?.[method]
+        );
+      } else {
+        // Search in nested router stacks for the relative path
+        for (const mwLayer of allLayers) {
+          if (!mwLayer.route && mwLayer.handle?.stack) {
+            const found = mwLayer.handle.stack.find(
+              (entry) => entry.route?.path === relPath && entry.route.methods?.[method]
+            );
+            if (found) {
+              layer = found;
+              isNestedRoute = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
 
   if (!layer?.route) {
     throw new Error(`Route not found: ${method.toUpperCase()} ${pathPattern}`);
@@ -212,8 +332,16 @@ async function invokeRoute(
   let body: unknown;
   const headers: Record<string, string> = {};
   let nextError: unknown;
+  const locals: Record<string, unknown> = {};
+
+  const request = {
+    params,
+    query: options.query ?? {},
+    body: options.body ?? {}
+  };
 
   const response = {
+    locals,
     status(code: number) {
       statusCode = code;
       return this;
@@ -232,12 +360,32 @@ async function invokeRoute(
     }
   };
 
+  // Run nested router middleware (e.g. repo lookup) before the route handler
+  if (isNestedRoute) {
+    for (const mwLayer of allLayers) {
+      if (!mwLayer.route && mwLayer.handle?.stack) {
+        for (const subLayer of mwLayer.handle.stack) {
+          if (!subLayer.route && typeof (subLayer as { handle?: Function }).handle === "function") {
+            let middlewareDone = false;
+            await (subLayer as { handle: Function }).handle(
+              request,
+              response,
+              (error?: unknown) => {
+                if (error) nextError = error;
+                middlewareDone = true;
+              }
+            );
+            if (nextError || !middlewareDone) {
+              return { statusCode, body, headers };
+            }
+          }
+        }
+      }
+    }
+  }
+
   await layer.route.stack[0].handle(
-    {
-      params: options.params ?? {},
-      query: options.query ?? {},
-      body: options.body ?? {}
-    },
+    request,
     response,
     (error?: unknown) => {
       nextError = error;

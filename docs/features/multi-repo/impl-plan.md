@@ -26,9 +26,9 @@ Phases must be done in order — each phase's output is an input to the next.
 ### Phase 1 — Shared types
 **Files:** `src/shared/api.ts`
 
-- [ ] Add `RepoEntry` type: `{ id: string; path: string }`
-- [ ] Add `RepoInfoResponse` type: `{ id: string; path: string; baseRef: string; changeCount: number }`
-- [ ] Rename existing `RepoResponse.repoPath` → `path`; drop `viewModeDefault` (unused by frontend state); keep `baseRef`
+- [x] Add `RepoEntry` type: `{ id: string; path: string }`
+- [x] Add `RepoInfoResponse` type: `{ id: string; path: string; baseRef: string; changeCount: number }`
+- [x] Rename existing `RepoResponse.repoPath` → `path`; drop `viewModeDefault` (unused by frontend state); keep `baseRef`
   - Note: `App.tsx` reads `repo.repoPath` — update that reference in Phase 10
 
 ---
@@ -38,13 +38,13 @@ Phases must be done in order — each phase's output is an input to the next.
 
 Current behaviour: exactly one `--repo <path>` required; produces `{ repoPath, port }`.
 
-- [ ] Change `ServerOptions` type to `{ repos: Array<{ id: string; path: string }>; port: number }`
-- [ ] Accept zero-or-more `--repo` args (remove the "missing --repo" hard error)
-- [ ] Parse `name:/path` syntax: if the value contains `:`, split on first `:` → `(name, path)`
-- [ ] For bare paths (no `:`), derive `id` from `path.basename` lowercased with non-`[a-z0-9]` → `-`
+- [x] Change `ServerOptions` type to `{ repos: Array<{ id: string; path: string }>; port: number }`
+- [x] Accept zero-or-more `--repo` args (remove the "missing --repo" hard error)
+- [x] Parse `name:/path` syntax: if the value contains `:`, split on first `:` → `(name, path)`
+- [x] For bare paths (no `:`), derive `id` from `path.basename` lowercased with non-`[a-z0-9]` → `-`
   - Examples: `/work/my_frontend` → `my-frontend`, `/repos/Backend.API` → `backend-api`
-- [ ] Detect duplicate `id` values across the collected repos; throw with a descriptive error listing both paths and the `name:/path` fix syntax
-- [ ] Resolve each path with `path.resolve()` (same as before)
+- [x] Detect duplicate `id` values across the collected repos; throw with a descriptive error listing both paths and the `name:/path` fix syntax
+- [x] Resolve each path with `path.resolve()` (same as before)
 
 ---
 
@@ -53,21 +53,21 @@ Current behaviour: exactly one `--repo <path>` required; produces `{ repoPath, p
 
 This is the largest change. The existing single-service, flat-route implementation is replaced entirely.
 
-- [ ] Change `startServer` signature:
+- [x] Change `startServer` signature:
   ```ts
   // Before
   startServer({ repoPath: string; port: number }, options?)
   // After
   startServer({ repos: Array<{ id: string; path: string }>; port: number }, options?)
   ```
-- [ ] Build `Map<string, ReviewService>` at startup: iterate `repos`, call `new ReviewService(path)` + `await validateRepository()` for each; fail fast on any error
-- [ ] Add `lookupRepo` helper:
+- [x] Build `Map<string, ReviewService>` at startup: iterate `repos`, call `new ReviewService(path)` + `await validateRepository()` for each; fail fast on any error
+- [x] Add `lookupRepo` helper:
   ```ts
   function lookupRepo(services: Map<string, ReviewService>, repoId: string, res: Response): ReviewService | null
   // returns the service or sends 404 and returns null
   ```
-- [ ] Create an Express `Router` with `mergeParams: true`; mount at `/api/repos/:repoId`
-- [ ] Migrate all route handlers onto the router (same logic, new relative paths):
+- [x] Create an Express `Router` with `mergeParams: true`; mount at `/api/repos/:repoId`
+- [x] Migrate all route handlers onto the router (same logic, new relative paths):
   - `GET /repo` — merge `id` into `getRepoInfo()` response; also fetch `getChangeSummaries().length` for `changeCount`
   - `GET /changes`
   - `GET /changes/:changeId`
@@ -76,43 +76,43 @@ This is the largest change. The existing single-service, flat-route implementati
   - `PATCH /comments/:commentId`
   - `DELETE /comments/:commentId`
   - `GET /export/comments.md`
-- [ ] Remove all old flat route handlers (`/api/repo`, `/api/changes`, etc.)
-- [ ] Add `GET /api/repos` flat endpoint — returns `[...services.entries()].map(([id, svc]) => ({ id, path: svc.repoPath }))`
-- [ ] Add `POST /api/repos` flat endpoint:
+- [x] Remove all old flat route handlers (`/api/repo`, `/api/changes`, etc.)
+- [x] Add `GET /api/repos` flat endpoint — returns `[...services.entries()].map(([id, svc]) => ({ id, path: svc.repoPath }))`
+- [x] Add `POST /api/repos` flat endpoint:
   - Accept `{ path: string; id?: string }`
   - Derive `id` from basename if not provided (same algorithm as Phase 2)
   - Return `409` if `id` already in map
   - Validate and instantiate `ReviewService`; return `400` on failure
   - Insert into map; return `201 { id, path }`
-- [ ] Add `DELETE /api/repos/:repoId` flat endpoint — remove from map; return `204`; return `404` if not found
+- [x] Add `DELETE /api/repos/:repoId` flat endpoint — remove from map; return `204`; return `404` if not found
 
 ---
 
 ### Phase 4 — Server: entry point wiring
 **Files:** `src/server/runServer.ts`
 
-- [ ] Update `startServer` call to pass `parsedOptions.repos` (array) instead of `parsedOptions.repoPath`
-- [ ] Remove any reference to `repoPath` from this file
+- [x] Update `startServer` call to pass `parsedOptions.repos` (array) instead of `parsedOptions.repoPath`
+- [x] Remove any reference to `repoPath` from this file
 
 ---
 
 ### Phase 5 — Server: tests
 **Files:** `src/server/server.test.ts`
 
-- [ ] Update `startServer` call: `{ repos: [{ id: 'test', path: repoPath }], port: 3000 }`
-- [ ] Update all route paths in existing tests:
+- [x] Update `startServer` call: `{ repos: [{ id: 'test', path: repoPath }], port: 3000 }`
+- [x] Update all route paths in existing tests:
   - `/api/changes` → `/api/repos/test/changes`
   - `/api/changes/:changeId` → `/api/repos/test/changes/:changeId`
   - `/api/comments` → `/api/repos/test/comments`
   - `/api/repo` → `/api/repos/test/repo`
   - `/api/export/comments.md` → `/api/repos/test/export/comments.md`
-- [ ] Add test: `GET /api/repos` returns array with `{ id: 'test', path: repoPath }`
-- [ ] Add test: unknown `repoId` in any route returns `404`
-- [ ] Add test: `POST /api/repos` with a valid second repo path → `201`, repo then appears in `GET /api/repos`
-- [ ] Add test: `POST /api/repos` with already-registered id → `409`
-- [ ] Add test: `POST /api/repos` with a non-git path → `400`
-- [ ] Add test: `DELETE /api/repos/test` → `204`; subsequent request to `/api/repos/test/changes` → `404`
-- [ ] Add test: `DELETE /api/repos/nonexistent` → `404`
+- [x] Add test: `GET /api/repos` returns array with `{ id: 'test', path: repoPath }`
+- [x] Add test: unknown `repoId` in any route returns `404`
+- [x] Add test: `POST /api/repos` with a valid second repo path → `201`, repo then appears in `GET /api/repos`
+- [x] Add test: `POST /api/repos` with already-registered id → `409`
+- [x] Add test: `POST /api/repos` with a non-git path → `400`
+- [x] Add test: `DELETE /api/repos/test` → `204`; subsequent request to `/api/repos/test/changes` → `404`
+- [x] Add test: `DELETE /api/repos/nonexistent` → `404`
 
 ---
 
@@ -123,11 +123,11 @@ These are thin HTTP wrappers. The full `crloop` CLI binary is a separate future 
 
 Each command reads `--url` (default `http://localhost:3000`) for the server base URL.
 
-- [ ] `crloop repos [--url URL]`
+- [x] `crloop repos [--url URL]`
   - `GET /api/repos`; print tab-aligned `id   path` rows; print `(no repos registered)` on empty; exit non-zero on connection failure
-- [ ] `crloop add-repo <path> [--id <repoId>] [--url URL]`
+- [x] `crloop add-repo <path> [--id <repoId>] [--url URL]`
   - `POST /api/repos { path, id? }`; print `Registered: <id> → <path>` on 201; print server error and exit non-zero on 400/409
-- [ ] `crloop remove-repo <repoId> [--url URL]`
+- [x] `crloop remove-repo <repoId> [--url URL]`
   - `DELETE /api/repos/:repoId`; print `Removed: <repoId>` on 204; print error and exit non-zero on 404
 
 ---
@@ -137,10 +137,10 @@ Each command reads `--url` (default `http://localhost:3000`) for the server base
 
 Replace the flat exported functions with a factory. The existing flat functions are called directly by `App.tsx`; they are all replaced in Phase 10.
 
-- [ ] Add top-level `getRepos(): Promise<RepoEntry[]>` → `GET /api/repos`
-- [ ] Add top-level `registerRepo(path: string, id?: string): Promise<RepoEntry>` → `POST /api/repos`
-- [ ] Add top-level `unregisterRepo(repoId: string): Promise<void>` → `DELETE /api/repos/:repoId`
-- [ ] Create `createApiClient(repoId: string)` factory that returns an object with scoped versions of all resource functions:
+- [x] Add top-level `getRepos(): Promise<RepoEntry[]>` → `GET /api/repos`
+- [x] Add top-level `registerRepo(path: string, id?: string): Promise<RepoEntry>` → `POST /api/repos`
+- [x] Add top-level `unregisterRepo(repoId: string): Promise<void>` → `DELETE /api/repos/:repoId`
+- [x] Create `createApiClient(repoId: string)` factory that returns an object with scoped versions of all resource functions:
   - `getRepo()` → `GET /api/repos/:repoId/repo`
   - `getChanges()` → `GET /api/repos/:repoId/changes`
   - `getChange(changeId, context)` → `GET /api/repos/:repoId/changes/:changeId`
@@ -149,15 +149,15 @@ Replace the flat exported functions with a factory. The existing flat functions 
   - `updateComment(commentId, input)` → `PATCH /api/repos/:repoId/comments/:commentId`
   - `deleteComment(commentId)` → `DELETE /api/repos/:repoId/comments/:commentId`
   - `exportMarkdown()` → `GET /api/repos/:repoId/export/comments.md`
-- [ ] Export `ApiClient` type (the return type of `createApiClient`)
-- [ ] Remove old flat resource functions (they are dead after Phase 10)
+- [x] Export `ApiClient` type (the return type of `createApiClient`)
+- [x] Remove old flat resource functions (they are dead after Phase 10)
 
 ---
 
 ### Phase 8 — Frontend: repo context and hook
 **Files:** new `src/client/RepoContext.tsx`
 
-- [ ] Define context shape:
+- [x] Define context shape:
   ```ts
   type RepoContextValue = {
     repos: RepoEntry[];
@@ -167,14 +167,14 @@ Replace the flat exported functions with a factory. The existing flat functions 
     refreshRepos: () => Promise<void>;
   }
   ```
-- [ ] `RepoProvider` component:
+- [x] `RepoProvider` component:
   - Fetches `GET /api/repos` at mount via `getRepos()`
   - Restores `activeRepoId` from `localStorage` keyed by `'crloop.repo.' + location.origin`; falls back to `repos[0].id`
   - Updates `localStorage` on `setActiveRepoId`
   - Re-derives `apiClient` from `createApiClient(activeRepoId)` whenever `activeRepoId` changes
   - Exposes `refreshRepos` to trigger a re-fetch (called by `RepoSelector` after register/unregister)
-- [ ] `useRepo()` hook — consumes the context; throws if used outside `RepoProvider`
-- [ ] Handle the case where `activeRepoId` from localStorage no longer exists in the re-fetched list (fall back to first entry, or null if empty)
+- [x] `useRepo()` hook — consumes the context; throws if used outside `RepoProvider`
+- [x] Handle the case where `activeRepoId` from localStorage no longer exists in the re-fetched list (fall back to first entry, or null if empty)
 
 ---
 
@@ -183,19 +183,19 @@ Replace the flat exported functions with a factory. The existing flat functions 
 
 Implements the three visual states from the design. Consumes `useRepo()`.
 
-- [ ] **State 1 (single repo):** render nothing — selector is hidden
-- [ ] **State 2 (two repos):** horizontal pill tab strip
+- [x] **State 1 (single repo):** render nothing — selector is hidden
+- [x] **State 2 (two repos):** horizontal pill tab strip
   - Active tab: `#2D2D2D` bg, white bold text, `borderRadius: 16px`, `padding: 5px 12px`
   - Inactive tab: no bg, `#555555` text, same size
   - `fill_container` spacer pushing `+` button to the far right
   - `+` button: `#222222` bg, `borderRadius: 8px`; opens add-repo modal on click
   - Clicking a tab calls `setActiveRepoId`
-- [ ] **State 3 (3+ repos):** overflow mode
+- [x] **State 3 (3+ repos):** overflow mode
   - Pinned tabs: the two most recently active repos (LRU order tracked in local state)
   - Overflow pill: `#1E1E1E` bg, `+N ▾` label, `borderRadius: 16px`; clicking opens dropdown
   - Overflow dropdown: floating panel anchored below the pill; lists hidden repos; selecting a repo calls `setActiveRepoId` and swaps it into the pinned two (push LRU tab to overflow)
   - `+` button remains outside the overflow pill
-- [ ] **Zero-repo state (`repos.length === 0`):**
+- [x] **Zero-repo state (`repos.length === 0`):**
   - Render a centered placeholder in the sidebar body area:
     ```
     No repositories loaded.
@@ -203,21 +203,21 @@ Implements the three visual states from the design. Consumes `useRepo()`.
     or click [+] to add one.
     ```
   - `[+]` opens the add-repo modal
-- [ ] **Add-repo modal** (used by `+` button in State 2, State 3, and zero-repo state):
+- [x] **Add-repo modal** (used by `+` button in State 2, State 3, and zero-repo state):
   - Text field: "Repository path" (required)
   - Text field: "ID (optional)" (placeholder: derived from basename)
   - Add button: calls `registerRepo(path, id?)` then `refreshRepos()`; closes on 201
   - Inline error below path field on 400 (`Not a git repository`) and 409 (`ID already in use`)
   - Dismissed by `Esc` or click-outside
-- [ ] After `unregisterRepo` succeeds: call `refreshRepos()`; if removed repo was active, auto-select first remaining repo (or enter zero-repo state)
+- [x] After `unregisterRepo` succeeds: call `refreshRepos()`; if removed repo was active, auto-select first remaining repo (or enter zero-repo state)
 
 ---
 
 ### Phase 10 — Frontend: App wiring
 **Files:** `src/client/main.tsx`, `src/client/App.tsx`
 
-- [ ] In `main.tsx`: wrap `<App />` with `<RepoProvider>`
-- [ ] In `App.tsx`:
+- [x] In `main.tsx`: wrap `<App />` with `<RepoProvider>`
+- [x] In `App.tsx`:
   - Replace `import { getRepo, getChanges, ... } from './api.js'` with `const { apiClient } = useRepo()`
   - Replace all direct API call sites with `apiClient.getRepo()`, `apiClient.getChanges()`, etc.
   - Guard all API calls: if `apiClient` is null (zero repos), skip and clear state
@@ -231,10 +231,10 @@ Implements the three visual states from the design. Consumes `useRepo()`.
 ### Phase 11 — Frontend: tests
 **Files:** `src/client/App.test.tsx`, new `src/client/RepoSelector.test.tsx`
 
-- [ ] In `App.test.tsx`: mock `GET /api/repos` to return `[{ id: 'test', path: '/fake/path' }]`
-- [ ] Update all mocked API paths from flat routes to `/api/repos/test/...`
-- [ ] Add test: app renders with zero repos → shows empty state placeholder
-- [ ] Add `RepoSelector.test.tsx`:
+- [x] In `App.test.tsx`: mock `GET /api/repos` to return `[{ id: 'test', path: '/fake/path' }]`
+- [x] Update all mocked API paths from flat routes to `/api/repos/test/...`
+- [x] Add test: app renders with zero repos → shows empty state placeholder
+- [x] Add `RepoSelector.test.tsx`:
   - State 1 (1 repo): selector not in DOM
   - State 2 (2 repos): both tabs rendered; clicking inactive tab calls `setActiveRepoId`
   - State 3 (3 repos): two pinned tabs + overflow pill visible; clicking overflow opens dropdown

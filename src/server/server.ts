@@ -2,69 +2,157 @@ import http from "node:http";
 import path from "node:path";
 import express from "express";
 import { DIFF_CONTEXT_VALUES } from "../shared/api.js";
-import type { CreateCommentRequest, DiffContextValue, UpdateCommentRequest } from "../shared/api.js";
+import type { CreateCommentRequest, DiffContextValue, RepoEntry, RepoInfoResponse, UpdateCommentRequest } from "../shared/api.js";
+import { deriveRepoId } from "./args.js";
+import { ClientError } from "./errors.js";
 import { ReviewService } from "./reviewService.js";
 
 type StartOptions = {
   dev?: boolean;
 };
 
+function getRepoService(response: express.Response): ReviewService {
+  return response.locals.service as ReviewService;
+}
+
+function getRepoId(response: express.Response): string {
+  return response.locals.repoId as string;
+}
+
 export async function startServer(
-  { repoPath, port }: { repoPath: string; port: number },
+  { repos, port }: { repos: Array<{ id: string; path: string }>; port: number },
   options: StartOptions = {}
 ): Promise<{ app: express.Express; server: http.Server; port: number }> {
-  const reviewService = new ReviewService(repoPath);
-  await reviewService.validateRepository();
+  const services = new Map<string, ReviewService>();
+
+  for (const repo of repos) {
+    const svc = new ReviewService(repo.path);
+    await svc.validateRepository();
+    services.set(repo.id, svc);
+  }
 
   const app = express();
   app.use(express.json());
 
-  app.get("/api/repo", async (_request, response, next) => {
+  // ── Flat repo-management endpoints ──────────────────────────
+
+  app.get("/api/repos", (_request, response) => {
+    const result: RepoEntry[] = [...services.entries()].map(([id, svc]) => ({ id, path: svc.repoPath }));
+    response.json(result);
+  });
+
+  app.post("/api/repos", async (request, response, next) => {
     try {
-      response.json(await reviewService.getRepoInfo());
+      const body = request.body as Partial<{ path: string; id: string }>;
+      if (typeof body.path !== "string" || body.path.trim().length === 0) {
+        response.status(400).json({ error: "Missing path" });
+        return;
+      }
+
+      const resolvedPath = path.resolve(body.path);
+      const id = typeof body.id === "string" && body.id.trim().length > 0 ? body.id : deriveRepoId(resolvedPath);
+
+      if (services.has(id)) {
+        response.status(409).json({ error: `Repo id already in use: ${id}` });
+        return;
+      }
+
+      const svc = new ReviewService(resolvedPath);
+      try {
+        await svc.validateRepository();
+      } catch {
+        response.status(400).json({ error: "Not a git repository" });
+        return;
+      }
+
+      services.set(id, svc);
+      response.status(201).json({ id, path: resolvedPath } satisfies RepoEntry);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/changes", async (_request, response, next) => {
+  app.delete("/api/repos/:repoId", (request, response) => {
+    const { repoId } = request.params;
+    if (!services.has(repoId)) {
+      response.status(404).json({ error: `Repo not found: ${repoId}` });
+      return;
+    }
+    services.delete(repoId);
+    response.status(204).send();
+  });
+
+  // ── Per-repo router ──────────────────────────────────────────
+
+  const repoRouter = express.Router({ mergeParams: true });
+
+  repoRouter.use((request, response, next) => {
+    const repoId = (request.params as Record<string, string>).repoId;
+    const svc = services.get(repoId);
+    if (!svc) {
+      response.status(404).json({ error: `Repo not found: ${repoId}` });
+      return;
+    }
+    response.locals.repoId = repoId;
+    response.locals.service = svc;
+    next();
+  });
+
+  repoRouter.get("/repo", async (_request, response, next) => {
     try {
-      response.json(await reviewService.getChangeSummaries());
+      const svc = getRepoService(response);
+      const [info, changes] = await Promise.all([svc.getRepoInfo(), svc.getChangeSummaries()]);
+      response.json({
+        id: getRepoId(response),
+        path: info.path,
+        baseRef: info.baseRef,
+        changeCount: changes.length
+      } satisfies RepoInfoResponse);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/changes/:changeId", async (request, response, next) => {
+  repoRouter.get("/changes", async (_request, response, next) => {
     try {
-      const change = await reviewService.getChange(request.params.changeId, parseDiffContext(request.query.context));
+      const svc = getRepoService(response);
+      response.json(await svc.getChangeSummaries());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  repoRouter.get("/changes/:changeId", async (request, response, next) => {
+    try {
+      const svc = getRepoService(response);
+      const change = await svc.getChange(request.params.changeId, parseDiffContext(request.query.context));
       if (!change) {
         response.status(404).json({ error: "Change not found" });
         return;
       }
-
       response.json(change);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/api/comments", async (request, response, next) => {
+  repoRouter.get("/comments", async (request, response, next) => {
     try {
+      const svc = getRepoService(response);
       const changeId = request.query.changeId;
       if (typeof changeId !== "string") {
         response.status(400).json({ error: "Missing changeId" });
         return;
       }
-
-      response.json(await reviewService.getComments(changeId));
+      response.json(await svc.getComments(changeId));
     } catch (error) {
       next(error);
     }
   });
 
-  app.post("/api/comments", async (request, response, next) => {
+  repoRouter.post("/comments", async (request, response, next) => {
     try {
+      const svc = getRepoService(response);
       const body = request.body as Partial<CreateCommentRequest>;
 
       if (
@@ -81,7 +169,7 @@ export async function startServer(
       }
 
       response.status(201).json(
-        await reviewService.createComment({
+        await svc.createComment({
           changeId: body.changeId,
           side: body.side,
           lineNumber: body.lineNumber,
@@ -93,8 +181,9 @@ export async function startServer(
     }
   });
 
-  app.patch("/api/comments/:commentId", async (request, response, next) => {
+  repoRouter.patch("/comments/:commentId", async (request, response, next) => {
     try {
+      const svc = getRepoService(response);
       const { commentId } = request.params;
       const body = request.body as Partial<UpdateCommentRequest>;
 
@@ -103,7 +192,7 @@ export async function startServer(
         return;
       }
 
-      const updated = await reviewService.updateComment(commentId, body.body);
+      const updated = await svc.updateComment(commentId, body.body);
       if (!updated) {
         response.status(404).json({ error: "Comment not found" });
         return;
@@ -115,15 +204,16 @@ export async function startServer(
     }
   });
 
-  app.delete("/api/comments/:commentId", async (request, response, next) => {
+  repoRouter.delete("/comments/:commentId", async (request, response, next) => {
     try {
+      const svc = getRepoService(response);
       const { commentId } = request.params;
       if (typeof commentId !== "string") {
         response.status(400).json({ error: "Missing commentId" });
         return;
       }
 
-      const deleted = await reviewService.deleteComment(commentId);
+      const deleted = await svc.deleteComment(commentId);
       if (!deleted) {
         response.status(404).json({ error: "Comment not found" });
         return;
@@ -135,20 +225,20 @@ export async function startServer(
     }
   });
 
-  app.get("/api/export/comments.md", async (_request, response, next) => {
+  repoRouter.get("/export/comments.txt", async (_request, response, next) => {
     try {
-      response.type("text/markdown").send(await reviewService.exportMarkdown());
+      const svc = getRepoService(response);
+      response.type("text/plain").send(await svc.exportComments());
     } catch (error) {
       next(error);
     }
   });
 
+  app.use("/api/repos/:repoId", repoRouter);
+
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
+    const status = error instanceof ClientError ? 400 : 500;
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status =
-      message.startsWith("Unknown changeId") || message.startsWith("Comment anchor") || message.startsWith("Invalid diff context")
-        ? 400
-        : 500;
     response.status(status).json({ error: message });
   });
 
@@ -173,7 +263,7 @@ function parseDiffContext(rawValue: unknown): DiffContextValue {
   }
 
   if (typeof rawValue !== "string" || !DIFF_CONTEXT_VALUES.includes(rawValue as DiffContextValue)) {
-    throw new Error("Invalid diff context");
+    throw new ClientError("Invalid diff context");
   }
 
   return rawValue as DiffContextValue;
