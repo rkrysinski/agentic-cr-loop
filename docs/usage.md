@@ -73,6 +73,9 @@ crloop add-repo /path/to/another-repo --id my-api
 
 # Remove a repo (stored comments are not deleted)
 crloop remove-repo my-api
+
+# Stop the server
+crloop stop-server
 ```
 
 To target a server on a non-default URL:
@@ -80,6 +83,7 @@ To target a server on a non-default URL:
 ```bash
 crloop repos --url http://localhost:4000
 crloop add-repo /path/to/repo --url http://localhost:4000
+crloop stop-server --url http://localhost:4000
 ```
 
 ### Repo ID derivation
@@ -130,7 +134,8 @@ crloop serve --repo /path/to/project
 # Open the UI and review changes
 open http://localhost:3000
 
-# When done, Ctrl+C to stop
+# When done, stop from another terminal (or Ctrl+C in the server terminal)
+crloop stop-server
 ```
 
 ## Typical multi-repo workflow

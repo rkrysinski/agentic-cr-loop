@@ -59,7 +59,9 @@ npm link crloop
 ```bash
 which crloop                                # must return a path
 crloop --version                            # must match the version in package.json
-crloop serve --repo /tmp/crloop-smoke       # must start the server without errors
+crloop serve --repo /tmp/crloop-smoke &     # must start the server without errors
+sleep 1
+crloop stop-server                          # must print "Server stopped." and exit 0
 ```
 
 **Clean up after testing:**

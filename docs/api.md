@@ -13,6 +13,7 @@ Shared request/response types: [`src/shared/api.ts`](../src/shared/api.ts)
 | `GET` | `/api/repos` | List all registered repos |
 | `POST` | `/api/repos` | Register a new repo at runtime |
 | `DELETE` | `/api/repos/:repoId` | Unregister a repo (204; stored comments are not deleted) |
+| `POST` | `/api/server/stop` | Gracefully shut down the server (204) |
 
 ### Per-repo resources
 

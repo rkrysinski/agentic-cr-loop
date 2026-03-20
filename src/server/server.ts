@@ -72,6 +72,11 @@ export async function startServer(
     }
   });
 
+  app.post("/api/server/stop", (_request, response) => {
+    response.status(204).send();
+    setImmediate(() => process.exit(0));
+  });
+
   app.delete("/api/repos/:repoId", (request, response) => {
     const { repoId } = request.params;
     if (!services.has(repoId)) {

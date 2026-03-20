@@ -121,6 +121,22 @@ async function cmdAddRepo(args: string[]): Promise<void> {
   }
 }
 
+async function cmdStopServer(args: string[]): Promise<void> {
+  const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  try {
+    const response = await fetch(`${baseUrl}/api/server/stop`, { method: "POST" });
+    if (response.status === 204) {
+      console.log("Server stopped.");
+    } else {
+      console.error(`Unexpected response: ${response.status}`);
+      process.exit(1);
+    }
+  } catch {
+    console.error("Connection failed — is the server running?");
+    process.exit(1);
+  }
+}
+
 async function cmdRemoveRepo(args: string[]): Promise<void> {
   const repoId = args[0];
   const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
@@ -152,12 +168,14 @@ function printHelp(): void {
 
 Usage:
   crloop serve [--repo <path>] [--repo name:<path>] [--port <number>]
+  crloop stop-server [--url URL]
   crloop repos [--url URL]
   crloop add-repo <path> [--id <repoId>] [--url URL]
   crloop remove-repo <repoId> [--url URL]
 
 Commands:
   serve        Start the review server (default when no command given)
+  stop-server  Stop the running server
   repos        List repos registered with the running server
   add-repo     Register a repo with the running server at runtime
   remove-repo  Unregister a repo from the running server
@@ -192,6 +210,11 @@ async function main(): Promise<void> {
     checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     const argv = command === "serve" ? args.slice(1) : args;
     await runServer({ argv });
+  } else if (command === "stop-server") {
+    const updateCheck = checkForUpdate();
+    await cmdStopServer(args.slice(1));
+    const notice = await updateCheck;
+    if (notice) console.log(notice);
   } else if (command === "repos") {
     const updateCheck = checkForUpdate();
     await cmdRepos(args.slice(1));

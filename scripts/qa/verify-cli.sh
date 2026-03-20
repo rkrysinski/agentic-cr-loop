@@ -129,6 +129,7 @@ assert_output_contains "--help documents 'serve' command" "serve"
 assert_output_contains "--help documents 'repos' command" "repos"
 assert_output_contains "--help documents 'add-repo' command" "add-repo"
 assert_output_contains "--help documents 'remove-repo' command" "remove-repo"
+assert_output_contains "--help documents 'stop-server' command" "stop-server"
 
 run_capturing crloop -h
 assert_output_contains "-h alias works" "crloop"
@@ -217,11 +218,21 @@ assert_exit1     "remove-repo non-existent id exits 1"     crloop remove-repo do
 run_capturing crloop remove-repo does-not-exist --url "$BASE_URL" || true
 assert_output_contains "remove-repo not-found error"       "not found"
 
+# ── Section 5b: stop-server ───────────────────────────────────────────────────
+
+echo ""
+echo "--- 5b. stop-server ---"
+
+assert_exit0     "stop-server exits 0"                     crloop stop-server --url "$BASE_URL"
+wait "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
+assert_exit1     "server is down after stop-server"        crloop repos --url "$BASE_URL"
+assert_output_contains "stop-server leaves server unreachable"  "Connection failed"
+
 # ── Section 6: serve name:path syntax ────────────────────────────────────────
 
 echo ""
 echo "--- 6. serve name:path syntax ---"
-stop_server
 
 crloop serve --repo "fe:$REPO_A" --repo "be:$REPO_B" --port "$PORT" > /tmp/qa-cli-server.log 2>&1 &
 SERVER_PID=$!
@@ -248,6 +259,7 @@ assert_output_contains "repos connection failure message"  "Connection failed"
 
 assert_exit1     "add-repo fails when server is down"      crloop add-repo "$REPO_A" --url "$BASE_URL"
 assert_exit1     "remove-repo fails when server is down"   crloop remove-repo a --url "$BASE_URL"
+assert_exit1     "stop-server fails when server is down"   crloop stop-server --url "$BASE_URL"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 

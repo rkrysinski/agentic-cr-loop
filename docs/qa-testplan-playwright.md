@@ -82,6 +82,7 @@ Every requirement from `docs/requirements.md` must map to at least one scenario.
 | FR-39 | CLI auto-select sole repo | 41 | CLI — not Playwright (shell) |
 | FR-40 | CLI list/register/unregister | 42, 44 | CLI — not Playwright (shell); 44 is automated |
 | FR-41 | CLI server URL | 43, 44 | CLI — not Playwright (shell); 44 covers connection-failure path |
+| FR-42 | CLI stop-server command | 44 | CLI — not Playwright (shell); Section 5b of verify-cli.sh |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | 7 | Theme switching |
@@ -531,7 +532,7 @@ The script covers the following assertions in seven sections:
 
 **Section 1 — `--version` / `--help` flags (no server)**
 - `crloop --version` exits 0 and prints the version string matching `package.json`.
-- `crloop --help` and `crloop -h` exit 0 and print usage including `serve`, `repos`, `add-repo`, and `remove-repo`.
+- `crloop --help` and `crloop -h` exit 0 and print usage including `serve`, `stop-server`, `repos`, `add-repo`, and `remove-repo`.
 
 **Section 2 — `serve` startup errors**
 - `--port abc` and `--port 0` exit 1 with `Invalid --port` message.
@@ -553,17 +554,21 @@ The script covers the following assertions in seven sections:
 - `add-repo` with missing path argument exits 1 and prints usage.
 - `remove-repo` with non-existent id exits 1 with `not found`.
 
+**Section 5b — `stop-server`**
+- `stop-server --url` exits 0 and prints `Server stopped.`.
+- After the server stops, `repos` exits 1 with `Connection failed`.
+
 **Section 6 — `serve` with `name:path` syntax**
 - `--repo fe:<path> --repo be:<path>` starts and registers repos with ids `fe` and `be`.
 
 **Section 7 — connection failure**
-- `repos`, `add-repo`, and `remove-repo` all exit 1 with `Connection failed` when no server is running.
+- `repos`, `add-repo`, `remove-repo`, and `stop-server` all exit 1 with `Connection failed` when no server is running.
 
 Expected output ends with:
 
 ```
 =========================================
-  CLI verification: 40 passed, 0 failed
+  CLI verification: 45 passed, 0 failed
 =========================================
 ```
 

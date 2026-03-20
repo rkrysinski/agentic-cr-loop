@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { startServer } from "./server.js";
 import { createTempGitRepo, runGit } from "./testUtils.js";
@@ -256,6 +256,19 @@ describe("server API", () => {
       params: { repoId: "nonexistent" }
     });
     expect(response.statusCode).toBe(404);
+  });
+
+  it("POST /api/server/stop returns 204 and schedules process exit", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    try {
+      const response = await invokeRoute(app, "post", "/api/server/stop");
+      expect(response.statusCode).toBe(204);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    } finally {
+      exitSpy.mockRestore();
+    }
   });
 });
 
