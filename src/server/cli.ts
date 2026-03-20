@@ -183,7 +183,11 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (command === "serve" || !command || command.startsWith("-")) {
+  if (command === "--help" || command === "-h") {
+    printHelp();
+  } else if (command === "--version" || command === "-v") {
+    console.log(getCurrentVersion());
+  } else if (command === "serve" || !command || command.startsWith("-")) {
     // Long-running server — fire and forget the check so it prints after "listening" message
     checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     const argv = command === "serve" ? args.slice(1) : args;
@@ -203,8 +207,6 @@ async function main(): Promise<void> {
     await cmdRemoveRepo(args.slice(1));
     const notice = await updateCheck;
     if (notice) console.log(notice);
-  } else if (command === "--help" || command === "-h") {
-    printHelp();
   } else {
     console.error(`Unknown command: ${command}\nRun "crloop --help" for usage.`);
     process.exit(1);

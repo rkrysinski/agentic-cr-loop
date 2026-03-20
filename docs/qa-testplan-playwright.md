@@ -80,8 +80,8 @@ Every requirement from `docs/requirements.md` must map to at least one scenario.
 | FR-37 | Persist selected repo | 29 | localStorage persistence |
 | FR-38 | CLI repo targeting | 40 | CLI — not Playwright (shell) |
 | FR-39 | CLI auto-select sole repo | 41 | CLI — not Playwright (shell) |
-| FR-40 | CLI list/register/unregister | 42 | CLI — not Playwright (shell) |
-| FR-41 | CLI server URL | 43 | CLI — not Playwright (shell) |
+| FR-40 | CLI list/register/unregister | 42, 44 | CLI — not Playwright (shell); 44 is automated |
+| FR-41 | CLI server URL | 43, 44 | CLI — not Playwright (shell); 44 covers connection-failure path |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | 7 | Theme switching |
@@ -481,7 +481,7 @@ These scenarios require the seed files created in Setup Step 1.
 
 ---
 
-## Scenarios 40–43: CLI
+## Scenarios 40–44: CLI
 
 > **Scope:** These scenarios test the CLI tool and cannot be executed via Playwright MCP. Run them manually in a terminal or via a shell-based test runner.
 >
@@ -516,6 +516,58 @@ These scenarios require the seed files created in Setup Step 1.
 - Verify the command connects to the specified server and returns results.
 - Run the same command with an invalid URL (e.g. `--server http://localhost:9999`).
 - Verify the CLI outputs a clear connection error, not an unhandled exception.
+
+### 44. CLI command and flag verification (automated)
+
+> **Scope:** Verifies every `crloop` command, flag, and error path. Fully automated — the script manages its own server lifecycle on port 3009 and requires no manual setup.
+
+Run the verification script:
+
+```bash
+bash scripts/qa/verify-cli.sh
+```
+
+The script covers the following assertions in seven sections:
+
+**Section 1 — `--version` / `--help` flags (no server)**
+- `crloop --version` exits 0 and prints the version string matching `package.json`.
+- `crloop --help` and `crloop -h` exit 0 and print usage including `serve`, `repos`, `add-repo`, and `remove-repo`.
+
+**Section 2 — `serve` startup errors**
+- `--port abc` and `--port 0` exit 1 with `Invalid --port` message.
+- Duplicate `--repo` ids exit 1 with `Duplicate repo id` message.
+
+**Section 3 — unknown command**
+- `crloop bogus-command` exits 1 with `Unknown command` message and a `--help` hint.
+
+**Section 4 — live server: `repos`, `add-repo`, `remove-repo`**
+- `repos --url` exits 0 and lists the startup repo.
+- `add-repo <path>` (auto-derived id) exits 0 and the new repo appears in `repos`.
+- `add-repo <path> --id <custom>` exits 0 and the custom id appears in `repos`.
+- `remove-repo <id>` exits 0 and the id disappears from `repos`.
+- Column alignment in `repos` output is verified.
+
+**Section 5 — error paths against live server**
+- `add-repo` with a duplicate id exits 1 with `already in use`.
+- `add-repo` with a non-git path exits 1 with `Not a git repository`.
+- `add-repo` with missing path argument exits 1 and prints usage.
+- `remove-repo` with non-existent id exits 1 with `not found`.
+
+**Section 6 — `serve` with `name:path` syntax**
+- `--repo fe:<path> --repo be:<path>` starts and registers repos with ids `fe` and `be`.
+
+**Section 7 — connection failure**
+- `repos`, `add-repo`, and `remove-repo` all exit 1 with `Connection failed` when no server is running.
+
+Expected output ends with:
+
+```
+=========================================
+  CLI verification: 40 passed, 0 failed
+=========================================
+```
+
+Any failure prints the failing assertion and the captured output.
 
 ---
 

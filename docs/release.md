@@ -35,6 +35,44 @@ git tag vX.Y.Z
 git push origin HEAD --tags
 ```
 
+### 3a. Pre-release smoke test (npm link)
+
+Before publishing, install the package locally using `npm link` and verify the CLI works end-to-end.
+
+**Link the package:**
+
+```bash
+# In the crloop repo root
+npm link
+```
+
+**Run smoke tests in a temporary project:**
+
+```bash
+mkdir /tmp/crloop-smoke && cd /tmp/crloop-smoke
+git init && git commit --allow-empty -m "init"   # crloop needs a git repo to work with
+npm link crloop
+```
+
+**Verify the binary resolves and basic commands work:**
+
+```bash
+which crloop                                # must return a path
+crloop --version                            # must match the version in package.json
+crloop serve --repo /tmp/crloop-smoke       # must start the server without errors
+```
+
+**Clean up after testing:**
+
+```bash
+npm unlink                                  # inside root repository
+cd /tmp/crloop-smoke
+npm unlink crloop
+cd / && rm -rf /tmp/crloop-smoke
+```
+
+If any step above fails, stop and fix before proceeding to publish.
+
 ### 4. Publish
 
 ```bash
@@ -62,7 +100,7 @@ crloop serve --repo /path/to/any/git-repo
 Confirm the version:
 
 ```bash
-crloop --version  # or: npm list -g crloop
+crloop --version  # must print X.Y.Z matching package.json
 ```
 
 ## Patch release (hotfix)
