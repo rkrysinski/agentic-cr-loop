@@ -576,7 +576,7 @@ export function App() {
             }
           >
             <span className="change-tree-file-row">
-              {isSelected ? <span className="change-tree-active-dot" aria-hidden="true" /> : null}
+              <span className="change-tree-active-dot" aria-hidden="true" style={{ visibility: isSelected ? "visible" : "hidden" }} />
               <span className="change-tree-file-icon" aria-hidden="true">
                 <IconFileCode />
               </span>
