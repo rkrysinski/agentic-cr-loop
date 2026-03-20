@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { deriveRepoId } from "./args.js";
+import { deriveRepoId, parseServerOptions } from "./args.js";
 import { logFatalError, runServer } from "./runServer.js";
 
 function getCurrentVersion(): string {
@@ -206,10 +207,27 @@ async function main(): Promise<void> {
   } else if (command === "--version" || command === "-v") {
     console.log(getCurrentVersion());
   } else if (command === "serve" || !command || command.startsWith("-")) {
-    // Long-running server — fire and forget the check so it prints after "listening" message
-    checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     const argv = command === "serve" ? args.slice(1) : args;
-    await runServer({ argv });
+    if (process.env["CRLOOP_DAEMON"] === "1") {
+      // Running as daemon — start server and keep process alive
+      await runServer({ argv });
+    } else {
+      // Validate args in the foreground so errors surface before spawning
+      parseServerOptions(argv);
+      // Spawn detached daemon and exit
+      const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, CRLOOP_DAEMON: "1" },
+      });
+      child.unref();
+      // Wait briefly to let the server bind, then confirm
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const portFlag = argv.indexOf("--port");
+      const port = portFlag !== -1 ? argv[portFlag + 1] : "3000";
+      console.log(`Server started (pid ${child.pid}) on http://localhost:${port}`);
+      checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
+    }
   } else if (command === "stop-server") {
     const updateCheck = checkForUpdate();
     await cmdStopServer(args.slice(1));

@@ -1,6 +1,6 @@
 # Requirements Specification
 
-Version 1.4
+Version 1.5
 
 ## Purpose
 
@@ -71,6 +71,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-40**: The CLI MUST provide commands for listing, registering, and unregistering repositories at runtime.
 - **FR-41**: The CLI MUST allow the user to specify the server URL to connect to.
 - **FR-42**: The CLI MUST provide a command to gracefully stop the running server.
+- **FR-43**: The `serve` command MUST return the terminal to the user immediately after the server is ready, running the server as a background process.
 
 ## Non-Functional
 
@@ -85,3 +86,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.2: Added multi-repo support requirements: multiple repos per server, path-prefixed API routing, discovery endpoint, startup and runtime registration, frontend repo selector states, scoped API client, and CLI repo resolution.
 - 1.3: Quality overhaul — added requirement IDs (FR/NFR), grouped by category, rewrote implementation-detail requirements as behavior-focused (WHAT not HOW), removed internal architecture rules (scoped API client constraint), eliminated redundancies between Purpose and Requirements sections, filled completeness gaps (export UI, comment storage/migration, base reference, theme, CLI server targeting, security scope), promoted implemented SHOULD items to MUST (file tree, comment badges, syntax highlighting, manual refresh), tightened ambiguous requirements ("suitable for AI agent" → concrete export fields, "diff anchor" → "content surrounding a commented line"), removed unimplemented `CODE_REVIEW_REPO` env var from CLI requirement (deferred to future), merged frontend selector states 2 and 3 into single requirement.
 - 1.4: Added FR-42 for graceful server shutdown via CLI (`stop-server` command / `POST /api/server/stop` endpoint).
+- 1.5: Added FR-43 for daemon behaviour — `serve` returns the terminal immediately after spawning the background server process.

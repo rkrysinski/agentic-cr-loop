@@ -79,8 +79,9 @@ setup() {
 }
 
 start_server() {
-  crloop serve --repo "a:$REPO_A" --port "$PORT" > /tmp/qa-cli-server.log 2>&1 &
-  SERVER_PID=$!
+  local output
+  output=$(crloop serve --repo "a:$REPO_A" --port "$PORT" 2>&1)
+  SERVER_PID=$(echo "$output" | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+' || true)
 
   local waited=0
   while ! curl -sf "$BASE_URL/api/repos" > /dev/null 2>&1; do
@@ -88,7 +89,7 @@ start_server() {
     waited=$((waited + 1))
     if [ "$waited" -gt 30 ]; then
       echo "Server did not start within 9s" >&2
-      cat /tmp/qa-cli-server.log >&2
+      echo "$output" >&2
       exit 1
     fi
   done
@@ -224,7 +225,6 @@ echo ""
 echo "--- 5b. stop-server ---"
 
 assert_exit0     "stop-server exits 0"                     crloop stop-server --url "$BASE_URL"
-wait "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
 assert_exit1     "server is down after stop-server"        crloop repos --url "$BASE_URL"
 assert_output_contains "stop-server leaves server unreachable"  "Connection failed"
@@ -234,8 +234,8 @@ assert_output_contains "stop-server leaves server unreachable"  "Connection fail
 echo ""
 echo "--- 6. serve name:path syntax ---"
 
-crloop serve --repo "fe:$REPO_A" --repo "be:$REPO_B" --port "$PORT" > /tmp/qa-cli-server.log 2>&1 &
-SERVER_PID=$!
+OUTPUT=$(crloop serve --repo "fe:$REPO_A" --repo "be:$REPO_B" --port "$PORT" 2>&1)
+SERVER_PID=$(echo "$OUTPUT" | grep -oE 'pid [0-9]+' | grep -oE '[0-9]+' || true)
 waited=0
 while ! curl -sf "$BASE_URL/api/repos" > /dev/null 2>&1; do
   sleep 0.3; waited=$((waited+1))

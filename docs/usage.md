@@ -100,7 +100,7 @@ Use `id:/path` syntax to override: `--repo fe:/path/to/frontend`
 
 ## Reviewing changes
 
-1. Start the server pointed at one or more repos.
+1. Start the server — the command returns immediately; the server runs in the background.
 2. Open `http://localhost:3000`.
 3. Select a changed file from the sidebar.
 4. Switch between unified and side-by-side diff views using the toggle.
@@ -134,7 +134,7 @@ crloop serve --repo /path/to/project
 # Open the UI and review changes
 open http://localhost:3000
 
-# When done, stop from another terminal (or Ctrl+C in the server terminal)
+# When done, stop the server
 crloop stop-server
 ```
 
