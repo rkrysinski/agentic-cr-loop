@@ -84,6 +84,7 @@ Every requirement from `docs/requirements.md` must map to at least one scenario.
 | FR-41 | CLI server URL | 43, 44 | CLI — not Playwright (shell); 44 covers connection-failure path |
 | FR-42 | CLI stop-server command | 44 | CLI — not Playwright (shell); Section 5b of verify-cli.sh |
 | FR-44 | UI preferences persistence | 45 | Reload assertions for theme, viewMode, sidebar, diffContext |
+| FR-45 | File-tree status coloring | 46 | CSS class and computed color assertions for added/deleted entries |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | 7 | Theme switching |
@@ -525,6 +526,46 @@ This scenario verifies that all six persisted settings are restored after a hard
 - Reload the page.
 - Verify removed-code rows are still hidden after reload (confirm toggle is active).
 - Disable the toggle, reload, and verify removed rows return.
+
+---
+
+## Scenario 46: File-Tree Status Coloring
+
+> **Prerequisite:** Single-repo setup (Scenarios 1–22). The server must be running with at least one added file and one deleted file in the working-tree diff. Use the seed from Setup Step 1 — `qa-untracked.txt` is present as an untracked/added file.
+
+### 46. File tree colors files by change type (FR-45)
+
+**Added / untracked file:**
+- In the file tree, locate `qa-untracked.txt` (changeType `untracked`).
+- Use `browser_evaluate` to verify the button element has the class `change-type-untracked`:
+  ```js
+  !!document.querySelector('.change-item.change-type-untracked')
+  ```
+- Use `browser_evaluate` to read the computed color of the `.path-text` child and confirm it is a teal/green value (matching `--diff-added-text`):
+  ```js
+  getComputedStyle(document.querySelector('.change-type-untracked .path-text')).color
+  ```
+- Verify the color is not the default grey (`rgb(170, 170, 170)` in light or `rgb(85, 85, 85)` in dark).
+
+**Modified file:**
+- Locate any `modified` file in the tree.
+- Use `browser_evaluate` to verify the button has class `change-type-modified` and does **not** have `change-type-added` or `change-type-deleted`:
+  ```js
+  const el = document.querySelector('.change-item.change-type-modified');
+  el && !el.classList.contains('change-type-added') && !el.classList.contains('change-type-deleted')
+  ```
+
+**Selected state override:**
+- Click an added/untracked file to select it.
+- Use `browser_evaluate` to verify that after selection the `.path-text` color reverts to the primary text color (not the teal/green), confirming the selected-state cascade wins:
+  ```js
+  getComputedStyle(document.querySelector('.change-item.selected .path-text')).color
+  ```
+
+**Theme consistency:**
+- Toggle to light theme using the toolbar theme control.
+- Repeat the color assertion for the added file — verify it is still a green/teal value (different hex from dark mode but same semantic).
+- Toggle back to dark theme.
 
 ---
 

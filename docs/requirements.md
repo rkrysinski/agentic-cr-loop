@@ -1,6 +1,6 @@
 # Requirements Specification
 
-Version 1.6
+Version 1.7
 
 ## Purpose
 
@@ -43,6 +43,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-21**: The system MUST show a comment count badge on each file that has comments.
 - **FR-22**: The system SHOULD allow the reviewer to collapse and resize the file list panel.
 - **FR-23**: The system MUST provide a manual refresh control to reload the change list and comment counts from the repository.
+- **FR-45**: The system SHOULD visually distinguish added, deleted, and renamed files from modified files in the file tree using color coding consistent with the diff view palette, in both dark and light themes.
 
 ## Multi-Repository
 
@@ -92,3 +93,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.4: Added FR-42 for graceful server shutdown via CLI (`stop-server` command / `POST /api/server/stop` endpoint).
 - 1.5: Added FR-43 for daemon behaviour — `serve` returns the terminal immediately after spawning the background server process.
 - 1.6: Added FR-44 for UI preferences persistence — theme, view mode, diff context, hide-removed-lines, sidebar collapsed state, and sidebar width now survive page reloads and browser restarts via localStorage.
+- 1.7: Added FR-45 for file-tree status coloring — added/untracked files shown in teal, deleted in red, renamed in amber, consistent with the diff view palette, in both dark and light themes.

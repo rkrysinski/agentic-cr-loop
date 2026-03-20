@@ -590,6 +590,33 @@ button, a, textarea, select, input {
   color: var(--color-orange);
 }
 
+/* ─── File status coloring by change type ────────────────────── */
+
+.change-type-added .change-tree-file-icon,
+.change-type-untracked .change-tree-file-icon {
+  color: var(--diff-added-text);      /* dark: #00d4aa  light: #007755 */
+}
+
+.change-type-added .path-text,
+.change-type-untracked .path-text {
+  color: var(--diff-added-text);
+}
+
+.change-type-deleted .change-tree-file-icon {
+  color: var(--diff-removed-text);    /* dark: #ff6b35  light: #cc4400 */
+}
+
+.change-type-deleted .path-text {
+  color: var(--diff-removed-text);
+}
+
+.change-type-renamed .change-tree-file-icon,
+.change-type-renamed .path-text {
+  color: var(--color-amber-text);     /* dark: #d4a017  light: #b87a00 */
+}
+
+/* selected state wins via cascade — no overrides needed */
+
 .change-tree-label {
   min-width: 0;
   font-weight: normal;

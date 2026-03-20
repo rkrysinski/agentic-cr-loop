@@ -108,6 +108,9 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /README\.md/ })).toBeInTheDocument();
     expect(screen.getByLabelText("2 comments")).toBeInTheDocument();
     expect(screen.queryByText(/modified · 2/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /README\.md/ })).toHaveClass("change-type-added");
+    expect(screen.getByRole("button", { name: /App\.tsx/ })).toHaveClass("change-type-modified");
+    expect(screen.getByRole("button", { name: /styles\.css/ })).toHaveClass("change-type-modified");
 
     fireEvent.keyDown(resizeHandle, { key: "ArrowRight" });
     expect(screen.getByRole("separator", { name: "Resize changed files panel" })).toHaveAttribute("aria-valuenow", "272");

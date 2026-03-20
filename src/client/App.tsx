@@ -565,7 +565,7 @@ export function App() {
         <li key={node.key} className="change-tree-node">
           <button
             type="button"
-            className={`change-item change-tree-file ${isSelected ? "selected" : ""}`}
+            className={`change-item change-tree-file change-type-${node.change.changeType} ${isSelected ? "selected" : ""}`}
             style={treeDepthStyle}
             onClick={() =>
               startTransition(() => {
