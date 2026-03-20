@@ -86,6 +86,48 @@ crloop add-repo /path/to/repo --url http://localhost:4000
 crloop stop-server --url http://localhost:4000
 ```
 
+### Machine-readable output (`--json`)
+
+Add `--json` to any command to get JSON output instead of human text. Use this when scripting or when an AI agent is consuming the output.
+
+```bash
+crloop repos --json
+# → [{"id":"my-repo","path":"/path/to/repo"}]
+
+crloop add-repo /path/to/repo --json
+# → {"id":"my-repo","path":"/path/to/repo"}
+
+crloop remove-repo my-repo --json
+# → {"id":"my-repo"}
+
+crloop stop-server --json
+# → {"stopped":true}
+```
+
+### Previewing mutations (`--dry-run`)
+
+Add `--dry-run` to `add-repo` or `remove-repo` to validate and preview the action without making any changes.
+
+```bash
+crloop add-repo /path/to/repo --dry-run
+# Would register: my-repo → /path/to/repo
+
+crloop add-repo /path/to/repo --dry-run --json
+# → {"dryRun":true,"id":"my-repo","path":"/path/to/repo"}
+
+crloop remove-repo my-repo --dry-run
+# Would remove: my-repo
+```
+
+### Schema introspection (`crloop schema`)
+
+Print a machine-readable JSON description of all commands and their accepted options:
+
+```bash
+crloop schema            # all commands
+crloop schema add-repo   # single command
+```
+
 ### Repo ID derivation
 
 When no explicit ID is given, the repo ID is derived from the directory basename: lowercased, non-alphanumeric characters replaced with `-`.

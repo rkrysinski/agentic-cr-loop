@@ -53,6 +53,10 @@ function getFlag(args: string[], flag: string): string | undefined {
   return idx !== -1 ? args[idx + 1] : undefined;
 }
 
+function hasFlag(args: string[], flag: string): boolean {
+  return args.includes(flag);
+}
+
 async function apiFetch(
   url: string,
   method: string,
@@ -69,6 +73,7 @@ async function apiFetch(
 
 async function cmdRepos(args: string[]): Promise<void> {
   const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const json = hasFlag(args, "--json");
   let result: { status: number; data: unknown };
   try {
     result = await apiFetch(`${baseUrl}/api/repos`, "GET");
@@ -81,7 +86,9 @@ async function cmdRepos(args: string[]): Promise<void> {
     process.exit(1);
   }
   const repos = result.data as Array<{ id: string; path: string }>;
-  if (repos.length === 0) {
+  if (json) {
+    console.log(JSON.stringify(repos));
+  } else if (repos.length === 0) {
     console.log("(no repos registered)");
   } else {
     const maxLen = Math.max(...repos.map((r) => r.id.length));
@@ -95,10 +102,22 @@ async function cmdAddRepo(args: string[]): Promise<void> {
   const repoPath = args[0];
   const id = getFlag(args, "--id");
   const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const json = hasFlag(args, "--json");
+  const dryRun = hasFlag(args, "--dry-run");
 
   if (!repoPath || repoPath.startsWith("-")) {
-    console.error("Usage: crloop add-repo <path> [--id <repoId>] [--url URL]");
+    console.error("Usage: crloop add-repo <path> [--id <repoId>] [--url URL] [--json] [--dry-run]");
     process.exit(1);
+  }
+
+  if (dryRun) {
+    const derivedId = id ?? deriveRepoId(repoPath);
+    if (json) {
+      console.log(JSON.stringify({ dryRun: true, id: derivedId, path: repoPath }));
+    } else {
+      console.log(`Would register: ${derivedId} → ${repoPath}`);
+    }
+    return;
   }
 
   const bodyPayload: { path: string; id?: string } = { path: repoPath };
@@ -114,7 +133,11 @@ async function cmdAddRepo(args: string[]): Promise<void> {
 
   if (result.status === 201) {
     const repo = result.data as { id: string; path: string };
-    console.log(`Registered: ${repo.id} → ${repo.path}`);
+    if (json) {
+      console.log(JSON.stringify(repo));
+    } else {
+      console.log(`Registered: ${repo.id} → ${repo.path}`);
+    }
   } else {
     const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
     console.error(error);
@@ -124,10 +147,15 @@ async function cmdAddRepo(args: string[]): Promise<void> {
 
 async function cmdStopServer(args: string[]): Promise<void> {
   const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const json = hasFlag(args, "--json");
   try {
     const response = await fetch(`${baseUrl}/api/server/stop`, { method: "POST" });
     if (response.status === 204) {
-      console.log("Server stopped.");
+      if (json) {
+        console.log(JSON.stringify({ stopped: true }));
+      } else {
+        console.log("Server stopped.");
+      }
     } else {
       console.error(`Unexpected response: ${response.status}`);
       process.exit(1);
@@ -141,10 +169,21 @@ async function cmdStopServer(args: string[]): Promise<void> {
 async function cmdRemoveRepo(args: string[]): Promise<void> {
   const repoId = args[0];
   const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const json = hasFlag(args, "--json");
+  const dryRun = hasFlag(args, "--dry-run");
 
   if (!repoId || repoId.startsWith("-")) {
-    console.error("Usage: crloop remove-repo <repoId> [--url URL]");
+    console.error("Usage: crloop remove-repo <repoId> [--url URL] [--json] [--dry-run]");
     process.exit(1);
+  }
+
+  if (dryRun) {
+    if (json) {
+      console.log(JSON.stringify({ dryRun: true, id: repoId }));
+    } else {
+      console.log(`Would remove: ${repoId}`);
+    }
+    return;
   }
 
   let result: { status: number; data: unknown };
@@ -156,11 +195,71 @@ async function cmdRemoveRepo(args: string[]): Promise<void> {
   }
 
   if (result.status === 204) {
-    console.log(`Removed: ${repoId}`);
+    if (json) {
+      console.log(JSON.stringify({ id: repoId }));
+    } else {
+      console.log(`Removed: ${repoId}`);
+    }
   } else {
     const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
     console.error(error);
     process.exit(1);
+  }
+}
+
+function cmdSchema(args: string[]): void {
+  const command = args[0];
+  const schema = {
+    serve: {
+      description: "Start the review server (default when no command given)",
+      options: {
+        "--repo": { type: "string", multiple: true, description: "Add a repository. Use name:/path for explicit ID." },
+        "--port": { type: "number", default: 3000, description: "Server port (must be > 0)" },
+      },
+    },
+    "stop-server": {
+      description: "Stop the running server",
+      options: {
+        "--url": { type: "string", default: "http://localhost:3000", description: "Server URL" },
+        "--json": { type: "boolean", description: "Output JSON: {stopped: true}" },
+      },
+    },
+    repos: {
+      description: "List repos registered with the running server",
+      options: {
+        "--url": { type: "string", default: "http://localhost:3000", description: "Server URL" },
+        "--json": { type: "boolean", description: "Output JSON array of {id, path} objects" },
+      },
+    },
+    "add-repo": {
+      description: "Register a repo with the running server at runtime",
+      args: [{ name: "path", required: true, description: "Filesystem path to the repository" }],
+      options: {
+        "--id": { type: "string", description: "Explicit repo ID (derived from basename if omitted)" },
+        "--url": { type: "string", default: "http://localhost:3000", description: "Server URL" },
+        "--json": { type: "boolean", description: "Output JSON {id, path} on success" },
+        "--dry-run": { type: "boolean", description: "Validate and preview without registering" },
+      },
+    },
+    "remove-repo": {
+      description: "Unregister a repo from the running server",
+      args: [{ name: "repoId", required: true, description: "ID of the repo to remove" }],
+      options: {
+        "--url": { type: "string", default: "http://localhost:3000", description: "Server URL" },
+        "--json": { type: "boolean", description: "Output JSON {id} on success" },
+        "--dry-run": { type: "boolean", description: "Preview without removing" },
+      },
+    },
+    schema: {
+      description: "Print machine-readable schema for all commands or a single command",
+      args: [{ name: "command", required: false, description: "Command name to describe (omit for all)" }],
+    },
+  };
+
+  if (command && command in schema) {
+    console.log(JSON.stringify(schema[command as keyof typeof schema], null, 2));
+  } else {
+    console.log(JSON.stringify(schema, null, 2));
   }
 }
 
@@ -169,10 +268,11 @@ function printHelp(): void {
 
 Usage:
   crloop serve [--repo <path>] [--repo name:<path>] [--port <number>]
-  crloop stop-server [--url URL]
-  crloop repos [--url URL]
-  crloop add-repo <path> [--id <repoId>] [--url URL]
-  crloop remove-repo <repoId> [--url URL]
+  crloop stop-server [--url URL] [--json]
+  crloop repos [--url URL] [--json]
+  crloop add-repo <path> [--id <repoId>] [--url URL] [--json] [--dry-run]
+  crloop remove-repo <repoId> [--url URL] [--json] [--dry-run]
+  crloop schema [command]
 
 Commands:
   serve        Start the review server (default when no command given)
@@ -180,6 +280,11 @@ Commands:
   repos        List repos registered with the running server
   add-repo     Register a repo with the running server at runtime
   remove-repo  Unregister a repo from the running server
+  schema       Print machine-readable JSON schema for commands
+
+Flags available on most commands:
+  --json       Output machine-readable JSON instead of human text
+  --dry-run    (add-repo, remove-repo) Preview action without executing it
 
 Repo ID derivation:
   Directory basename lowercased, non-alphanumeric chars replaced with "-"
@@ -189,8 +294,11 @@ Examples:
   crloop serve --repo /path/to/project
   crloop serve --repo fe:/path/to/frontend --repo be:/path/to/backend
   crloop add-repo /path/to/repo --id my-api
+  crloop add-repo /path/to/repo --dry-run
   crloop repos --url http://localhost:4000
+  crloop repos --json
   crloop remove-repo my-api
+  crloop schema add-repo
 
 ID derivation examples:
   my_frontend  →  my-frontend   (${deriveRepoId("my_frontend")})
@@ -228,26 +336,32 @@ async function main(): Promise<void> {
       console.log(`Server started (pid ${child.pid}) on http://localhost:${port}`);
       checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     }
+  } else if (command === "schema") {
+    cmdSchema(args.slice(1));
   } else if (command === "stop-server") {
+    const subArgs = args.slice(1);
     const updateCheck = checkForUpdate();
-    await cmdStopServer(args.slice(1));
+    await cmdStopServer(subArgs);
     const notice = await updateCheck;
-    if (notice) console.log(notice);
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
   } else if (command === "repos") {
+    const subArgs = args.slice(1);
     const updateCheck = checkForUpdate();
-    await cmdRepos(args.slice(1));
+    await cmdRepos(subArgs);
     const notice = await updateCheck;
-    if (notice) console.log(notice);
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
   } else if (command === "add-repo") {
+    const subArgs = args.slice(1);
     const updateCheck = checkForUpdate();
-    await cmdAddRepo(args.slice(1));
+    await cmdAddRepo(subArgs);
     const notice = await updateCheck;
-    if (notice) console.log(notice);
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
   } else if (command === "remove-repo") {
+    const subArgs = args.slice(1);
     const updateCheck = checkForUpdate();
-    await cmdRemoveRepo(args.slice(1));
+    await cmdRemoveRepo(subArgs);
     const notice = await updateCheck;
-    if (notice) console.log(notice);
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
   } else {
     console.error(`Unknown command: ${command}\nRun "crloop --help" for usage.`);
     process.exit(1);

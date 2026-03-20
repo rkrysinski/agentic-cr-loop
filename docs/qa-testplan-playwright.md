@@ -615,11 +615,11 @@ Run the verification script:
 bash scripts/qa/verify-cli.sh
 ```
 
-The script covers the following assertions in seven sections:
+The script covers the following assertions in nine sections:
 
 **Section 1 — `--version` / `--help` flags (no server)**
 - `crloop --version` exits 0 and prints the version string matching `package.json`.
-- `crloop --help` and `crloop -h` exit 0 and print usage including `serve`, `stop-server`, `repos`, `add-repo`, and `remove-repo`.
+- `crloop --help` and `crloop -h` exit 0 and print usage including `serve`, `stop-server`, `repos`, `add-repo`, `remove-repo`, `schema`, `--json`, and `--dry-run`.
 
 **Section 2 — `serve` startup errors**
 - `--port abc` and `--port 0` exit 1 with `Invalid --port` message.
@@ -628,12 +628,25 @@ The script covers the following assertions in seven sections:
 **Section 3 — unknown command**
 - `crloop bogus-command` exits 1 with `Unknown command` message and a `--help` hint.
 
+**Section 3b — `schema` command (no server)**
+- `crloop schema` exits 0 and outputs valid JSON.
+- `crloop schema add-repo` exits 0 and the output has an `options` key.
+
+**Section 3c — `--dry-run` flag (no server)**
+- `add-repo <path> --dry-run` exits 0 and prints `Would register:` without calling the server.
+- `add-repo <path> --dry-run --json` exits 0 and outputs `{dryRun:true}`.
+- `remove-repo <id> --dry-run` exits 0 and prints `Would remove:` without calling the server.
+- `remove-repo <id> --dry-run --json` exits 0 and outputs `{dryRun:true}`.
+
 **Section 4 — live server: `repos`, `add-repo`, `remove-repo`**
 - `repos --url` exits 0 and lists the startup repo.
 - `add-repo <path>` (auto-derived id) exits 0 and the new repo appears in `repos`.
 - `add-repo <path> --id <custom>` exits 0 and the custom id appears in `repos`.
 - `remove-repo <id>` exits 0 and the id disappears from `repos`.
 - Column alignment in `repos` output is verified.
+- `repos --json` outputs a valid JSON array with `id` and `path` fields.
+- `add-repo <path> --id <id> --json` exits 0 and outputs `{id, path}` JSON.
+- `remove-repo <id> --json` exits 0 and outputs `{id}` JSON.
 
 **Section 5 — error paths against live server**
 - `add-repo` with a duplicate id exits 1 with `already in use`.
@@ -642,7 +655,7 @@ The script covers the following assertions in seven sections:
 - `remove-repo` with non-existent id exits 1 with `not found`.
 
 **Section 5b — `stop-server`**
-- `stop-server --url` exits 0 and prints `Server stopped.`.
+- `stop-server --url --json` exits 0 and outputs `{stopped:true}` JSON.
 - After the server stops, `repos` exits 1 with `Connection failed`.
 
 **Section 6 — `serve` with `name:path` syntax**
@@ -655,7 +668,7 @@ Expected output ends with:
 
 ```
 =========================================
-  CLI verification: 45 passed, 0 failed
+  CLI verification: 64 passed, 0 failed
 =========================================
 ```
 

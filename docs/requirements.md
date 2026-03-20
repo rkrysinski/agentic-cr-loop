@@ -77,6 +77,9 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-41**: The CLI MUST allow the user to specify the server URL to connect to.
 - **FR-42**: The CLI MUST provide a command to gracefully stop the running server.
 - **FR-43**: The `serve` command MUST return the terminal to the user immediately after the server is ready, running the server as a background process.
+- **FR-46**: The CLI MUST support a `--json` flag on all commands except `serve` and `schema`, causing output to be emitted as JSON to stdout rather than human-readable text.
+- **FR-47**: The CLI MUST support a `--dry-run` flag on `add-repo` and `remove-repo`, causing the command to validate its arguments and print a preview of the action without contacting the server or making any changes.
+- **FR-48**: The CLI MUST provide a `schema` command that prints a machine-readable JSON description of all commands and their accepted arguments and options.
 
 ## Non-Functional
 
@@ -94,3 +97,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.5: Added FR-43 for daemon behaviour — `serve` returns the terminal immediately after spawning the background server process.
 - 1.6: Added FR-44 for UI preferences persistence — theme, view mode, diff context, hide-removed-lines, sidebar collapsed state, and sidebar width now survive page reloads and browser restarts via localStorage.
 - 1.7: Added FR-45 for file-tree status coloring — added/untracked files shown in teal, deleted in red, renamed in amber, consistent with the diff view palette, in both dark and light themes.
+- 1.8: Added FR-46, FR-47, FR-48 for AI-agent CLI affordances — `--json` flag for machine-readable output on all read/write commands, `--dry-run` flag for previewing mutations without side effects, and `schema` command for runtime introspection of command parameters.
