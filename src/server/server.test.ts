@@ -270,6 +270,104 @@ describe("server API", () => {
       exitSpy.mockRestore();
     }
   });
+
+  it("GET /api/repos/:repoId/repo returns repo info with changeCount", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/test/repo");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      id: "test",
+      baseRef: "HEAD"
+    });
+    expect(typeof (response.body as { changeCount: number }).changeCount).toBe("number");
+  });
+
+  it("GET /api/repos/:repoId/changes/:changeId with invalid context returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
+    const trackedChange = (changesResponse.body as Array<{ newPath: string | null; changeId: string }>).find(
+      (c) => c.newPath === "tracked.txt"
+    );
+
+    try {
+      await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
+        params: { changeId: trackedChange!.changeId },
+        query: { context: "invalid" }
+      });
+      expect.fail("Expected route to throw");
+    } catch (error: unknown) {
+      expect(error instanceof Error).toBe(true);
+      expect((error as Error).message).toContain("Invalid diff context");
+    }
+  });
+
+  it("GET /api/repos/:repoId/changes/:changeId with unknown changeId returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
+      params: { changeId: "nonexistent" }
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("GET /api/repos/:repoId/comments without changeId returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/test/comments");
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("POST /api/repos/:repoId/comments with invalid body returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos/test/comments", {
+      body: { changeId: "c1", side: "bad-side", lineNumber: 1, body: "note" }
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("POST /api/repos/:repoId/comments with empty body returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
+    const trackedChange = (changesResponse.body as Array<{ newPath: string | null; changeId: string }>).find(
+      (c) => c.newPath === "tracked.txt"
+    );
+    const response = await invokeRoute(app, "post", "/api/repos/test/comments", {
+      body: { changeId: trackedChange!.changeId, side: "new", lineNumber: 1, body: "   " }
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("PATCH /api/repos/:repoId/comments/:commentId with nonexistent id returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "patch", "/api/repos/test/comments/:commentId", {
+      params: { commentId: "does-not-exist" },
+      body: { body: "new text" }
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("PATCH /api/repos/:repoId/comments/:commentId with empty body returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "patch", "/api/repos/test/comments/:commentId", {
+      params: { commentId: "any" },
+      body: { body: "   " }
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("DELETE /api/repos/:repoId/comments/:commentId with nonexistent id returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "delete", "/api/repos/test/comments/:commentId", {
+      params: { commentId: "does-not-exist" }
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("POST /api/repos with missing path returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos", {
+      body: { id: "noop" }
+    });
+    expect(response.statusCode).toBe(400);
+  });
 });
 
 // ── Route invocation helper ──────────────────────────────────
