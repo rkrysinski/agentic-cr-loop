@@ -26,6 +26,8 @@ case "$MODE" in
 esac
 
 cd "$PROJ_ROOT"
+# Kill any existing process already bound to the API port (3000)
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 # shellcheck disable=SC2086
 $CMD > "$LOG" 2>&1 &
 echo $! > "$PID_FILE"

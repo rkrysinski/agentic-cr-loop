@@ -45,12 +45,14 @@ function renderSelector(repos: Array<{ id: string; path: string }>) {
 }
 
 describe("RepoSelector", () => {
-  it("shows the active repo and add button even when only one repo is loaded", async () => {
-    renderSelector([{ id: "main", path: "/work/main" }]);
+  it("hides the selector when only one repo is loaded", async () => {
+    const { container } = renderSelector([{ id: "main", path: "/work/main" }]);
 
-    const mainTab = await screen.findByRole("tab", { name: "main" });
-    expect(mainTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("button", { name: "Add repository" })).toBeInTheDocument();
+    // Wait for the fetch to settle then assert nothing is rendered
+    await waitFor(() => {
+      expect(container.firstChild).toBeNull();
+    });
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByText(/No repositories loaded/i)).not.toBeInTheDocument();
   });
 

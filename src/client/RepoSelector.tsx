@@ -40,6 +40,7 @@ function AddRepoModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =
   return (
     <div
       className="modal-backdrop"
+      data-testid="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -170,6 +171,11 @@ export function RepoSelector() {
   function handleSelectRepo(id: string) {
     setActiveRepoId(id);
     setShowOverflow(false);
+  }
+
+  // ── Single repo — hide selector (FR-34) ─────────────────────
+  if (repos.length === 1) {
+    return null;
   }
 
   // ── Zero repos ──────────────────────────────────────────────

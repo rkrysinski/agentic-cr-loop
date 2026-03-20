@@ -12,6 +12,8 @@ mkdir -p /tmp/qa-repos
 if git -C "$REPO_ROOT" worktree list | grep -q "$TEST_REPO"; then
   echo "Worktree $TEST_REPO already exists, skipping."
 else
+  # Remove stale branch left over from a previous interrupted run
+  git -C "$REPO_ROOT" branch -D qa/test-repo 2>/dev/null || true
   git -C "$REPO_ROOT" worktree add "$TEST_REPO" -b qa/test-repo HEAD
   echo "Worktree created: $TEST_REPO"
 fi
