@@ -1,7 +1,6 @@
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { getChangePath } from "../shared/changePaths.js";
-import { renderReviewCommentsText, type ReviewExportFile } from "../shared/export.js";
 import { DiffViewer } from "./diffView.js";
 import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoInfoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
@@ -28,6 +27,7 @@ const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 480;
 const KEYBOARD_RESIZE_STEP = 32;
 const DEFAULT_DIFF_CONTEXT: DiffContextValue = "full";
+const COPY_CONFIRM_DURATION_MS = 1_500;
 
 const DIFF_CONTEXT_OPTIONS: Array<{ value: DiffContextValue; label: string }> = [
   { value: "0", label: "none" },
@@ -170,6 +170,7 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
 export function App() {
   const { apiClient } = useRepo();
   const layoutRef = useRef<HTMLElement | null>(null);
+  const selectedChangeIdRef = useRef<string | null>(null);
   const [repo, setRepo] = useState<RepoInfoResponse | null>(null);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
@@ -193,17 +194,55 @@ export function App() {
   const [selectedChangeRefreshKey, setSelectedChangeRefreshKey] = useState(0);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [exportMode, setExportMode] = useState(false);
-  const [exportComments, setExportComments] = useState<Map<string, CommentsResponse>>(new Map());
+  const [exportText, setExportText] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   const [copyConfirm, setCopyConfirm] = useState(false);
+
+  useEffect(() => {
+    selectedChangeIdRef.current = selectedChangeId;
+  }, [selectedChangeId]);
+
+  const refreshAll = useCallback(async (preferredChangeId: string | null = selectedChangeIdRef.current) => {
+    if (!apiClient) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const [repoInfo, nextChanges] = await Promise.all([apiClient.getRepo(), apiClient.getChanges()]);
+      const nextSelectedChangeId =
+        preferredChangeId && nextChanges.some((change) => change.changeId === preferredChangeId)
+          ? preferredChangeId
+          : nextChanges[0]?.changeId ?? null;
+      const shouldRefreshSelectedChange = nextSelectedChangeId !== null && nextSelectedChangeId === preferredChangeId;
+      setRepo(repoInfo);
+      setChanges(nextChanges);
+      setSelectedChangeId(nextSelectedChangeId);
+      if (shouldRefreshSelectedChange) {
+        setSelectedChangeRefreshKey((current) => current + 1);
+      }
+      resetNewComment();
+      resetEditingComment();
+      if (!nextSelectedChangeId) {
+        setSelectedChange(null);
+        setComments(EMPTY_COMMENTS);
+        setLoading(false);
+      }
+    } catch (nextError: unknown) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+      setLoading(false);
+    }
+  }, [apiClient]);
 
   useEffect(() => {
     setChanges([]);
     setSelectedChangeId(null);
     setSelectedChange(null);
     setComments(EMPTY_COMMENTS);
-    void refreshAll();
-  }, [apiClient]); // eslint-disable-line react-hooks/exhaustive-deps
+    void refreshAll(null);
+  }, [apiClient, refreshAll]);
 
   useEffect(() => {
     if (!selectedChangeId) {
@@ -247,39 +286,6 @@ export function App() {
     };
   }, [apiClient, selectedChangeId, diffContext, selectedChangeRefreshKey]);
 
-  async function refreshAll() {
-    if (!apiClient) {
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const [repoInfo, nextChanges] = await Promise.all([apiClient.getRepo(), apiClient.getChanges()]);
-      const nextSelectedChangeId =
-        selectedChangeId && nextChanges.some((change) => change.changeId === selectedChangeId)
-          ? selectedChangeId
-          : nextChanges[0]?.changeId ?? null;
-      const shouldRefreshSelectedChange = nextSelectedChangeId !== null && nextSelectedChangeId === selectedChangeId;
-      setRepo(repoInfo);
-      setChanges(nextChanges);
-      setSelectedChangeId(nextSelectedChangeId);
-      if (shouldRefreshSelectedChange) {
-        setSelectedChangeRefreshKey((current) => current + 1);
-      }
-      resetNewComment();
-      resetEditingComment();
-      if (!nextSelectedChangeId) {
-        setSelectedChange(null);
-        setComments(EMPTY_COMMENTS);
-        setLoading(false);
-      }
-    } catch (nextError: unknown) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
-      setLoading(false);
-    }
-  }
-
   async function submitComment() {
     if (!selectedChange || !pendingAnchor || draftComment.trim().length === 0 || !apiClient) {
       return;
@@ -305,10 +311,17 @@ export function App() {
   }
 
   async function refreshCommentsAndCounts(changeId: string) {
-    if (!apiClient) return;
-    const [nextChanges, nextComments] = await Promise.all([apiClient.getChanges(), apiClient.getComments(changeId)]);
-    setChanges(nextChanges);
-    setComments(nextComments);
+    if (!apiClient) {
+      return;
+    }
+
+    try {
+      const [nextChanges, nextComments] = await Promise.all([apiClient.getChanges(), apiClient.getComments(changeId)]);
+      setChanges(nextChanges);
+      setComments(nextComments);
+    } catch (nextError: unknown) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
   }
 
   async function submitCommentEdit() {
@@ -368,17 +381,18 @@ export function App() {
 
   async function enterExportMode() {
     setExportMode(true);
-    if (filesWithComments.length === 0 || !apiClient) {
+    setCopyConfirm(false);
+    setExportText("");
+    if (!apiClient) {
       return;
     }
+
     setExportLoading(true);
     try {
-      const results = await Promise.all(filesWithComments.map((c) => apiClient.getComments(c.changeId)));
-      const map = new Map<string, CommentsResponse>();
-      filesWithComments.forEach((c, i) => {
-        map.set(c.changeId, results[i]!);
-      });
-      setExportComments(map);
+      setError(null);
+      setExportText(await apiClient.exportComments());
+    } catch (nextError: unknown) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
       setExportLoading(false);
     }
@@ -386,7 +400,8 @@ export function App() {
 
   function exitExportMode() {
     setExportMode(false);
-    setExportComments(new Map());
+    setExportText("");
+    setCopyConfirm(false);
   }
 
   const selectedAnchorKey = pendingAnchor
@@ -575,42 +590,15 @@ export function App() {
     0
   );
 
-  function getExportFiles(): ReviewExportFile[] {
-    return filesWithComments.map((change) => ({
-      path: getChangePath(change),
-      comments: [
-        ...(exportComments.get(change.changeId)?.current ?? []).map((comment) => ({
-          comment,
-          status: "current" as const
-        })),
-        ...(exportComments.get(change.changeId)?.outdated ?? []).map((comment) => ({
-          comment,
-          status: "outdated" as const
-        }))
-      ]
-    }));
-  }
-
-  function buildExportText(): string {
-    return renderReviewCommentsText(getExportFiles(), {
-      header: {
-        repoName,
-        baseRef: repo?.baseRef ?? "HEAD",
-        date: new Date().toISOString().slice(0, 10)
-      }
-    });
-  }
-
   function handleCopy() {
-    void navigator.clipboard.writeText(buildExportText()).then(() => {
+    void navigator.clipboard.writeText(exportText).then(() => {
       setCopyConfirm(true);
-      setTimeout(() => setCopyConfirm(false), 1500);
+      setTimeout(() => setCopyConfirm(false), COPY_CONFIRM_DURATION_MS);
     });
   }
 
   function handleDownload() {
-    const text = buildExportText();
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([exportText], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -771,11 +759,11 @@ export function App() {
                 <span className="export-header-title">review_comments.txt</span>
                 <span className="export-header-subtitle">// {totalCommentCount} comment{totalCommentCount !== 1 ? "s" : ""} · {filesWithComments.length} file{filesWithComments.length !== 1 ? "s" : ""}</span>
                 <div className="export-header-spacer" />
-                <button type="button" className="export-copy-btn" onClick={handleCopy}>
+                <button type="button" className="export-copy-btn" onClick={handleCopy} disabled={exportLoading || exportText.length === 0}>
                   <IconClipboard />
                   {copyConfirm ? "copied!" : "copy"}
                 </button>
-                <button type="button" className="export-download-btn" onClick={handleDownload}>
+                <button type="button" className="export-download-btn" onClick={handleDownload} disabled={exportLoading || exportText.length === 0}>
                   <IconExport />
                   save .txt
                 </button>
@@ -794,35 +782,7 @@ export function App() {
                   {exportLoading ? (
                     <span className="export-loading-text">// loading comments…</span>
                   ) : (
-                    <>
-                      <span className="export-hdr-line">CODE REVIEW  ·  {repoName}  ·  branch: {repo?.baseRef ?? "HEAD"}  ·  {new Date().toISOString().slice(0, 10)}</span>
-                      <div className="export-divider" />
-                      {filesWithComments.length === 0 ? (
-                        <span className="export-empty-text">// no comments found</span>
-                      ) : null}
-                      {filesWithComments.map((change, idx) => {
-                        const path = getChangePath(change);
-                        const fileComments = exportComments.get(change.changeId);
-                        return (
-                          <div key={change.changeId} className="export-file-section">
-                            {idx > 0 ? <div className="export-divider" /> : null}
-                            <span className="export-file-hdr">FILE: {path}</span>
-                            {fileComments?.current.map((c) => (
-                              <div key={c.commentId} className="export-comment-card">
-                                <span className="export-comment-meta">[COMMENT · Line {c.lineNumber} · side: {c.side}]</span>
-                                <span className="export-comment-body">{c.body}</span>
-                              </div>
-                            ))}
-                            {fileComments?.outdated.map((c) => (
-                              <div key={c.commentId} className="export-comment-card export-comment-card-outdated">
-                                <span className="export-comment-meta export-comment-meta-outdated">[OUTDATED COMMENT · Line {c.lineNumber} · side: {c.side}]</span>
-                                <span className="export-comment-body export-comment-body-outdated">{c.body}</span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </>
+                    <pre className="export-text-pre">{exportText}</pre>
                   )}
                 </div>
               </div>

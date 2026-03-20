@@ -517,6 +517,83 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText("after")).toBeInTheDocument());
     expect(screen.queryByText("Loading review data…")).not.toBeInTheDocument();
   });
+
+  it("loads export text from the server endpoint instead of rebuilding it in the client", async () => {
+    let exportRequestCount = 0;
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
+      }
+
+      if (url.pathname === "/api/repos/test/repo") {
+        return jsonResponse({ id: "test", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: { current: 1, outdated: 0 }
+          }
+        ]);
+      }
+
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: []
+        });
+      }
+
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
+        return jsonResponse({ current: [], outdated: [] });
+      }
+
+      if (url.pathname === "/api/repos/test/export/comments.txt") {
+        exportRequestCount += 1;
+        return textResponse(
+          [
+            "CODE REVIEW  ·  repo  ·  branch: HEAD  ·  2026-03-20",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "",
+            "REVIEW tracked.txt",
+            "",
+            "NOTE 1 SIDE new LINE 1 STATUS current",
+            "Check this",
+            "END NOTE",
+            ""
+          ].join("\n")
+        );
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp();
+
+    await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "export_comments" }));
+
+    await waitFor(() => expect(exportRequestCount).toBe(1));
+    const exportPreview = await screen.findByText(/NOTE 1 SIDE new LINE 1 STATUS current/);
+    expect(exportPreview).toBeInTheDocument();
+    expect(exportPreview).toHaveTextContent("Check this");
+  });
 });
 
 function parseRequestUrl(input: RequestInfo | URL): URL {
@@ -536,5 +613,16 @@ function emptyResponse(status = 204): Response {
     ok: status >= 200 && status < 300,
     status,
     json: async () => undefined
+  } as Response;
+}
+
+function textResponse(body: string, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name: string) => (name.toLowerCase() === "content-type" ? "text/plain" : null)
+    },
+    text: async () => body
   } as Response;
 }

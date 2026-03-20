@@ -893,16 +893,6 @@ button, a, textarea, select, input {
   background: #fff0e8;
 }
 
-.toolbar-pill-btn-export {
-  color: var(--color-orange);
-  font-weight: 600;
-}
-
-.toolbar-pill-btn-export:hover {
-  color: var(--color-orange);
-  opacity: 0.85;
-}
-
 .toolbar-pill-btn svg {
   width: 14px;
   height: 14px;
@@ -1682,85 +1672,20 @@ button {
   background: var(--bg-page);
   border-radius: var(--radius);
   padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
-.export-hdr-line {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #555555;
-}
-
-.export-divider {
-  height: 1px;
-  background: var(--bg-elevated);
-  flex-shrink: 0;
-}
-
-.export-file-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.export-file-hdr {
+.export-text-pre {
+  margin: 0;
+  min-height: 100%;
   font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 600;
-  color: #58a6ff;
-}
-
-[data-theme="light"] .export-file-hdr {
-  color: #0b5cab;
-}
-
-.export-comment-card {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--bg-elevated);
-}
-
-.export-comment-card-outdated {
-  background: #251e0a;
-}
-
-[data-theme="light"] .export-comment-card-outdated {
-  background: #fffbf0;
-}
-
-.export-comment-meta {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #777777;
-}
-
-.export-comment-meta-outdated {
-  color: #b87a00;
-}
-
-.export-comment-body {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: #c9c9c9;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-[data-theme="light"] .export-comment-body {
+  line-height: 1.6;
   color: var(--text-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.export-comment-body-outdated {
-  color: #888888;
-}
-
-.export-loading-text,
-.export-empty-text {
+.export-loading-text {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);

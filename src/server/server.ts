@@ -4,6 +4,7 @@ import express from "express";
 import { DIFF_CONTEXT_VALUES } from "../shared/api.js";
 import type { CreateCommentRequest, DiffContextValue, RepoEntry, RepoInfoResponse, UpdateCommentRequest } from "../shared/api.js";
 import { deriveRepoId } from "./args.js";
+import { resolveClientDistDirectory } from "./assetPaths.js";
 import { ClientError } from "./errors.js";
 import { ReviewService } from "./reviewService.js";
 
@@ -248,7 +249,7 @@ export async function startServer(
   });
 
   if (!options.dev) {
-    const clientDir = path.resolve(process.cwd(), "dist/client");
+    const clientDir = resolveClientDistDirectory(import.meta.url);
     app.use(express.static(clientDir));
     app.get("/{*path}", (_request, response) => {
       response.sendFile(path.join(clientDir, "index.html"));

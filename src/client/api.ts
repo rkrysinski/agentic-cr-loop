@@ -9,19 +9,36 @@ import type {
 } from "../shared/api.js";
 import type { FileChange, ReviewComment } from "../shared/types.js";
 
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return undefined;
+  }
+
+  const contentType = response.headers?.get?.("content-type") ?? "";
+  const shouldReadJson =
+    contentType.includes("application/json") ||
+    (!contentType && typeof response.json === "function" && typeof response.text !== "function");
+
+  if (shouldReadJson) {
+    return response.json();
+  }
+
+  return response.text();
+}
+
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? `Request failed with ${response.status}`);
+    const payload = await parseResponseBody(response).catch(() => null);
+    const message =
+      typeof payload === "string"
+        ? payload.trim()
+        : (payload as { error?: string } | null)?.error;
+    throw new Error(message || `Request failed with ${response.status}`);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return (await parseResponseBody(response)) as T;
 }
 
 // ── Top-level repo management ────────────────────────────────
@@ -36,10 +53,6 @@ export function registerRepo(path: string, id?: string): Promise<RepoEntry> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(id ? { path, id } : { path })
   });
-}
-
-export function unregisterRepo(repoId: string): Promise<void> {
-  return request<void>(`/api/repos/${encodeURIComponent(repoId)}`, { method: "DELETE" });
 }
 
 // ── Per-repo API client factory ──────────────────────────────

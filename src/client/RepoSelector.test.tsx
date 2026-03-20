@@ -45,13 +45,13 @@ function renderSelector(repos: Array<{ id: string; path: string }>) {
 }
 
 describe("RepoSelector", () => {
-  it("renders nothing for a single repo", async () => {
-    const { container } = renderSelector([{ id: "main", path: "/work/main" }]);
-    // Wait for the provider to load repos
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(0));
-    // Selector renders null for single repo — no visible tabs
-    expect(container.querySelector(".repo-selector-tabs")).toBeNull();
-    expect(container.querySelector(".repo-selector-empty")).toBeNull();
+  it("shows the active repo and add button even when only one repo is loaded", async () => {
+    renderSelector([{ id: "main", path: "/work/main" }]);
+
+    const mainTab = await screen.findByRole("tab", { name: "main" });
+    expect(mainTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Add repository" })).toBeInTheDocument();
+    expect(screen.queryByText(/No repositories loaded/i)).not.toBeInTheDocument();
   });
 
   it("renders empty state when there are no repos", async () => {
@@ -85,10 +85,10 @@ describe("RepoSelector", () => {
       { id: "gamma", path: "/work/gamma" }
     ]);
 
-    // Two pinned tabs + overflow pill
     await screen.findByRole("tab", { name: "alpha" });
+    expect(screen.getByRole("tab", { name: "beta" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "gamma" })).toBeNull();
-    expect(screen.getByRole("button", { name: /\+2/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /\+1/ })).toBeInTheDocument();
   });
 
   it("overflow dropdown shows remaining repos and switches on click", async () => {
@@ -99,17 +99,34 @@ describe("RepoSelector", () => {
     ]);
 
     await screen.findByRole("tab", { name: "alpha" });
-    const overflowBtn = screen.getByRole("button", { name: /\+2/ });
+    const overflowBtn = screen.getByRole("button", { name: /\+1/ });
 
     fireEvent.click(overflowBtn);
     const gammaOption = await screen.findByRole("option", { name: "gamma" });
 
     fireEvent.click(gammaOption);
 
-    // gamma is now pinned and active; alpha/beta remain pinned via LRU
     await waitFor(() =>
       expect(screen.getByRole("tab", { name: "gamma" })).toHaveAttribute("aria-selected", "true")
     );
+  });
+
+  it("keeps pinned repos in most-recent order", async () => {
+    renderSelector([
+      { id: "alpha", path: "/work/alpha" },
+      { id: "beta", path: "/work/beta" },
+      { id: "gamma", path: "/work/gamma" }
+    ]);
+
+    await screen.findByRole("tab", { name: "alpha" });
+    fireEvent.click(screen.getByRole("tab", { name: "beta" }));
+    fireEvent.click(screen.getByRole("button", { name: /\+1/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "gamma" }));
+
+    await waitFor(() => {
+      const tabLabels = screen.getAllByRole("tab").map((tab) => tab.textContent);
+      expect(tabLabels).toEqual(["gamma", "beta"]);
+    });
   });
 
   it("opens add-repo modal and submits a new repo", async () => {

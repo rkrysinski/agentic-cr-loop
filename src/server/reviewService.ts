@@ -145,7 +145,13 @@ export class ReviewService {
         }))
       }));
 
-    return renderReviewCommentsText([...files, ...orphanedFiles]);
+    return renderReviewCommentsText([...files, ...orphanedFiles], {
+      header: {
+        repoName: path.basename(this.repoPath) || this.repoPath,
+        baseRef: "HEAD",
+        date: new Date().toISOString().slice(0, 10)
+      }
+    });
   }
 
   private async syncReviewSession(): Promise<void> {

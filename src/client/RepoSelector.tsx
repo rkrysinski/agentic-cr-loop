@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { RepoEntry } from "../shared/api.js";
 import { registerRepo } from "./api.js";
 import { IconChevronDown, IconPlus } from "./icons.js";
 import { useRepo } from "./RepoContext.js";
@@ -96,6 +97,32 @@ function AddRepoModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =
   );
 }
 
+function getPinnedRepos(repos: RepoEntry[], lruOrder: string[], limit: number): RepoEntry[] {
+  const repoById = new Map(repos.map((repo) => [repo.id, repo]));
+  const orderedIds = [...lruOrder, ...repos.map((repo) => repo.id)];
+  const pinned: RepoEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const repoId of orderedIds) {
+    if (seen.has(repoId)) {
+      continue;
+    }
+
+    seen.add(repoId);
+    const repo = repoById.get(repoId);
+    if (!repo) {
+      continue;
+    }
+
+    pinned.push(repo);
+    if (pinned.length === limit) {
+      break;
+    }
+  }
+
+  return pinned;
+}
+
 // ── RepoSelector ──────────────────────────────────────────────
 
 export function RepoSelector() {
@@ -111,7 +138,10 @@ export function RepoSelector() {
 
   // Update LRU when active repo changes
   useEffect(() => {
-    if (!activeRepoId) return;
+    if (!activeRepoId) {
+      return;
+    }
+
     setLruOrder((prev) => {
       const next = [activeRepoId, ...prev.filter((id) => id !== activeRepoId)];
       return next.slice(0, 2);
@@ -120,13 +150,19 @@ export function RepoSelector() {
 
   // Close overflow dropdown on outside click
   useEffect(() => {
-    if (!showOverflow) return;
+    if (!showOverflow) {
+      return;
+    }
+
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
       const insidePill = pillRef.current?.contains(target) ?? false;
       const insideDropdown = dropdownRef.current?.contains(target) ?? false;
-      if (!insidePill && !insideDropdown) setShowOverflow(false);
+      if (!insidePill && !insideDropdown) {
+        setShowOverflow(false);
+      }
     }
+
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [showOverflow]);
@@ -161,11 +197,6 @@ export function RepoSelector() {
     );
   }
 
-  // ── Single repo (hidden) ─────────────────────────────────────
-  if (repos.length === 1) {
-    return null;
-  }
-
   // ── Shared: tab renderer ─────────────────────────────────────
   function renderTab(repoId: string) {
     const isActive = repoId === activeRepoId;
@@ -183,41 +214,16 @@ export function RepoSelector() {
     );
   }
 
-  // ── Two repos (pill tab strip) ───────────────────────────────
-  if (repos.length === 2) {
-    return (
-      <>
-        <div className="repo-selector-divider" />
-        <div className="repo-selector-tabs" role="tablist" aria-label="Active repository">
-          {repos.map((repo) => renderTab(repo.id))}
-          <div className="repo-selector-spacer" />
-          <button
-            type="button"
-            className="repo-selector-add-btn"
-            aria-label="Add repository"
-            onClick={() => setShowModal(true)}
-          >
-            <IconPlus />
-          </button>
-        </div>
-        {showModal ? (
-          <AddRepoModal onClose={() => setShowModal(false)} onAdded={refreshRepos} />
-        ) : null}
-      </>
-    );
-  }
-
-  // ── 3+ repos (overflow mode) ─────────────────────────────────
-  const pinnedIds = lruOrder.slice(0, 2);
-  const pinnedRepos = repos.filter((r) => pinnedIds.includes(r.id));
-  const overflowRepos = repos.filter((r) => !pinnedIds.includes(r.id));
+  const visibleRepos = repos.length > 2 ? getPinnedRepos(repos, lruOrder, 2) : repos;
+  const visibleRepoIds = new Set(visibleRepos.map((repo) => repo.id));
+  const overflowRepos = repos.filter((repo) => !visibleRepoIds.has(repo.id));
 
   return (
     <>
       <div className="repo-selector-divider" />
       <div className="repo-selector-tabs-wrapper">
         <div className="repo-selector-tabs" role="tablist" aria-label="Active repository">
-          {pinnedRepos.map((repo) => renderTab(repo.id))}
+          {visibleRepos.map((repo) => renderTab(repo.id))}
 
           {overflowRepos.length > 0 ? (
             <button
