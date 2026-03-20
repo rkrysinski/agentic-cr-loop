@@ -2,6 +2,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import type { CSSProperties } from "react";
 import { getChangePath } from "../shared/changePaths.js";
 import { DiffViewer } from "./diffView.js";
+import { DIFF_CONTEXT_VALUES } from "../shared/api.js";
 import type { ChangeSummary, CommentsResponse, DiffContextValue, RepoInfoResponse } from "../shared/api.js";
 import type { FileChange, ReviewComment, ViewMode } from "../shared/types.js";
 import {
@@ -9,6 +10,7 @@ import {
   IconFileCode, IconFileText, IconFolderGit2, IconFolderOpen, IconGitBranch,
   IconGitPullRequest, IconList, IconMoon, IconRefresh, IconSun, IconTerminal, IconX
 } from "./icons.js";
+import { usePersistedState } from "./hooks.js";
 import { useRepo } from "./RepoContext.js";
 import { RepoSelector } from "./RepoSelector.js";
 
@@ -176,8 +178,14 @@ export function App() {
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
   const [selectedChange, setSelectedChange] = useState<FileChange | null>(null);
   const [comments, setComments] = useState<CommentsResponse>(EMPTY_COMMENTS);
-  const [viewMode, setViewMode] = useState<ViewMode>("unified");
-  const [hideRemovedCode, setHideRemovedCode] = useState(false);
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>(
+    "crloop.ui.viewMode", "unified",
+    (raw) => (raw === "unified" || raw === "side-by-side" ? raw : "unified")
+  );
+  const [hideRemovedCode, setHideRemovedCode] = usePersistedState<boolean>(
+    "crloop.ui.hideRemovedCode", false,
+    (raw) => raw === "true"
+  );
   const [pendingAnchor, setPendingAnchor] = useState<PendingAnchor | null>(null);
   const [draftComment, setDraftComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -186,13 +194,25 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [pendingCommentActionId, setPendingCommentActionId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistedState<boolean>(
+    "crloop.ui.isSidebarCollapsed", false,
+    (raw) => raw === "true"
+  );
   const [expandedDirectoryKeys, setExpandedDirectoryKeys] = useState<Record<string, boolean>>({});
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = usePersistedState<number>(
+    "crloop.ui.sidebarWidth", DEFAULT_SIDEBAR_WIDTH,
+    (raw) => { const n = Number(raw); return Number.isFinite(n) && n >= MIN_SIDEBAR_WIDTH && n <= MAX_SIDEBAR_WIDTH ? n : DEFAULT_SIDEBAR_WIDTH; }
+  );
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [diffContext, setDiffContext] = useState<DiffContextValue>(DEFAULT_DIFF_CONTEXT);
+  const [diffContext, setDiffContext] = usePersistedState<DiffContextValue>(
+    "crloop.ui.diffContext", DEFAULT_DIFF_CONTEXT,
+    (raw) => (DIFF_CONTEXT_VALUES.includes(raw as DiffContextValue) ? (raw as DiffContextValue) : DEFAULT_DIFF_CONTEXT)
+  );
   const [selectedChangeRefreshKey, setSelectedChangeRefreshKey] = useState(0);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = usePersistedState<"dark" | "light">(
+    "crloop.ui.theme", "dark",
+    (raw) => (raw === "dark" || raw === "light" ? raw : "dark")
+  );
   const [exportMode, setExportMode] = useState(false);
   const [exportText, setExportText] = useState("");
   const [exportLoading, setExportLoading] = useState(false);

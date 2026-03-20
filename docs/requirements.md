@@ -1,6 +1,6 @@
 # Requirements Specification
 
-Version 1.5
+Version 1.6
 
 ## Purpose
 
@@ -64,6 +64,10 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-36**: The frontend MUST show an empty state with instructions when zero repositories are registered.
 - **FR-37**: The frontend MUST persist the selected repository across page reloads.
 
+## Frontend — UI Preferences
+
+- **FR-44**: The frontend MUST persist the reviewer's UI preferences across page reloads and browser restarts, including: display theme (dark/light), diff view mode (unified/side-by-side), diff context line count, hide-removed-lines toggle state, sidebar collapsed state, and sidebar width.
+
 ## CLI
 
 - **FR-38**: The CLI MUST allow the user to specify which repository to target when multiple repositories are registered.
@@ -87,3 +91,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.3: Quality overhaul — added requirement IDs (FR/NFR), grouped by category, rewrote implementation-detail requirements as behavior-focused (WHAT not HOW), removed internal architecture rules (scoped API client constraint), eliminated redundancies between Purpose and Requirements sections, filled completeness gaps (export UI, comment storage/migration, base reference, theme, CLI server targeting, security scope), promoted implemented SHOULD items to MUST (file tree, comment badges, syntax highlighting, manual refresh), tightened ambiguous requirements ("suitable for AI agent" → concrete export fields, "diff anchor" → "content surrounding a commented line"), removed unimplemented `CODE_REVIEW_REPO` env var from CLI requirement (deferred to future), merged frontend selector states 2 and 3 into single requirement.
 - 1.4: Added FR-42 for graceful server shutdown via CLI (`stop-server` command / `POST /api/server/stop` endpoint).
 - 1.5: Added FR-43 for daemon behaviour — `serve` returns the terminal immediately after spawning the background server process.
+- 1.6: Added FR-44 for UI preferences persistence — theme, view mode, diff context, hide-removed-lines, sidebar collapsed state, and sidebar width now survive page reloads and browser restarts via localStorage.

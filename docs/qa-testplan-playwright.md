@@ -83,6 +83,7 @@ Every requirement from `docs/requirements.md` must map to at least one scenario.
 | FR-40 | CLI list/register/unregister | 42, 44 | CLI — not Playwright (shell); 44 is automated |
 | FR-41 | CLI server URL | 43, 44 | CLI — not Playwright (shell); 44 covers connection-failure path |
 | FR-42 | CLI stop-server command | 44 | CLI — not Playwright (shell); Section 5b of verify-cli.sh |
+| FR-44 | UI preferences persistence | 45 | Reload assertions for theme, viewMode, sidebar, diffContext |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | 7 | Theme switching |
@@ -479,6 +480,51 @@ These scenarios require the seed files created in Setup Step 1.
 - Verify an empty-state message is displayed with instructions on how to register a repository (e.g. text mentioning `--repo` or the add-repo action).
 - Verify no `4xx` or `5xx` errors appear in `browser_network_requests` (the app should gracefully handle zero repos).
 - Use `browser_snapshot` to confirm no repo selector tabs are rendered.
+
+---
+
+## Scenario 45: UI Preferences Persistence
+
+> **Prerequisite:** Single-repo setup (Scenarios 1–22). The server must be running.
+
+### 45. UI preferences survive page reload (FR-44)
+
+This scenario verifies that all six persisted settings are restored after a hard reload. Run it after completing the single-repo baseline scenarios so that a file is already selected.
+
+**Theme:**
+- Toggle from dark to light using the toolbar theme control.
+- Use `browser_evaluate` to confirm `document.querySelector('.app-shell').dataset.theme === 'light'`.
+- Reload the page with `browser_navigate` to the same URL.
+- Use `browser_evaluate` to confirm `document.querySelector('.app-shell').dataset.theme === 'light'` (persisted).
+- Toggle back to dark and reload to confirm dark is also persisted.
+
+**View mode:**
+- Switch to side-by-side view using the toolbar.
+- Reload the page.
+- Use `browser_snapshot` to confirm the side-by-side layout is active (e.g. the side-by-side toolbar button appears selected or aria-pressed=true).
+
+**Sidebar collapsed state:**
+- Click the sidebar toggle to collapse the file panel.
+- Reload the page.
+- Use `browser_evaluate` to verify the sidebar remains collapsed (`aria-expanded === 'false'`).
+- Expand the sidebar, reload, and verify it stays expanded.
+
+**Sidebar width:**
+- Focus the resize separator and press the right arrow key several times to increase the width.
+- Use `browser_evaluate` to read `aria-valuenow` and note the new width value.
+- Reload the page.
+- Use `browser_evaluate` to confirm `aria-valuenow` matches the saved width.
+
+**Diff context:**
+- Change the diff context dropdown from `full` to `3 lines`.
+- Reload the page.
+- Use `browser_snapshot` or `browser_evaluate` to confirm the dropdown still shows `3 lines` after reload.
+
+**Hide removed code:**
+- In unified view, enable the hide-removed toggle.
+- Reload the page.
+- Verify removed-code rows are still hidden after reload (confirm toggle is active).
+- Disable the toggle, reload, and verify removed rows return.
 
 ---
 

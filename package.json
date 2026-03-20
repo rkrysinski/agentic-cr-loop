@@ -1,6 +1,6 @@
 {
   "name": "crloop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": false,
   "type": "module",
   "description": "Agentic code review loop — human and agent review together",
