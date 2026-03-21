@@ -31,6 +31,13 @@ if [ -d /tmp/crloop-tmp/qa-repos ]; then
   echo "Removed /tmp/crloop-tmp/qa-repos"
 fi
 
+# Kill any remaining crloop serve processes not managed by stop-server.sh
+LEFTOVER_PIDS=$(pgrep -f 'crloop serve' 2>/dev/null || true)
+if [ -n "$LEFTOVER_PIDS" ]; then
+  echo "$LEFTOVER_PIDS" | xargs kill 2>/dev/null || true
+  echo "Killed orphan crloop serve processes: $LEFTOVER_PIDS"
+fi
+
 # Remove log files
 rm -f /tmp/crloop-tmp/qa-server.log /tmp/crloop-tmp/qa-server-multi.log /tmp/crloop-tmp/qa-server-zero.log \
        /tmp/crloop-tmp/qa-server-sole.log /tmp/crloop-tmp/qa-server-cli.log /tmp/crloop-tmp/qa-server.pid

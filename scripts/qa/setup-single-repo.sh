@@ -36,6 +36,17 @@ if [ ! -f "$TEST_REPO/qa-binary.bin" ]; then
   echo "Seeded qa-binary.bin"
 fi
 
+# Scenario 5 — hide-removed-lines: file with deletions (unstaged)
+DELETED_FILE="$TEST_REPO/qa-with-deletions.txt"
+if [ ! -f "$DELETED_FILE" ]; then
+  printf 'line one\nline two (will be deleted)\nline three\n' > "$DELETED_FILE"
+  git -C "$TEST_REPO" add "$DELETED_FILE"
+  git -C "$TEST_REPO" commit -q -m "qa: add qa-with-deletions.txt"
+  # Remove the middle line so the working-tree diff shows a deletion
+  printf 'line one\nline three\n' > "$DELETED_FILE"
+  echo "Seeded qa-with-deletions.txt (line two deleted, unstaged)"
+fi
+
 # Scenario 17 — syntax highlighting: modified .ts file in working dir (unstaged)
 TS_FILE="$TEST_REPO/src/server/hash.ts"
 if [ -f "$TS_FILE" ] && ! grep -q 'qa-syntax-highlight' "$TS_FILE"; then
