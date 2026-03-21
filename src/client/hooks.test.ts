@@ -336,6 +336,47 @@ describe("useViewedState", () => {
       expect(result.current[0]).toEqual(new Set(["file-x"]));
     });
 
+    it("destroys new repo stored state when called with stale headShortId from old repo", () => {
+      const NEW_REPO = "new-repo";
+      const NEW_HEAD = "newhead999";
+      const NEW_KEY = `crloop.viewed.${NEW_REPO}`;
+      seed(["file-a"]);
+      store[NEW_KEY] = JSON.stringify({ head: NEW_HEAD, ids: ["file-x"] });
+
+      const { rerender } = renderHook(
+        ({ repo, head }: { repo: string; head: string }) => useViewedState(repo, head),
+        { initialProps: { repo: REPO, head: HEAD } }
+      );
+
+      // repoId switches to new repo but headShortId is still the OLD head (stale)
+      rerender({ repo: NEW_REPO, head: HEAD });
+
+      // the new repo's localStorage entry is nuked by the mismatch
+      expect(lsMock.removeItem).toHaveBeenCalledWith(NEW_KEY);
+    });
+
+    it("preserves new repo's stored viewed state when headShortId passes through null during repo switch", () => {
+      const NEW_REPO = "new-repo";
+      const NEW_HEAD = "newhead999";
+      const NEW_KEY = `crloop.viewed.${NEW_REPO}`;
+      seed(["file-a"]);
+      store[NEW_KEY] = JSON.stringify({ head: NEW_HEAD, ids: ["file-x"] });
+
+      const { result, rerender } = renderHook(
+        ({ repo, head }: { repo: string; head: string | null }) => useViewedState(repo, head),
+        { initialProps: { repo: REPO, head: HEAD as string | null } }
+      );
+      expect(result.current[0].has("file-a")).toBe(true);
+
+      // App.tsx resets repo→null before async fetch, so headShortId goes null first
+      rerender({ repo: NEW_REPO, head: null });
+      expect(lsMock.removeItem).not.toHaveBeenCalled();
+
+      // then the correct head arrives
+      rerender({ repo: NEW_REPO, head: NEW_HEAD });
+      expect(result.current[0]).toEqual(new Set(["file-x"]));
+    });
+
     it("clears set when repoId becomes null", () => {
       seed(["file-a"]);
       const { result, rerender } = renderHook(

@@ -264,6 +264,7 @@ export function App() {
   }, [apiClient]);
 
   useEffect(() => {
+    setRepo(null);
     setChanges([]);
     setSelectedChangeId(null);
     setSelectedChange(null);
