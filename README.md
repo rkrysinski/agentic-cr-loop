@@ -38,10 +38,25 @@ crloop repos                         # list registered repos
 crloop remove-repo <id>              # unregister a repo
 ```
 
+### Stop the server
+
+```bash
+crloop stop-server
+```
+
 ### Help
 
 ```bash
 crloop --help
+```
+
+## Uninstall
+
+Stop any running server first, then remove the package:
+
+```bash
+crloop stop-server
+npm uninstall -g crloop
 ```
 
 ## Documentation
