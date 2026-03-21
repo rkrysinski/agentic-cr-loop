@@ -1142,16 +1142,22 @@ button, a, textarea, select, input {
   position: relative;
 }
 
-/* 3px colored left border on diff gutters via box-shadow */
+/* 3px colored left border on diff gutters via box-shadow — only on the first (old) gutter column */
 .gutter-removed {
   background: var(--diff-removed-gutter);
   color: var(--diff-removed-text);
-  box-shadow: inset 3px 0 0 var(--color-orange);
 }
 
 .gutter-added {
   background: var(--diff-added-gutter);
   color: var(--diff-added-text);
+}
+
+.gutter-old.gutter-removed {
+  box-shadow: inset 3px 0 0 var(--color-orange);
+}
+
+.gutter-old.gutter-added {
   box-shadow: inset 3px 0 0 var(--color-teal);
 }
 
