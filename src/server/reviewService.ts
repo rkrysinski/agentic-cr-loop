@@ -15,6 +15,7 @@ const FULL_CONTEXT_LINES = 1_000_000;
 export class ReviewService {
   repoPath: string;
   commentStore: CommentStore;
+  private headShortId = "";
 
   constructor(repoPath: string) {
     this.repoPath = repoPath;
@@ -30,7 +31,8 @@ export class ReviewService {
 
     return {
       path: this.repoPath,
-      baseRef: "HEAD"
+      baseRef: "HEAD",
+      headShortId: this.headShortId
     };
   }
 
@@ -166,6 +168,7 @@ export class ReviewService {
     }
 
     this.repoPath = topLevel;
+    this.headShortId = headShortId;
     this.commentStore = new CommentStore(topLevel, getReviewSessionFileName(headShortId));
   }
 

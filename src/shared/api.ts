@@ -14,11 +14,13 @@ export type RepoInfoResponse = {
   path: string;
   baseRef: string;
   changeCount: number;
+  headShortId: string;
 };
 
 export type RepoResponse = {
   path: string;
   baseRef: "HEAD";
+  headShortId: string;
 };
 
 export type ChangeSummary = {

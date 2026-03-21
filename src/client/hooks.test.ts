@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { usePersistedState } from "./hooks.js";
+import { usePersistedState, useViewedState } from "./hooks.js";
 
 // jsdom's localStorage is a minimal stub (not a Storage.prototype instance).
 // Replace it with a vi.fn()-backed mock so we can control reads/writes.
@@ -210,6 +210,150 @@ describe("usePersistedState", () => {
       const firstSetter = result.current[1];
       rerender();
       expect(result.current[1]).toBe(firstSetter);
+    });
+  });
+});
+
+describe("useViewedState", () => {
+  const REPO = "my-repo";
+  const HEAD = "abc123def456";
+  const KEY = `crloop.viewed.${REPO}`;
+
+  function seed(ids: string[], head = HEAD) {
+    store[KEY] = JSON.stringify({ head, ids });
+  }
+
+  describe("initial value", () => {
+    it("returns an empty set when repoId is null", () => {
+      const { result } = renderHook(() => useViewedState(null, HEAD));
+      expect(result.current[0].size).toBe(0);
+    });
+
+    it("returns an empty set when headShortId is null", () => {
+      const { result } = renderHook(() => useViewedState(REPO, null));
+      expect(result.current[0].size).toBe(0);
+    });
+
+    it("returns an empty set when nothing is stored", () => {
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      expect(result.current[0].size).toBe(0);
+    });
+
+    it("reads stored ids when HEAD matches", () => {
+      seed(["file-a", "file-b"]);
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      expect(result.current[0]).toEqual(new Set(["file-a", "file-b"]));
+    });
+
+    it("returns empty set and clears storage when stored HEAD does not match", () => {
+      seed(["file-a"], "old-head-12");
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      expect(result.current[0].size).toBe(0);
+      expect(lsMock.removeItem).toHaveBeenCalledWith(KEY);
+    });
+
+    it("returns empty set when stored JSON is malformed", () => {
+      store[KEY] = "not-valid-json";
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      expect(result.current[0].size).toBe(0);
+    });
+  });
+
+  describe("addViewed", () => {
+    it("adds a changeId to the set", () => {
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      act(() => result.current[1]("file-a"));
+      expect(result.current[0].has("file-a")).toBe(true);
+    });
+
+    it("persists the viewed set to localStorage with the current head", () => {
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      act(() => result.current[1]("file-a"));
+      expect(lsMock.setItem).toHaveBeenCalledWith(
+        KEY,
+        JSON.stringify({ head: HEAD, ids: ["file-a"] })
+      );
+    });
+
+    it("accumulates multiple changeIds", () => {
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      act(() => result.current[1]("file-a"));
+      act(() => result.current[1]("file-b"));
+      expect(result.current[0]).toEqual(new Set(["file-a", "file-b"]));
+    });
+
+    it("does not update state or call setItem when changeId is already viewed (dedup guard)", () => {
+      seed(["file-a"]);
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      vi.clearAllMocks();
+      act(() => result.current[1]("file-a"));
+      expect(lsMock.setItem).not.toHaveBeenCalled();
+    });
+
+    it("silently ignores localStorage quota errors", () => {
+      lsMock.setItem.mockImplementationOnce(() => { throw new Error("QuotaExceededError"); });
+      const { result } = renderHook(() => useViewedState(REPO, HEAD));
+      expect(() => act(() => result.current[1]("file-a"))).not.toThrow();
+      expect(result.current[0].has("file-a")).toBe(true);
+    });
+
+    it("does nothing when repoId is null", () => {
+      const { result } = renderHook(() => useViewedState(null, HEAD));
+      act(() => result.current[1]("file-a"));
+      expect(lsMock.setItem).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when headShortId is null", () => {
+      const { result } = renderHook(() => useViewedState(REPO, null));
+      act(() => result.current[1]("file-a"));
+      expect(lsMock.setItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("HEAD change invalidation", () => {
+    it("resets to empty set when headShortId changes", () => {
+      seed(["file-a"]);
+      const { result, rerender } = renderHook(
+        ({ head }: { head: string | null }) => useViewedState(REPO, head),
+        { initialProps: { head: HEAD } }
+      );
+      expect(result.current[0].has("file-a")).toBe(true);
+      rerender({ head: "newhead123456" });
+      expect(result.current[0].size).toBe(0);
+    });
+
+    it("loads stored ids for the new HEAD after repo switch", () => {
+      const NEW_REPO = "other-repo";
+      const NEW_KEY = `crloop.viewed.${NEW_REPO}`;
+      store[NEW_KEY] = JSON.stringify({ head: HEAD, ids: ["file-x"] });
+
+      const { result, rerender } = renderHook(
+        ({ repo }: { repo: string }) => useViewedState(repo, HEAD),
+        { initialProps: { repo: REPO } }
+      );
+      expect(result.current[0].size).toBe(0);
+      rerender({ repo: NEW_REPO });
+      expect(result.current[0]).toEqual(new Set(["file-x"]));
+    });
+
+    it("clears set when repoId becomes null", () => {
+      seed(["file-a"]);
+      const { result, rerender } = renderHook(
+        ({ repo }: { repo: string | null }) => useViewedState(repo, HEAD),
+        { initialProps: { repo: REPO as string | null } }
+      );
+      expect(result.current[0].has("file-a")).toBe(true);
+      rerender({ repo: null });
+      expect(result.current[0].size).toBe(0);
+    });
+  });
+
+  describe("addViewed stability", () => {
+    it("returns the same addViewed reference across re-renders with same args", () => {
+      const { result, rerender } = renderHook(() => useViewedState(REPO, HEAD));
+      const first = result.current[1];
+      rerender();
+      expect(result.current[1]).toBe(first);
     });
   });
 });

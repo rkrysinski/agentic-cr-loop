@@ -10,7 +10,7 @@ import {
   IconFileCode, IconFileText, IconFolderGit2, IconFolderOpen, IconGitBranch,
   IconGitPullRequest, IconList, IconMoon, IconRefresh, IconSun, IconTerminal, IconX
 } from "./icons.js";
-import { usePersistedState } from "./hooks.js";
+import { usePersistedState, useViewedState } from "./hooks.js";
 import { useRepo } from "./RepoContext.js";
 import { RepoSelector } from "./RepoSelector.js";
 
@@ -170,7 +170,7 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
 // ─── App ──────────────────────────────────────────────────────
 
 export function App() {
-  const { apiClient } = useRepo();
+  const { apiClient, activeRepoId } = useRepo();
   const layoutRef = useRef<HTMLElement | null>(null);
   const selectedChangeIdRef = useRef<string | null>(null);
   const [repo, setRepo] = useState<RepoInfoResponse | null>(null);
@@ -213,6 +213,8 @@ export function App() {
     "crloop.ui.theme", "dark",
     (raw) => (raw === "dark" || raw === "light" ? raw : "dark")
   );
+  const [viewedChangeIds, addViewed] = useViewedState(activeRepoId, repo?.headShortId ?? null);
+
   const [exportMode, setExportMode] = useState(false);
   const [exportText, setExportText] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
@@ -221,6 +223,11 @@ export function App() {
   useEffect(() => {
     selectedChangeIdRef.current = selectedChangeId;
   }, [selectedChangeId]);
+
+  useEffect(() => {
+    if (!selectedChangeId || !repo) return;
+    addViewed(selectedChangeId);
+  }, [selectedChangeId, repo, addViewed]);
 
   const refreshAll = useCallback(async (preferredChangeId: string | null = selectedChangeIdRef.current) => {
     if (!apiClient) {
@@ -519,7 +526,7 @@ export function App() {
     });
   }, [changes, selectedChangeId]);
 
-  function renderChangeTree(nodes: ChangeTreeNode[], depth = 0) {
+  function renderChangeTree(nodes: ChangeTreeNode[], viewedIds: ReadonlySet<string>, depth = 0) {
     return nodes.map((node) => {
       if (node.kind === "directory") {
         const collapsedDirectory = collapseDirectory(node);
@@ -551,7 +558,7 @@ export function App() {
               </span>
               <span className="change-tree-label">{collapsedDirectory.label}</span>
             </button>
-            {isExpanded ? <ul className="change-tree-children">{renderChangeTree(collapsedDirectory.node.children, depth + 1)}</ul> : null}
+            {isExpanded ? <ul className="change-tree-children">{renderChangeTree(collapsedDirectory.node.children, viewedIds, depth + 1)}</ul> : null}
           </li>
         );
       }
@@ -560,6 +567,7 @@ export function App() {
       const filePath = getChangePath(node.change);
       const segments = filePath.split("/");
       const isSelected = selectedChangeId === node.change.changeId;
+      const isViewed = viewedIds.has(node.change.changeId);
 
       return (
         <li key={node.key} className="change-tree-node">
@@ -580,7 +588,7 @@ export function App() {
               <span className="change-tree-file-icon" aria-hidden="true">
                 <IconFileCode />
               </span>
-              <span className="path-text">
+              <span className={`path-text${!isSelected ? (isViewed ? " change-tree-filename--viewed" : " change-tree-filename--unviewed") : ""}`}>
                 {node.change.changeType === "renamed" && node.change.oldPath
                   ? `${node.change.oldPath.split("/").at(-1)} → ${segments.at(-1)}`
                   : segments.at(-1)}
@@ -724,7 +732,7 @@ export function App() {
                 })}
               </ul>
             ) : (
-              <ul className="change-list change-tree">{renderChangeTree(changeTree.children)}</ul>
+              <ul className="change-list change-tree">{renderChangeTree(changeTree.children, viewedChangeIds)}</ul>
             )}
           </div>
 

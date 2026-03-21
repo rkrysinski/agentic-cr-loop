@@ -68,6 +68,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 ## Frontend — UI Preferences
 
 - **FR-44**: The frontend MUST persist the reviewer's UI preferences across page reloads and browser restarts, including: display theme (dark/light), diff view mode (unified/side-by-side), diff context line count, hide-removed-lines toggle state, sidebar collapsed state, and sidebar width.
+- **FR-49**: The frontend MUST visually distinguish files the reviewer has not yet opened (unviewed) from files they have opened (viewed) in the file tree, using bold font weight for unviewed files and normal weight for viewed files. The viewed set MUST be persisted in localStorage keyed to the active repository and MUST be invalidated when the repository HEAD changes.
 
 ## CLI
 
@@ -98,3 +99,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.6: Added FR-44 for UI preferences persistence — theme, view mode, diff context, hide-removed-lines, sidebar collapsed state, and sidebar width now survive page reloads and browser restarts via localStorage.
 - 1.7: Added FR-45 for file-tree status coloring — added/untracked files shown in teal, deleted in red, renamed in amber, consistent with the diff view palette, in both dark and light themes.
 - 1.8: Added FR-46, FR-47, FR-48 for AI-agent CLI affordances — `--json` flag for machine-readable output on all read/write commands, `--dry-run` flag for previewing mutations without side effects, and `schema` command for runtime introspection of command parameters.
+- 1.9: Added FR-49 for file-tree viewed/unviewed state — unviewed files shown in bold, viewed files in normal weight, viewed set persisted in localStorage per-repo and invalidated on HEAD change. Also added `headShortId` to `GET /api/repos/:repoId/repo` response to support client-side cache-key invalidation.

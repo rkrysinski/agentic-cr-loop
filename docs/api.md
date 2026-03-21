@@ -60,14 +60,15 @@ Error responses:
 
 ```json
 {
-  "id":          "frontend",
-  "path":        "/home/user/projects/frontend",
-  "baseRef":     "main",
-  "changeCount": 12
+  "id":           "frontend",
+  "path":         "/home/user/projects/frontend",
+  "baseRef":      "main",
+  "changeCount":  12,
+  "headShortId":  "ba3428599239"
 }
 ```
 
-`id` is new relative to the old flat `/api/repo` endpoint; `path`, `baseRef`, and `changeCount` are unchanged.
+`id` is new relative to the old flat `/api/repo` endpoint; `path`, `baseRef`, and `changeCount` are unchanged. `headShortId` is the 12-character short SHA of the current HEAD commit; the client uses it as a cache key to invalidate the viewed-file set when HEAD changes.
 
 ## Comment Storage
 

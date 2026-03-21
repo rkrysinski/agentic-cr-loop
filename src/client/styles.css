@@ -534,6 +534,14 @@ button, a, textarea, select, input {
   flex-shrink: 0;
 }
 
+.path-text.change-tree-filename--unviewed {
+  font-weight: 800;
+}
+
+.path-text.change-tree-filename--viewed {
+  font-weight: 400;
+}
+
 .change-tree-chevron,
 .change-tree-folder-icon,
 .change-tree-file-icon {
@@ -579,7 +587,11 @@ button, a, textarea, select, input {
 .change-tree-file-icon {
   width: 14px;
   height: 14px;
-  color: #777777;
+  color: #58a6ff;
+}
+
+[data-theme="light"] .change-tree-file-icon {
+  color: #1d6fd8;
 }
 
 .change-item.selected .change-tree-file-icon {
@@ -588,6 +600,10 @@ button, a, textarea, select, input {
 
 [data-theme="light"] .change-item.selected .change-tree-file-icon {
   color: var(--color-orange);
+}
+
+[data-theme="light"] .path-text {
+  color: #0d0d0d;
 }
 
 /* ─── File status coloring by change type ────────────────────── */
@@ -635,11 +651,15 @@ button, a, textarea, select, input {
   min-width: 0;
   flex: 1 1 auto;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #ffffff;
 }
 
 .change-item.selected .path-text {
-  color: var(--text-primary);
+  color: #ffffff;
+}
+
+[data-theme="light"] .change-item.selected .path-text {
+  color: #0d0d0d;
 }
 
 .change-meta {

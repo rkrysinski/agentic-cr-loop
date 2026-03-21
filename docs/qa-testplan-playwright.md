@@ -85,6 +85,7 @@ Every requirement from `docs/requirements.md` must map to at least one scenario.
 | FR-42 | CLI stop-server command | 44 | CLI — not Playwright (shell); Section 5b of verify-cli.sh |
 | FR-44 | UI preferences persistence | 45 | Reload assertions for theme, viewMode, sidebar, diffContext |
 | FR-45 | File-tree status coloring | 46 | CSS class and computed color assertions for added/deleted entries |
+| FR-49 | File-tree viewed/unviewed state | 47 | font-weight assertions, localStorage persistence, HEAD-change invalidation |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | 7 | Theme switching |
@@ -565,6 +566,72 @@ This scenario verifies that all six persisted settings are restored after a hard
 **Theme consistency:**
 - Toggle to light theme using the toolbar theme control.
 - Repeat the color assertion for the added file — verify it is still a green/teal value (different hex from dark mode but same semantic).
+- Toggle back to dark theme.
+
+### 47. File tree viewed/unviewed state (FR-49)
+
+**Prerequisite:** Clear localStorage before starting to ensure a clean viewed-state slate:
+```js
+localStorage.removeItem('crloop.viewed.' + 'code-review')
+```
+Then reload the page.
+
+**Unviewed state — bold font weight:**
+- Before clicking any file, locate any file row in the tree that is not the auto-selected one (if any).
+- Use `browser_evaluate` to read the computed font-weight of its `.path-text` span and confirm it is `800`:
+  ```js
+  getComputedStyle(document.querySelector('.change-tree-filename--unviewed')).fontWeight
+  ```
+- Verify the element has the class `change-tree-filename--unviewed` and does **not** have `change-tree-filename--viewed`.
+
+**Viewed state — normal font weight after click:**
+- Click an unviewed file to open it.
+- Use `browser_evaluate` to confirm the clicked file's `.path-text` now has `font-weight: 400` (or `normal`):
+  ```js
+  getComputedStyle(document.querySelector('.change-item.selected .path-text')).fontWeight
+  ```
+- Click a different file in the tree. The previously clicked file should now carry the class `change-tree-filename--viewed` and have `font-weight: 400`:
+  ```js
+  const viewed = document.querySelector('.change-tree-filename--viewed');
+  viewed && getComputedStyle(viewed).fontWeight
+  ```
+
+**localStorage persistence:**
+- After viewing at least one file, use `browser_evaluate` to read the stored value:
+  ```js
+  JSON.parse(localStorage.getItem('crloop.viewed.code-review'))
+  ```
+- Verify it has the shape `{ head: "<12-char SHA>", ids: ["<changeId>", ...] }`.
+- Reload the page (`browser_navigate` to the same URL).
+- Confirm the previously viewed file still has `change-tree-filename--viewed` and `font-weight: 400` after reload.
+
+**HEAD change invalidation:**
+- Use `browser_evaluate` to overwrite the stored entry with a stale head:
+  ```js
+  const key = 'crloop.viewed.code-review';
+  const data = JSON.parse(localStorage.getItem(key));
+  localStorage.setItem(key, JSON.stringify({ head: 'staleheadxxxx', ids: data.ids }));
+  ```
+- Reload the page.
+- Verify all files now show `change-tree-filename--unviewed` (bold `font-weight: 800`) — the stale entry was discarded.
+- Verify `localStorage.getItem('crloop.viewed.code-review')` is `null` (the invalidated entry was removed).
+
+**File icon and text colors (dark theme):**
+- With dark theme active, use `browser_evaluate` to check file icon color:
+  ```js
+  getComputedStyle(document.querySelector('.change-tree-file-icon')).color
+  ```
+  Verify it resolves to `rgb(88, 166, 255)` (`#58a6ff`).
+- Check file text color:
+  ```js
+  getComputedStyle(document.querySelector('.path-text')).color
+  ```
+  Verify it resolves to `rgb(255, 255, 255)` (`#ffffff`).
+
+**File icon and text colors (light theme):**
+- Toggle to light theme.
+- Verify file icon color resolves to `rgb(29, 111, 216)` (`#1d6fd8`).
+- Verify file text color resolves to `rgb(13, 13, 13)` (`#0d0d0d`).
 - Toggle back to dark theme.
 
 ---

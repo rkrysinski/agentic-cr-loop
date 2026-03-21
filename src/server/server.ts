@@ -112,7 +112,8 @@ export async function startServer(
         id: getRepoId(response),
         path: info.path,
         baseRef: info.baseRef,
-        changeCount: changes.length
+        changeCount: changes.length,
+        headShortId: info.headShortId
       } satisfies RepoInfoResponse);
     } catch (error) {
       next(error);
