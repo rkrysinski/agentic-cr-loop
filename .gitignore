@@ -9,3 +9,4 @@ docs/qa-results.md
 crloop-*.tgz
 bin/crloop
 .worktree
+test-results

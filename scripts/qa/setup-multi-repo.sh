@@ -13,6 +13,7 @@ for NAME in frontend backend shared-libs; do
   if git -C "$REPO_ROOT" worktree list | grep -q "$TARGET"; then
     echo "Worktree $TARGET already exists, skipping."
   else
+    git -C "$REPO_ROOT" branch -D "qa/$NAME" 2>/dev/null || true
     git -C "$REPO_ROOT" worktree add "$TARGET" -b "qa/$NAME" HEAD
     echo "Worktree created: $TARGET"
   fi
