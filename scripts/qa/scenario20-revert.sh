@@ -2,7 +2,7 @@
 # Scenario 20 — undo the qa-carry-forward-test commit and re-stage the rename.
 set -euo pipefail
 
-TEST_REPO=/tmp/qa-repos/test-repo
+TEST_REPO=/tmp/crloop-tmp/qa-repos/test-repo
 
 git -C "$TEST_REPO" reset --soft HEAD~1
 git -C "$TEST_REPO" reset HEAD .

@@ -2,7 +2,7 @@
 # QA Server stop script — kills by PID file first, falls back to pkill.
 set -euo pipefail
 
-PID_FILE=/tmp/qa-server.pid
+PID_FILE=/tmp/crloop-tmp/qa-server.pid
 
 if [ -f "$PID_FILE" ]; then
   PID=$(cat "$PID_FILE")

@@ -123,7 +123,7 @@ Use `browser_evaluate` freely to read DOM attributes, `localStorage`, scroll dim
 bash scripts/qa/setup-single-repo.sh
 ```
 
-Creates `/tmp/qa-repos/test-repo` as a worktree and seeds all files needed by Scenarios 14–17. Safe to re-run — skips steps already done.
+Creates `/tmp/crloop-tmp/qa-repos/test-repo` as a worktree and seeds all files needed by Scenarios 14–17. Safe to re-run — skips steps already done.
 
 ### Step 2 — Start the server (single-repo, Scenarios 1–22)
 
@@ -142,7 +142,7 @@ bash scripts/qa/stop-server.sh
 bash scripts/qa/setup-multi-repo.sh
 ```
 
-Creates `frontend`, `backend`, and `shared-libs` worktrees under `/tmp/qa-repos/`. Safe to re-run — skips worktrees that already exist.
+Creates `frontend`, `backend`, and `shared-libs` worktrees under `/tmp/crloop-tmp/qa-repos/`. Safe to re-run — skips worktrees that already exist.
 
 ### Step 4 — Restart the server with all three repos
 
@@ -167,7 +167,7 @@ bash scripts/qa/wait-for-server.sh
 bash scripts/qa/cleanup.sh
 ```
 
-Stops the server, removes all worktrees and QA branches, deletes `/tmp/qa-repos`, and removes log files.
+Stops the server, removes all worktrees and QA branches, deletes `/tmp/crloop-tmp/qa-repos`, and removes log files.
 
 ---
 
@@ -412,7 +412,7 @@ These scenarios require the seed files created in Setup Step 1.
 
 - Click the `+` button at the far right of the tab strip.
 - Verify the add-repo modal opens with a "Repository path" required field and an "ID (optional)" field.
-- Submit a valid local git repository path (leave ID blank). Use `/tmp/qa-repos/frontend` or any real git path you have handy.
+- Submit a valid local git repository path (leave ID blank). Use `/tmp/crloop-tmp/qa-repos/frontend` or any real git path you have handy.
 - Verify the modal closes and `GET /api/repos` is re-fetched.
 - Verify the new repo appears in the selector with an ID derived from the path basename.
 - Cleanup: use `browser_evaluate` or a direct API call (`DELETE /api/repos/:newId`) to remove the newly added repo and restore the 3-repo baseline.
@@ -583,7 +583,7 @@ This scenario verifies that all six persisted settings are restored after a hard
 
 ### 41. CLI auto-select sole repo (FR-39)
 
-- Stop the server and restart with a single repo: `npm run dev -- --repo /tmp/qa-repos/frontend`.
+- Stop the server and restart with a single repo: `npm run dev -- --repo /tmp/crloop-tmp/qa-repos/frontend`.
 - Run a CLI command **without** the `--repo` flag.
 - Verify the CLI automatically targets the sole registered repo without requiring explicit selection.
 - Verify no error or prompt asking the user to specify a repo.
@@ -592,7 +592,7 @@ This scenario verifies that all six persisted settings are restored after a hard
 
 - Run the CLI command to list repos (e.g. `npx code-review repos list`).
 - Verify the output lists all registered repos with their IDs and paths.
-- Run the CLI command to register a new repo at runtime (e.g. `npx code-review repos add /tmp/qa-repos/frontend`).
+- Run the CLI command to register a new repo at runtime (e.g. `npx code-review repos add /tmp/crloop-tmp/qa-repos/frontend`).
 - Verify the new repo appears in a subsequent `repos list` output.
 - Run the CLI command to unregister the newly added repo (e.g. `npx code-review repos remove <id>`).
 - Verify the repo is removed from the list.
@@ -686,6 +686,8 @@ bash scripts/qa/cleanup.sh
 
 ## Notes for the Agent
 
+- **All temporary directories must be created inside `/tmp/crloop-tmp/`** — never create test repos, scratch files, or working directories directly under `/tmp`. Use paths like `/tmp/crloop-tmp/my-dir`.
+- **Run all `scripts/qa/` commands using paths relative to the repository root** — e.g. `bash scripts/qa/setup-single-repo.sh`, not `/Users/you/work/.../scripts/qa/setup-single-repo.sh`. Using absolute paths breaks portability and has caused permission errors in past runs.
 - For assertions on DOM attributes or `localStorage`, prefer `browser_evaluate` over trying to infer state from snapshots alone.
 - The `.txt` download action cannot be filesystem-verified via Playwright MCP; verify the export UI and copy action instead.
 - In export mode, wait for async comment aggregation to finish before asserting rendered file sections — use `browser_wait_for` if needed.

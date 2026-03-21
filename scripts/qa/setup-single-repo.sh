@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # QA Setup — single-repo mode (Scenarios 1–22)
-# Creates /tmp/qa-repos/test-repo worktree and seeds scenario-specific files.
+# Creates /tmp/crloop-tmp/qa-repos/test-repo worktree and seeds scenario-specific files.
 # Safe to re-run: skips steps already done.
 set -euo pipefail
 
 REPO_ROOT="$(git -C "$(dirname "$0")/../.." rev-parse --show-toplevel)"
-TEST_REPO=/tmp/qa-repos/test-repo
+TEST_REPO=/tmp/crloop-tmp/qa-repos/test-repo
 
-mkdir -p /tmp/qa-repos
+mkdir -p /tmp/crloop-tmp/qa-repos
 
 if git -C "$REPO_ROOT" worktree list | grep -q "$TEST_REPO"; then
   echo "Worktree $TEST_REPO already exists, skipping."

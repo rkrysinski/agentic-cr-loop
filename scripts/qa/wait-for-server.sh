@@ -3,7 +3,7 @@
 # Polls the API endpoint rather than sleeping a fixed amount.
 set -euo pipefail
 
-LOG=/tmp/qa-server.log
+LOG=/tmp/crloop-tmp/qa-server.log
 MAX_WAIT=30  # seconds
 INTERVAL=1
 

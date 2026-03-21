@@ -13,9 +13,9 @@ SERVER_PID=""
 PASS=0
 FAIL=0
 REPO_ROOT="$(git -C "$(dirname "$0")/../.." rev-parse --show-toplevel)"
-REPO_A=/tmp/qa-cli-repo-a
-REPO_B=/tmp/qa-cli-repo-b
-REPO_C=/tmp/qa-cli-repo-c
+REPO_A=/tmp/crloop-tmp/qa-cli-repo-a
+REPO_B=/tmp/crloop-tmp/qa-cli-repo-b
+REPO_C=/tmp/crloop-tmp/qa-cli-repo-c
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,16 +24,16 @@ fail() { echo "  FAIL  $1"; FAIL=$((FAIL + 1)); }
 
 assert_exit0() {
   local label="$1"; shift
-  if "$@" > /tmp/qa-cli-out.txt 2>&1; then
+  if "$@" > /tmp/crloop-tmp/qa-cli-out.txt 2>&1; then
     pass "$label"
   else
-    fail "$label  (exit $?, output: $(cat /tmp/qa-cli-out.txt))"
+    fail "$label  (exit $?, output: $(cat /tmp/crloop-tmp/qa-cli-out.txt))"
   fi
 }
 
 assert_exit1() {
   local label="$1"; shift
-  if ! "$@" > /tmp/qa-cli-out.txt 2>&1; then
+  if ! "$@" > /tmp/crloop-tmp/qa-cli-out.txt 2>&1; then
     pass "$label"
   else
     fail "$label  (expected exit 1, got 0)"
@@ -43,15 +43,15 @@ assert_exit1() {
 assert_output_contains() {
   local label="$1"
   local pattern="$2"
-  if grep -q "$pattern" /tmp/qa-cli-out.txt; then
+  if grep -q "$pattern" /tmp/crloop-tmp/qa-cli-out.txt; then
     pass "$label"
   else
-    fail "$label  (pattern '$pattern' not found in: $(cat /tmp/qa-cli-out.txt))"
+    fail "$label  (pattern '$pattern' not found in: $(cat /tmp/crloop-tmp/qa-cli-out.txt))"
   fi
 }
 
 run_capturing() {
-  "$@" > /tmp/qa-cli-out.txt 2>&1
+  "$@" > /tmp/crloop-tmp/qa-cli-out.txt 2>&1
 }
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ stop_server() {
 
 cleanup() {
   stop_server
-  rm -rf "$REPO_A" "$REPO_B" "$REPO_C" /tmp/qa-cli-out.txt /tmp/qa-cli-server.log
+  rm -rf "$REPO_A" "$REPO_B" "$REPO_C" /tmp/crloop-tmp/qa-cli-out.txt /tmp/crloop-tmp/qa-cli-server.log
 }
 
 trap cleanup EXIT
@@ -169,17 +169,17 @@ echo ""
 echo "--- 3b. schema command ---"
 
 assert_exit0 "schema exits 0" crloop schema
-if node -e "JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'))" 2>/dev/null; then
+if node -e "JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'))" 2>/dev/null; then
   pass "schema outputs valid JSON"
 else
-  fail "schema output is not valid JSON ($(cat /tmp/qa-cli-out.txt))"
+  fail "schema output is not valid JSON ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 assert_exit0 "schema add-repo exits 0" crloop schema add-repo
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(!r.options)throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(!r.options)throw new Error()" 2>/dev/null; then
   pass "schema add-repo output has 'options' key"
 else
-  fail "schema add-repo output missing 'options' key ($(cat /tmp/qa-cli-out.txt))"
+  fail "schema add-repo output missing 'options' key ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 # ── Section 3c: --dry-run flag (no server needed) ─────────────────────────────
@@ -192,10 +192,10 @@ run_capturing crloop add-repo "$REPO_C" --dry-run
 assert_output_contains "add-repo --dry-run prints 'Would register'" "Would register"
 
 run_capturing crloop add-repo "$REPO_C" --dry-run --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(r.dryRun!==true)throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(r.dryRun!==true)throw new Error()" 2>/dev/null; then
   pass "add-repo --dry-run --json outputs {dryRun:true}"
 else
-  fail "add-repo --dry-run --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "add-repo --dry-run --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 assert_exit0 "remove-repo --dry-run exits 0" crloop remove-repo any-id --dry-run
@@ -203,10 +203,10 @@ run_capturing crloop remove-repo any-id --dry-run
 assert_output_contains "remove-repo --dry-run prints 'Would remove'" "Would remove"
 
 run_capturing crloop remove-repo any-id --dry-run --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(r.dryRun!==true)throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(r.dryRun!==true)throw new Error()" 2>/dev/null; then
   pass "remove-repo --dry-run --json outputs {dryRun:true}"
 else
-  fail "remove-repo --dry-run --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "remove-repo --dry-run --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 # ── Section 4: live server — repos, add-repo, remove-repo ────────────────────
@@ -233,7 +233,7 @@ assert_output_contains "repos shows custom-id"             "custom-id"
 # remove-repo
 assert_exit0     "remove-repo exits 0"                     crloop remove-repo custom-id --url "$BASE_URL"
 run_capturing crloop repos --url "$BASE_URL"
-if grep -q "custom-id" /tmp/qa-cli-out.txt; then
+if grep -q "custom-id" /tmp/crloop-tmp/qa-cli-out.txt; then
   fail "removed repo no longer appears in repos list"
 else
   pass "removed repo no longer appears in repos list"
@@ -246,24 +246,24 @@ assert_output_contains "repos output contains derived id" "qa-cli-repo-b"
 
 # --json output
 run_capturing crloop repos --url "$BASE_URL" --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(!Array.isArray(r)||!r[0].id)throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(!Array.isArray(r)||!r[0].id)throw new Error()" 2>/dev/null; then
   pass "repos --json outputs valid JSON array with id/path"
 else
-  fail "repos --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "repos --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 assert_exit0 "add-repo --json exits 0" crloop add-repo "$REPO_C" --id json-c --url "$BASE_URL" --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(r.id!=='json-c')throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(r.id!=='json-c')throw new Error()" 2>/dev/null; then
   pass "add-repo --json outputs {id, path}"
 else
-  fail "add-repo --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "add-repo --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 assert_exit0 "remove-repo --json exits 0" crloop remove-repo json-c --url "$BASE_URL" --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(r.id!=='json-c')throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(r.id!=='json-c')throw new Error()" 2>/dev/null; then
   pass "remove-repo --json outputs {id}"
 else
-  fail "remove-repo --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "remove-repo --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 
 # ── Section 5: error paths against live server ───────────────────────────────
@@ -297,10 +297,10 @@ echo ""
 echo "--- 5b. stop-server ---"
 
 assert_exit0     "stop-server --json exits 0"              crloop stop-server --url "$BASE_URL" --json
-if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/qa-cli-out.txt','utf8'));if(r.stopped!==true)throw new Error()" 2>/dev/null; then
+if node -e "const r=JSON.parse(require('fs').readFileSync('/tmp/crloop-tmp/qa-cli-out.txt','utf8'));if(r.stopped!==true)throw new Error()" 2>/dev/null; then
   pass "stop-server --json outputs {stopped:true}"
 else
-  fail "stop-server --json output malformed ($(cat /tmp/qa-cli-out.txt))"
+  fail "stop-server --json output malformed ($(cat /tmp/crloop-tmp/qa-cli-out.txt))"
 fi
 SERVER_PID=""
 assert_exit1     "server is down after stop-server"        crloop repos --url "$BASE_URL"

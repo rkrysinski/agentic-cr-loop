@@ -3,7 +3,7 @@
 # This is used to test comment carry-forward behaviour.
 set -euo pipefail
 
-TEST_REPO=/tmp/qa-repos/test-repo
+TEST_REPO=/tmp/crloop-tmp/qa-repos/test-repo
 
 if [ ! -d "$TEST_REPO/.git" ] && [ ! -f "$TEST_REPO/.git" ]; then
   echo "Error: $TEST_REPO is not a git repo." >&2

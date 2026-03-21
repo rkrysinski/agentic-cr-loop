@@ -2,7 +2,7 @@
 # Scenario 19 — modify qa-untracked.txt so the existing comment becomes outdated.
 set -euo pipefail
 
-TARGET=/tmp/qa-repos/test-repo/qa-untracked.txt
+TARGET=/tmp/crloop-tmp/qa-repos/test-repo/qa-untracked.txt
 
 if [ ! -f "$TARGET" ]; then
   echo "Error: $TARGET not found. Run setup-single-repo.sh first." >&2

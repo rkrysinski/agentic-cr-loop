@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # QA Server start script
 # Usage: start-server.sh single|multi|zero
-# Writes PID to /tmp/qa-server.pid and log to /tmp/qa-server.log
+# Writes PID to /tmp/crloop-tmp/qa-server.pid and log to /tmp/crloop-tmp/qa-server.log
 set -euo pipefail
 
 MODE="${1:-}"
 PROJ_ROOT="$(git -C "$(dirname "$0")/../.." rev-parse --show-toplevel)"
-LOG=/tmp/qa-server.log
-PID_FILE=/tmp/qa-server.pid
+LOG=/tmp/crloop-tmp/qa-server.log
+PID_FILE=/tmp/crloop-tmp/qa-server.pid
 
 case "$MODE" in
   single)
-    CMD="npm run dev -- --repo /tmp/qa-repos/test-repo"
+    CMD="npm run dev -- --repo /tmp/crloop-tmp/qa-repos/test-repo"
     ;;
   multi)
-    CMD="npm run dev -- --repo frontend:/tmp/qa-repos/frontend --repo backend:/tmp/qa-repos/backend --repo shared-libs:/tmp/qa-repos/shared-libs"
+    CMD="npm run dev -- --repo frontend:/tmp/crloop-tmp/qa-repos/frontend --repo backend:/tmp/crloop-tmp/qa-repos/backend --repo shared-libs:/tmp/crloop-tmp/qa-repos/shared-libs"
     ;;
   zero)
     CMD="npm run dev"
