@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await page.waitForSelector('.change-item', { timeout: 10_000 });
 });
 
-test('ui-41. File tree colors files by change type (FR-45)', async ({ page }) => {
+test('ui-42. File tree colors files by change type (FR-45)', async ({ page }) => {
   // ── Added / untracked file ────────────────────────────────────────────────
 
   // Verify the button has class change-type-untracked
@@ -89,7 +89,7 @@ test('ui-41. File tree colors files by change type (FR-45)', async ({ page }) =>
   await clickTheme(page);
 });
 
-test('ui-42. File tree viewed/unviewed state (FR-49)', async ({ page }) => {
+test('ui-43. File tree viewed/unviewed state (FR-49)', async ({ page }) => {
   // ── Setup: clear localStorage for viewed state ────────────────────────────
 
   // Find the repo name key used in localStorage

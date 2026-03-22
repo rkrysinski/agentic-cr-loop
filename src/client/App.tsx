@@ -173,7 +173,10 @@ export function App() {
   const { apiClient, activeRepoId } = useRepo();
   const layoutRef = useRef<HTMLElement | null>(null);
   const selectedChangeIdRef = useRef<string | null>(null);
-  const [repo, setRepo] = useState<RepoInfoResponse | null>(null);
+  const [repoData, setRepoData] = useState<{ repoId: string; info: RepoInfoResponse } | null>(null);
+  // repo is null whenever the cached data belongs to a different repo, ensuring headShortId
+  // is null on the same render that activeRepoId changes — before any effects run.
+  const repo = repoData?.repoId === activeRepoId ? repoData.info : null;
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null);
   const [selectedChange, setSelectedChange] = useState<FileChange | null>(null);
@@ -244,7 +247,7 @@ export function App() {
           ? preferredChangeId
           : nextChanges[0]?.changeId ?? null;
       const shouldRefreshSelectedChange = nextSelectedChangeId !== null && nextSelectedChangeId === preferredChangeId;
-      setRepo(repoInfo);
+      setRepoData({ repoId: activeRepoId!, info: repoInfo });
       setChanges(nextChanges);
       setSelectedChangeId(nextSelectedChangeId);
       if (shouldRefreshSelectedChange) {
@@ -261,10 +264,9 @@ export function App() {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
       setLoading(false);
     }
-  }, [apiClient]);
+  }, [apiClient, activeRepoId]);
 
   useEffect(() => {
-    setRepo(null);
     setChanges([]);
     setSelectedChangeId(null);
     setSelectedChange(null);

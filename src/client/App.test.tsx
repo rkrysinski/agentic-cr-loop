@@ -521,6 +521,96 @@ describe("App", () => {
     expect(screen.queryByText("Loading review data…")).not.toBeInTheDocument();
   });
 
+  it("tracks viewed state per repo independently — files in a new repo start unviewed", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([
+          { id: "repo-a", path: "/a" },
+          { id: "repo-b", path: "/b" },
+        ]);
+      }
+
+      // ── repo-a ──────────────────────────────────────────────────────────────
+
+      if (url.pathname === "/api/repos/repo-a/repo") {
+        return jsonResponse({ id: "repo-a", path: "/a", baseRef: "HEAD", changeCount: 2, headShortId: "sha-a" });
+      }
+
+      if (url.pathname === "/api/repos/repo-a/changes" && !url.search) {
+        return jsonResponse([
+          { changeId: "change-a1", changeType: "modified", oldPath: "a-first.txt", newPath: "a-first.txt", isBinary: false, commentCounts: { current: 0, outdated: 0 } },
+          { changeId: "change-a2", changeType: "modified", oldPath: "a-second.txt", newPath: "a-second.txt", isBinary: false, commentCounts: { current: 0, outdated: 0 } },
+        ]);
+      }
+
+      if (url.pathname === "/api/repos/repo-a/changes/change-a1" && url.searchParams.get("context") === "full") {
+        return jsonResponse({ changeId: "change-a1", changeType: "modified", oldPath: "a-first.txt", newPath: "a-first.txt", isBinary: false, diffFingerprint: "fp-a1", hunks: [] });
+      }
+
+      if (url.pathname === "/api/repos/repo-a/changes/change-a2" && url.searchParams.get("context") === "full") {
+        return jsonResponse({ changeId: "change-a2", changeType: "modified", oldPath: "a-second.txt", newPath: "a-second.txt", isBinary: false, diffFingerprint: "fp-a2", hunks: [] });
+      }
+
+      if (url.pathname === "/api/repos/repo-a/comments") {
+        return jsonResponse({ current: [], outdated: [] });
+      }
+
+      // ── repo-b ──────────────────────────────────────────────────────────────
+
+      if (url.pathname === "/api/repos/repo-b/repo") {
+        return jsonResponse({ id: "repo-b", path: "/b", baseRef: "HEAD", changeCount: 2, headShortId: "sha-b" });
+      }
+
+      if (url.pathname === "/api/repos/repo-b/changes" && !url.search) {
+        return jsonResponse([
+          { changeId: "change-b1", changeType: "modified", oldPath: "b-first.txt", newPath: "b-first.txt", isBinary: false, commentCounts: { current: 0, outdated: 0 } },
+          { changeId: "change-b2", changeType: "modified", oldPath: "b-second.txt", newPath: "b-second.txt", isBinary: false, commentCounts: { current: 0, outdated: 0 } },
+        ]);
+      }
+
+      if (url.pathname === "/api/repos/repo-b/changes/change-b1" && url.searchParams.get("context") === "full") {
+        return jsonResponse({ changeId: "change-b1", changeType: "modified", oldPath: "b-first.txt", newPath: "b-first.txt", isBinary: false, diffFingerprint: "fp-b1", hunks: [] });
+      }
+
+      if (url.pathname === "/api/repos/repo-b/changes/change-b2" && url.searchParams.get("context") === "full") {
+        return jsonResponse({ changeId: "change-b2", changeType: "modified", oldPath: "b-second.txt", newPath: "b-second.txt", isBinary: false, diffFingerprint: "fp-b2", hunks: [] });
+      }
+
+      if (url.pathname === "/api/repos/repo-b/comments") {
+        return jsonResponse({ current: [], outdated: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp();
+
+    // Wait for repo-a to load; change-a1 is auto-selected (first in list)
+    await waitFor(() => expect(screen.getByText("a-second.txt")).toBeInTheDocument());
+
+    // Click a-second.txt — it becomes selected and addViewed fires for change-a2
+    fireEvent.click(screen.getByRole("button", { name: /a-second\.txt/ }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /a-second\.txt/ })).toHaveClass("selected");
+    });
+
+    // Switch to repo-b via its tab (visible because there are 2 repos)
+    fireEvent.click(screen.getByRole("tab", { name: "repo-b" }));
+    await waitFor(() => expect(screen.getByText("b-second.txt")).toBeInTheDocument());
+
+    // b-second.txt was never opened — it must show as unviewed (no state leaked from repo-a).
+    // The fix ensures repo?.headShortId is null on the same render that activeRepoId changes
+    // (derived state, not a separate setState call), so useViewedState never receives the old
+    // repo's headShortId as the cache key for the new repo's localStorage entry.
+    const bSecondButton = screen.getByRole("button", { name: /b-second\.txt/ });
+    expect(bSecondButton.querySelector(".path-text")).toHaveClass("change-tree-filename--unviewed");
+    expect(bSecondButton.querySelector(".path-text")).not.toHaveClass("change-tree-filename--viewed");
+  });
+
   it("loads export text from the server endpoint instead of rebuilding it in the client", async () => {
     let exportRequestCount = 0;
 

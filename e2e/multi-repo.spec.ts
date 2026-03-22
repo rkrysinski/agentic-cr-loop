@@ -511,7 +511,80 @@ test('ui-37. Comment creation isolated to active repo', async ({ page }) => {
   }
 });
 
-test('ui-38. Console and network smoke test (multi-repo)', async ({ page }) => {
+test('ui-38. Viewed state resets when switching repos and is restored on return', async ({ page }) => {
+  // Make 'frontend' the active repo
+  const frontendTab = page.getByRole('tab', { name: /frontend/i });
+  if (await frontendTab.isVisible()) {
+    await frontendTab.click();
+  } else {
+    const overflowPill = page.getByText(/\+\d+/);
+    await overflowPill.click();
+    await page.waitForTimeout(300);
+    await page.getByText('frontend').last().click();
+  }
+  await page.waitForTimeout(500);
+
+  // Ensure there are at least two files in the file tree
+  const fileItems = page.locator('.change-item.change-tree-file');
+  const fileCount = await fileItems.count();
+  if (fileCount < 2) {
+    // Not enough files to verify unviewed vs viewed — skip the rest
+    return;
+  }
+
+  // Click the second file to make it viewed (the first is auto-selected on load)
+  await fileItems.nth(1).click();
+  await page.waitForTimeout(400);
+
+  // Click back to the first file so the second is no longer selected but is marked viewed
+  await fileItems.first().click();
+  await page.waitForTimeout(400);
+
+  // The second file (now unselected) should show as viewed
+  const secondFileViewedBefore = await page.evaluate(() => {
+    const items = document.querySelectorAll('.change-item.change-tree-file');
+    return items[1]?.querySelector('.change-tree-filename--viewed') !== null;
+  });
+  expect(secondFileViewedBefore).toBe(true);
+
+  // Switch to 'backend'
+  const backendTab = page.getByRole('tab', { name: /backend/i });
+  if (await backendTab.isVisible()) {
+    await backendTab.click();
+  } else {
+    const overflowPill = page.getByText(/\+\d+/);
+    await overflowPill.click();
+    await page.waitForTimeout(300);
+    await page.getByText('backend').last().click();
+  }
+  await page.waitForTimeout(500);
+
+  // In 'backend', no files should be viewed (we never opened any here)
+  const viewedInBackend = await page.evaluate(
+    () => document.querySelectorAll('.change-tree-filename--viewed').length,
+  );
+  expect(viewedInBackend).toBe(0);
+
+  // Switch back to 'frontend'
+  if (await frontendTab.isVisible()) {
+    await frontendTab.click();
+  } else {
+    const overflowPill = page.getByText(/\+\d+/);
+    await overflowPill.click();
+    await page.waitForTimeout(300);
+    await page.getByText('frontend').last().click();
+  }
+  await page.waitForTimeout(500);
+
+  // The second file should still be marked viewed after returning
+  const secondFileViewedAfter = await page.evaluate(() => {
+    const items = document.querySelectorAll('.change-item.change-tree-file');
+    return items[1]?.querySelector('.change-tree-filename--viewed') !== null;
+  });
+  expect(secondFileViewedAfter).toBe(true);
+});
+
+test('ui-39. Console and network smoke test (multi-repo)', async ({ page }) => {
   const errors: string[] = [];
   page.on('response', (r) => {
     if (r.status() >= 400 && r.url().includes('/api/')) {

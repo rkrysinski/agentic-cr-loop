@@ -10,9 +10,9 @@ test.afterAll(() => {
   switchServerMode('single');
 });
 
-// ── Scenario 39: Zero-Repo Empty State ───────────────────────────────────────
+// ── Scenario 40: Zero-Repo Empty State ───────────────────────────────────────
 
-test('ui-39. Empty state with zero repositories (FR-36)', async ({ page }) => {
+test('ui-40. Empty state with zero repositories (FR-36)', async ({ page }) => {
   await page.goto('/');
   await page.waitForTimeout(1000);
 

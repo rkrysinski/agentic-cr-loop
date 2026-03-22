@@ -22,6 +22,14 @@ npm run build:server
 npm link
 ```
 
+**Before running BATS — check whether the binary is stale:**
+
+`cli-5, sec 1` verifies that `crloop --version` matches `package.json`. This fails when the globally linked binary is out of date — most commonly after a version bump in `package.json`. If `package.json` has changed since the last build, rebuild and re-link before running `npm run test:cli`:
+```bash
+npm run build:server
+npm link
+```
+
 ---
 
 ## Quick Start
@@ -35,7 +43,7 @@ npm run test:cli
 ```
 
 **Expected baselines:**
-- Playwright: `42 passed, 0 skipped`
+- Playwright: `43 passed, 0 skipped`
 - BATS: `40 passed, 0 failed`
 
 ---
@@ -47,10 +55,10 @@ npm run test:cli
 | Spec file | Command | Scenarios |
 |---|---|---|
 | `e2e/single-repo.spec.ts` | `npx playwright test e2e/single-repo.spec.ts` | ui-1–ui-22 |
-| `e2e/multi-repo.spec.ts` | `npx playwright test e2e/multi-repo.spec.ts` | ui-23–ui-38 |
-| `e2e/zero-repo.spec.ts` | `npx playwright test e2e/zero-repo.spec.ts` | ui-39 |
-| `e2e/ui-prefs.spec.ts` | `npx playwright test e2e/ui-prefs.spec.ts` | ui-40 |
-| `e2e/file-tree.spec.ts` | `npx playwright test e2e/file-tree.spec.ts` | ui-41, ui-42 |
+| `e2e/multi-repo.spec.ts` | `npx playwright test e2e/multi-repo.spec.ts` | ui-23–ui-39 |
+| `e2e/zero-repo.spec.ts` | `npx playwright test e2e/zero-repo.spec.ts` | ui-40 |
+| `e2e/ui-prefs.spec.ts` | `npx playwright test e2e/ui-prefs.spec.ts` | ui-41 |
+| `e2e/file-tree.spec.ts` | `npx playwright test e2e/file-tree.spec.ts` | ui-42, ui-43 |
 
 To re-run a single failing test by name:
 ```bash
@@ -120,7 +128,7 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-33 | Preserve single-repo behavior | ui-1–ui-22 | `single-repo.spec.ts` — all tests |
 | FR-34 | Hide repo selector (1 repo) | ui-22 | `single-repo.spec.ts` — ui-22 |
 | FR-35 | Show repo selector (2+ repos) | ui-23 | `multi-repo.spec.ts` — ui-23 |
-| FR-36 | Empty state (0 repos) | ui-39 | `zero-repo.spec.ts` — ui-39 |
+| FR-36 | Empty state (0 repos) | ui-40 | `zero-repo.spec.ts` — ui-40 |
 | FR-37 | Persist selected repo | ui-29 | `multi-repo.spec.ts` — ui-29 |
 | FR-38 | CLI repo targeting | cli-1 | `test/cli.bats` — cli-1 |
 | FR-39 | CLI auto-select sole repo | cli-2 | `test/cli.bats` — cli-2 |
@@ -128,12 +136,12 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-41 | CLI server URL | cli-4, cli-5 | `test/cli.bats` — cli-4, cli-5 |
 | FR-42 | CLI stop-server command | cli-5 | `test/cli.bats` — `cli-5, sec 5b` |
 | FR-43 | CLI serve daemon behaviour | cli-5 | `test/cli.bats` — `cli-5, sec 2` |
-| FR-44 | UI preferences persistence | ui-40 | `ui-prefs.spec.ts` — ui-40 |
-| FR-45 | File-tree status coloring | ui-41 | `file-tree.spec.ts` — ui-41 |
+| FR-44 | UI preferences persistence | ui-41 | `ui-prefs.spec.ts` — ui-41 |
+| FR-45 | File-tree status coloring | ui-42 | `file-tree.spec.ts` — ui-42 |
 | FR-46 | CLI --json flag | cli-5 | `test/cli.bats` — `cli-5, sec 4` and `sec 5b` |
 | FR-47 | CLI --dry-run flag | cli-5 | `test/cli.bats` — `cli-5, sec 3c` |
 | FR-48 | CLI schema command | cli-5 | `test/cli.bats` — `cli-5, sec 3b` |
-| FR-49 | File-tree viewed/unviewed state | ui-42 | `file-tree.spec.ts` — ui-42 |
+| FR-49 | File-tree viewed/unviewed state | ui-38, ui-43 | `multi-repo.spec.ts` — ui-38; `file-tree.spec.ts` — ui-43 |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | ui-7 | `single-repo.spec.ts` — ui-7 |

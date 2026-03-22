@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await navigateAndWait(page);
 });
 
-test('ui-40. UI preferences survive page reload (FR-44)', async ({ page }) => {
+test('ui-41. UI preferences survive page reload (FR-44)', async ({ page }) => {
   // ── Theme ────────────────────────────────────────────────────────────────
 
   // Get current theme
