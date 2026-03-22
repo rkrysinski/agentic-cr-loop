@@ -4,7 +4,7 @@
 
 This design adds two things to enable the agent-human review loop:
 
-1. A **CLI command layer** (`agentic-code-review <command>`) that wraps the existing HTTP API for terminal use.
+1. A **CLI command layer** (`crloop <command>`) that wraps the existing HTTP API for terminal use.
 2. An **Agent Skill** (`SKILL.md`) that teaches AI agents the CLI vocabulary and review loop workflow.
 
 No new dependencies. No new transport layer. The CLI commands call the running HTTP server. The skill is a markdown file.
@@ -13,24 +13,115 @@ Requires Node.js 18+ and `git` on PATH.
 
 ## CLI Commands
 
-The CLI is available as `agentic-code-review <command>` after global install, or `npx agentic-code-review <command>` without installing. See [distribution.md](./distribution.md) for install modes.
+The CLI is available as `crloop <command>` after global install, or `npx crloop <command>` without installing. See [distribution.md](./distribution.md) for install modes.
 
 All commands except `serve` assume a review tool server is already running. Commands discover the server URL from `--url` (default `http://localhost:3000`) or a `CODE_REVIEW_URL` environment variable.
 
-### `agentic-code-review serve`
+### Implementation Status
 
-Existing behavior, unchanged. Starts the server.
+| Command | Status |
+|---|---|
+| `serve` | ✅ Implemented |
+| `stop-server` | ✅ Implemented |
+| `repos` | ✅ Implemented |
+| `add-repo` | ✅ Implemented |
+| `remove-repo` | ✅ Implemented |
+| `schema` | ✅ Implemented |
+| `changes` | 🔲 Planned (requires session coordination) |
+| `diff` | 🔲 Planned |
+| `comment` | 🔲 Planned |
+| `comments` | 🔲 Planned |
+| `export` | 🔲 Planned |
+| `status` | 🔲 Planned |
+| `finish-self-review` | 🔲 Planned |
+| `wait` | 🔲 Planned |
+
+---
+
+## Implemented Commands
+
+### `crloop serve`
+
+Start the review server. Default command when no subcommand is given. Spawns a detached daemon and exits.
 
 ```
-agentic-code-review serve --repo /path/to/repo [--port 3000]
+crloop serve [--repo <path>] [--repo name:<path>] [--port 3000]
 ```
 
-### `agentic-code-review changes`
+Multiple `--repo` flags register multiple repos at startup. Use `name:/path` syntax for an explicit ID:
+
+```
+crloop serve --repo fe:/path/to/frontend --repo be:/path/to/backend
+```
+
+### `crloop stop-server`
+
+Stop the running server.
+
+```
+crloop stop-server [--url URL] [--json]
+```
+
+Calls `POST /api/server/stop`. Outputs `Server stopped.` or `{"stopped": true}` with `--json`.
+
+### `crloop repos`
+
+List repos registered with the running server.
+
+```
+crloop repos [--url URL] [--json]
+```
+
+Default output (human-readable):
+```
+my-api   /path/to/api
+frontend /path/to/frontend
+```
+
+With `--json`: raw JSON array from `GET /api/repos`.
+
+### `crloop add-repo`
+
+Register a repo with the running server at runtime.
+
+```
+crloop add-repo <path> [--id <repoId>] [--url URL] [--json] [--dry-run]
+```
+
+Calls `POST /api/repos`. The repo ID is derived from the directory basename (lowercased, non-alphanumeric → `-`) unless overridden with `--id`. Use `--dry-run` to preview the derived ID without registering.
+
+### `crloop remove-repo`
+
+Unregister a repo from the running server.
+
+```
+crloop remove-repo <repoId> [--url URL] [--json] [--dry-run]
+```
+
+Calls `DELETE /api/repos/:repoId`. Use `--dry-run` to preview without removing.
+
+### `crloop schema`
+
+Print machine-readable JSON schema for all commands or a single command.
+
+```
+crloop schema [command]
+```
+
+---
+
+## Planned Commands (Agentic Workflow)
+
+These commands require session coordination (`session.json`, state machine) which is not yet implemented. They will be built in the next phase.
+
+All planned commands accept `--repo <repoId>` to target a specific repo when multiple repos are registered.
+
+### `crloop changes`
 
 List changed files with comment counts.
 
 ```
-agentic-code-review changes [--url URL] [--json]
+crloop changes [--repo <repoId>] [--url URL] [--json]
 ```
 
 Default output (human-readable):
@@ -40,42 +131,42 @@ A  src/server/sessionStore.ts  (0 comments)
 D  src/old/legacy.ts           (1 comment, 1 outdated)
 ```
 
-With `--json`: raw JSON array from `GET /api/changes`.
+With `--json`: raw JSON array from `GET /api/repos/:repoId/changes`.
 
-### `agentic-code-review diff <file-path>`
+### `crloop diff <file-path>`
 
 Show the diff for a changed file.
 
 ```
-agentic-code-review diff src/server/server.ts [--context 0|3|20|100|full] [--url URL] [--json]
+crloop diff src/server/server.ts [--context 0|3|20|100|full] [--repo <repoId>] [--url URL] [--json]
 ```
 
 Default output: unified diff text reconstructed from the API response hunks.
-With `--json`: raw JSON from `GET /api/changes/:changeId`.
+With `--json`: raw JSON from `GET /api/repos/:repoId/changes/:changeId`.
 
 The command resolves `<file-path>` to a `changeId` by matching against the changes list. Accepts either the file path or the changeId directly.
 
-### `agentic-code-review comment`
+### `crloop comment`
 
 Add a comment to a changed line.
 
 ```
-agentic-code-review comment \
+crloop comment \
   --file src/server/server.ts \
   --side new \
   --line 42 \
   --body "Extract this into a helper function"
-  [--url URL]
+  [--repo <repoId>] [--url URL]
 ```
 
-Calls `POST /api/comments`. Prints the created comment ID on success.
+Calls `POST /api/repos/:repoId/comments`. Prints the created comment ID on success.
 
-### `agentic-code-review comment --from-file <path>`
+### `crloop comment --from-file <path>`
 
 Bulk-import comments from a JSON file.
 
 ```
-agentic-code-review comment --from-file comments.json [--url URL]
+crloop comment --from-file comments.json [--repo <repoId>] [--url URL]
 ```
 
 The JSON file format:
@@ -96,14 +187,14 @@ The JSON file format:
 ]
 ```
 
-The command resolves each `file` to a `changeId`, then calls `POST /api/comments` for each entry. Reports success/failure per comment.
+The command resolves each `file` to a `changeId`, then calls `POST /api/repos/:repoId/comments` for each entry. Reports success/failure per comment.
 
-### `agentic-code-review comments <file-path>`
+### `crloop comments <file-path>`
 
 List comments for a file.
 
 ```
-agentic-code-review comments src/server/server.ts [--url URL] [--json]
+crloop comments src/server/server.ts [--repo <repoId>] [--url URL] [--json]
 ```
 
 Default output:
@@ -113,24 +204,24 @@ Default output:
 [outdated] new:10  This looks wrong
 ```
 
-With `--json`: raw JSON from `GET /api/comments?changeId=...`.
+With `--json`: raw JSON from `GET /api/repos/:repoId/comments?changeId=...`.
 
-### `agentic-code-review export`
+### `crloop export`
 
-Export all comments as markdown.
+Export all comments as plain text.
 
 ```
-agentic-code-review export [--url URL]
+crloop export [--repo <repoId>] [--url URL]
 ```
 
-Prints the markdown export to stdout. Same output as `GET /api/export/comments.md`.
+Prints the export to stdout. From `GET /api/repos/:repoId/export/comments.txt`.
 
-### `agentic-code-review status`
+### `crloop status`
 
 Show review session status.
 
 ```
-agentic-code-review status [--url URL] [--json]
+crloop status [--repo <repoId>] [--url URL] [--json]
 ```
 
 Default output:
@@ -141,50 +232,58 @@ Comments:   5 current, 1 outdated
 Head:       b58557fe1d0
 ```
 
-With `--json`: raw JSON from `GET /api/session`.
+With `--json`: raw JSON from `GET /api/repos/:repoId/session`.
 
-### `agentic-code-review finish-self-review`
+Requires `GET /api/repos/:repoId/session` — not yet implemented (session coordination phase).
+
+### `crloop finish-self-review`
 
 Agent signals it has finished self-review and hands off to the human.
 
 ```
-agentic-code-review finish-self-review [--url URL]
+crloop finish-self-review [--repo <repoId>] [--url URL]
 ```
 
-Calls `POST /api/session/transition` with `{ "status": "human-review" }`. Prints confirmation.
+Calls `POST /api/repos/:repoId/session/transition` with `{ "status": "human-review" }`. Prints confirmation.
 
-### `agentic-code-review wait`
+Requires `POST /api/repos/:repoId/session/transition` — not yet implemented.
+
+### `crloop wait`
 
 Block until the human finishes review.
 
 ```
-agentic-code-review wait [--url URL] [--poll-interval 3]
+crloop wait [--repo <repoId>] [--url URL] [--poll-interval 3]
 ```
 
-Polls `GET /api/session` every N seconds. Exits when status changes to `agent-addressing` or `complete`. Prints the final status and export path. Exit code 0 if `agent-addressing` (feedback to process), exit code 2 if `complete` (no comments, done).
+Polls `GET /api/repos/:repoId/session` every N seconds. Exits when status changes to `agent-addressing` or `complete`. Prints the final status. Exit code 0 if `agent-addressing` (feedback to process), exit code 2 if `complete` (no comments, done).
 
 This is the only command that blocks. It replaces the need for the agent to implement its own polling loop.
+
+Requires session endpoints — not yet implemented.
+
+---
 
 ## Implementation
 
 ### Entry Point: `src/server/cli.ts`
 
-New file. Parses `process.argv` to dispatch to the correct command handler. Each command is a function that:
+Existing file. Parses `process.argv` to dispatch to the correct command handler. Each command is a function that:
 1. Reads `--url` or `CODE_REVIEW_URL`
 2. Makes HTTP request(s) to the running server
 3. Formats and prints output
 4. Sets exit code
 
-The file must start with `#!/usr/bin/env node` for npm bin linking.
+The file starts with `#!/usr/bin/env node` for npm bin linking.
 
 ### Registration: `package.json`
 
 ```json
 {
-  "name": "agentic-code-review",
+  "name": "crloop",
   "private": false,
   "bin": {
-    "agentic-code-review": "dist/server/server/cli.js"
+    "crloop": "dist/server/server/cli.js"
   },
   "files": [
     "dist/server",
@@ -195,70 +294,69 @@ The file must start with `#!/usr/bin/env node` for npm bin linking.
 }
 ```
 
-The `bin` field makes `npx agentic-code-review <command>` and `agentic-code-review <command>` (after global install) work. The `files` field ensures only compiled output and the skill are included in the npm tarball. See [distribution.md](./distribution.md) for the full package.json and publish process.
+The `bin` field makes `npx crloop <command>` and `crloop <command>` (after global install) work. The `files` field ensures only compiled output and the skill are included in the npm tarball. See [distribution.md](./distribution.md) for the full package.json and publish process.
 
 ### Runtime: tsc-compiled Node.js
 
 The CLI is compiled by the existing `tsc -p tsconfig.server.json` alongside the server code. Uses only Node.js built-ins:
-- `node:util.parseArgs` for argument parsing
+- `node:fs`, `node:path`, `node:child_process`, `node:url` for serve/daemonization
 - Global `fetch()` for HTTP calls (Node.js 18+)
 - No additional dependencies
 
-### Estimated Size
+### New Server Endpoints Required (for agentic commands)
 
-~300-400 lines. Each command is 20-40 lines (parse args, fetch, format output). The `serve` command delegates to the existing `index.ts` entry point.
+The planned agentic CLI commands need two new per-repo endpoints that do not exist yet:
 
-### New Server Endpoints Required
+- `GET /api/repos/:repoId/session` — returns session status (status, iteration, head, comment counts)
+- `POST /api/repos/:repoId/session/transition` — transition session state
 
-The CLI needs two new endpoints that do not exist yet:
-
-- `GET /api/session` — returns session status (status, iteration, head, comment counts). This is part of the combined design's session coordination feature and would be implemented alongside the `session.json` work.
-- `POST /api/session/transition` — transition session state. Same.
-
-The remaining CLI commands use only existing endpoints.
+These will be implemented as part of the session coordination phase. The remaining planned commands use existing per-repo endpoints under `GET/POST /api/repos/:repoId/...`.
 
 ## SKILL.md
 
 The skill file is at `skill/SKILL.md` in the project root and is included in the published npm tarball (via the `files` whitelist). Users copy it to their agent's skill directory after install. See [distribution.md](./distribution.md#skill-distribution) for distribution details.
 
-See [skill/SKILL.md](./skill/SKILL.md) for the full content.
+The SKILL.md will be finalized once the agentic CLI commands are implemented.
 
-## Workflow Sequence
+See [skill/SKILL.md](./skill/SKILL.md) for the current draft content.
 
-Commands shown without `npx` prefix (assumes global install or dev dependency). Prepend `npx` if running without install.
+## Workflow Sequence (Planned)
+
+Commands shown without `npx` prefix (assumes global install or dev dependency).
 
 ```
 Agent                                    CLI                       Server         Browser
   |                                       |                          |              |
   |-- (writes code) --------------------->                           |              |
   |                                       |                          |              |
-  |-- agentic-code-review changes ------->|-- GET /api/changes ----->|              |
+  |-- crloop changes -------------------->|-- GET /repos/:id/changes->|              |
   |<-- file list -------------------------|<-- JSON -----------------|              |
   |                                       |                          |              |
-  |-- agentic-code-review diff foo.ts --->|-- GET /api/changes/x --->|              |
+  |-- crloop diff foo.ts ---------------->|-- GET /repos/:id/changes/x->|            |
   |<-- diff content ----------------------|<-- JSON -----------------|              |
   |                                       |                          |              |
   |-- (analyzes diff, writes comments.json)                          |              |
   |                                       |                          |              |
-  |-- agentic-code-review comment ------->|-- POST /api/comments --->|              |
-  |   --from-file comments.json           |   (per comment)          |              |
+  |-- crloop comment --from-file ---------->|-- POST /repos/:id/comments->|          |
+  |   comments.json                       |   (per comment)          |              |
   |<-- "5 created, 0 failed" -------------|<-- 201 ------------------|              |
   |                                       |                          |              |
-  |-- agentic-code-review --------------->|-- POST /api/session/ --->|              |
-  |   finish-self-review                  |   transition             |              |
+  |-- crloop finish-self-review ---------->|-- POST /repos/:id/session/->|           |
+  |                                       |   transition             |              |
   |<-- "Handed off to human" -------------|                          |-- banner --> |
   |                                       |                          |              |
-  |-- agentic-code-review wait ---------->|-- poll GET /session ---->|              |
+  |-- crloop wait --------------------->|-- poll GET /repos/:id/session->|           |
   |   (blocks)                            |   every 3s               |              |
   |                                       |                          |   (human     |
   |                                       |                          |    reviews)  |
   |                                       |                          |              |
   |                                       |                          |<- Finish ----|
   |                                       |<-- "addressing" ---------|              |
-  |<-- exit 0, prints export path --------|                          |              |
+  |<-- exit 0 ----------------------------|                          |              |
   |                                       |                          |              |
-  |-- agentic-code-review export -------->|-- GET /api/export ------>|              |
-  |<-- markdown --------------------------|<-- text/markdown --------|              |
+  |-- crloop export --------------------->|-- GET /repos/:id/export/->|             |
+  |                                       |   comments.txt           |              |
+  |<-- plain text ------------------------|<-- text/plain -----------|              |
   |                                       |                          |              |
   |-- (addresses comments, loops) ------->                           |              |
 ```

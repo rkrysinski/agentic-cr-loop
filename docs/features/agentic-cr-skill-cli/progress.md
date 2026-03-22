@@ -12,7 +12,7 @@ Enable a closed-loop workflow where an AI agent and a human reviewer collaborate
 6. Agent addresses comments, loops back to step 2
 7. Loop terminates when the human finishes review with no remaining comments
 
-The tool ships as an npm package (`agentic-code-review`) that users install without cloning the repository.
+The tool ships as an npm package (`crloop`) that users install without cloning the repository.
 
 ## Approach: Skill + CLI with File-Based Coordination
 
@@ -51,9 +51,9 @@ We also evaluated WebSockets for real-time push but decided against them — pol
 |---|---|
 | **File-based coordination** | `session.json` in `.local-code-review/` is the source of truth for review state |
 | **REST API** | Primary CRUD interface (comments, changes, session transitions) |
-| **CLI** | `npx agentic-code-review <command>` — thin HTTP client, tsc-compiled, zero deps |
+| **CLI** | `npx crloop <command>` — thin HTTP client, tsc-compiled, zero deps |
 | **Agent Skill** | `skill/SKILL.md` — teaches agents the CLI vocabulary and review loop |
-| **npm distribution** | Published to npm registry, installed via `npm install -g agentic-code-review` |
+| **npm distribution** | Published to npm registry, installed via `npm install -g crloop` |
 
 ### Session state machine
 
@@ -96,21 +96,21 @@ Evaluated WebSockets and decided against (polling sufficient for this use case).
 
 ### 3. CLI design
 
-Designed 9 CLI commands that wrap the existing HTTP API: `serve`, `changes`, `diff`, `comment`, `comments`, `export`, `status`, `finish-self-review`, `wait`. Each command maps to existing API endpoints except `GET /api/session` and `POST /api/session/transition` which are new.
+Designed CLI commands that wrap the HTTP API: server-management commands (`serve`, `stop-server`, `repos`, `add-repo`, `remove-repo`, `schema`) and planned agentic commands (`changes`, `diff`, `comment`, `comments`, `export`, `status`, `finish-self-review`, `wait`).
 
-File: `docs/design-skill-cli.md`
+File: `docs/features/agentic-cr-skill-cli/design-skill-cli.md`
 
-### 4. Agent Skill
+### 4. Agent Skill (draft)
 
-Wrote `SKILL.md` covering the review loop workflow, CLI reference, self-review guidelines, feedback addressing instructions, and a full loop example. ~800 tokens when loaded.
+Wrote `SKILL.md` covering the review loop workflow, CLI reference, self-review guidelines, feedback addressing instructions, and a full loop example. Will be finalized once the agentic CLI commands are implemented.
 
-File: `skill/SKILL.md`
+File: `docs/features/agentic-cr-skill-cli/skill/SKILL.md`
 
 ### 5. Distribution plan
 
-Defined npm distribution: package name `agentic-code-review`, `files` whitelist for published tarball, `bin` entry for CLI, `prepublishOnly` build+test gate, versioning strategy, and skill distribution.
+Defined npm distribution: package name `crloop`, `files` whitelist for published tarball, `bin` entry for CLI, `prepublishOnly` build+test gate, versioning strategy, and skill distribution.
 
-File: `docs/distribution.md`
+File: `docs/features/agentic-cr-skill-cli/distribution.md`
 
 ### 6. Implementation ordering decision
 
@@ -119,32 +119,34 @@ Decided that multi-repo support must come before the CLI/skill implementation be
 - The session model needs to know which repo it's operating on
 - Building the CLI against a single-repo API then retrofitting multi-repo means breaking changes
 
-## Current Feature: Multi-Repo Support
+### 7. Multi-repo support ✅
 
-Adding support for multiple repositories in a single server instance. This must be implemented before session coordination, CLI, and skill work because it changes the API route structure that everything else builds on.
+Added support for multiple repositories in a single server instance. Per-repo API routes now live under `/api/repos/:repoId/`. Server-management CLI commands (`serve`, `stop-server`, `repos`, `add-repo`, `remove-repo`, `schema`) are implemented and published.
 
-### Key decisions needed
-
-- API routing: `/api/repos/:repoId/changes` vs repo as query param vs other
-- Server startup: `--repo` accepting multiple paths vs dynamic registration
-- ReviewService: one instance per registered repo
-- Comment storage: already per-repo (`.local-code-review/` inside each repo), no change needed
+Key changes:
+- API routing: `/api/repos/:repoId/changes`, `/api/repos/:repoId/comments`, etc.
+- `serve` accepts multiple `--repo` flags and `name:/path` syntax
+- `ReviewService` instantiated per repo; `services` map keyed by repoId
+- Dynamic repo registration at runtime via `add-repo` / `remove-repo`
 - Frontend: repo selector in the UI
+- Distribution: `private: false`, `bin: { "crloop": "..." }` in package.json, version 0.1.1
 
-### Implementation order
+## Current Phase: Session Coordination
 
-1. Multi-repo support (API routing, ReviewService-per-repo, UI repo selector)
-2. Session coordination (`session.json`, state transitions, "Finish Review" button, author field)
-3. CLI layer (`src/server/cli.ts`, compiled by existing tsc, registered via bin in package.json)
-4. Agent Skill (finalize `skill/SKILL.md` against the actual CLI)
-5. Distribution (npm publish setup, package.json changes)
+Implementing session state machine and "Finish Review" handoff before the agentic CLI commands can be built.
+
+### Work remaining
+
+1. **Session coordination** — `session.json`, state transitions, "Finish Review" button in UI, author field on comments, `GET /api/repos/:repoId/session`, `POST /api/repos/:repoId/session/transition`
+2. **Agentic CLI commands** — `changes`, `diff`, `comment`, `comments`, `export`, `status`, `finish-self-review`, `wait` in `src/server/cli.ts`
+3. **Agent Skill finalization** — update `skill/SKILL.md` against the actual CLI commands and multi-repo routing
 
 ## Design Documents
 
 - `docs/requirements.md` — functional requirements (v1.0 original + v1.1 backfill)
-- `docs/architecture.md` — existing system architecture (unchanged)
-- `docs/api.md` — current API reference (unchanged)
+- `docs/architecture.md` — existing system architecture
+- `docs/api.md` — current API reference
 - `docs/features/agentic-cr-skill-cli/design-skill-cli.md` — CLI commands and skill design for agent integration
 - `docs/features/agentic-cr-skill-cli/distribution.md` — npm distribution approach
 - `docs/features/agentic-cr-skill-cli/progress.md` — this file
-- `docs/features/agentic-cr-skill-cli/skill/SKILL.md` — agent skill definition
+- `docs/features/agentic-cr-skill-cli/skill/SKILL.md` — agent skill definition (draft)

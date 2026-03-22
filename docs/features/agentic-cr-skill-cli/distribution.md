@@ -33,7 +33,7 @@ npx crloop serve --repo .
 ```json
 {
   "name": "crloop",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Agentic code review loop — human and agent review together",
