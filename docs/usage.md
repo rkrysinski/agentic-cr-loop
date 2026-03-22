@@ -195,6 +195,105 @@ crloop add-repo /path/to/shared-libs
 crloop remove-repo shared-libs
 ```
 
+## Agentic review loop
+
+`crloop` supports an agent-human review loop where an AI agent self-reviews changes, posts findings, hands off to a human, and waits for feedback.
+
+### How it works
+
+1. **Agent self-reviews** — the agent reads the diff natively (`git diff`, `git status`) and posts findings via `crloop comment`.
+2. **Agent hands off** — `crloop finish-self-review` transitions the session to `human-review` and `crloop open` opens the review UI in the browser.
+3. **Agent waits** — `crloop wait` blocks and polls until the human finishes review.
+4. **Agent addresses feedback** — `crloop export` prints the comments and the agent iterates.
+
+### Lock file and server discovery
+
+`crloop serve` writes a lock file at `~/.crloop/server.json` on daemon start. `crloop stop-server` removes it. All agentic commands discover the server URL from this file automatically — no `--url` flag needed when using the default port.
+
+```bash
+crloop url          # print the base URL of the running server
+crloop url --json   # → {"url":"http://localhost:3000","port":3000,"pid":12345}
+```
+
+`crloop url` exits 1 if the lock file is missing or the server process is no longer alive.
+
+### Repo auto-detection
+
+Agentic commands (`comment`, `open`, `export`, `status`, `finish-self-review`, `wait`) automatically detect the target repo by matching the current working directory against registered repo paths. Use `--repo <repoId>` to override.
+
+### Posting comments
+
+Single comment:
+
+```bash
+crloop comment \
+  --file src/server/server.ts \
+  --side new \
+  --line 42 \
+  --body "Extract this into a helper function"
+```
+
+Bulk import from a JSON file (preferred when the agent has multiple findings):
+
+```bash
+crloop comment --from-file findings.json
+```
+
+JSON file format:
+
+```json
+[
+  { "file": "src/server/server.ts", "side": "new", "line": 42, "body": "Extract this into a helper function" },
+  { "file": "src/server/server.ts", "side": "new", "line": 55, "body": "Add error handling here" }
+]
+```
+
+Add `--dry-run` to validate inputs without posting.
+
+### Session management
+
+```bash
+crloop status                # show session state, iteration, and comment counts
+crloop finish-self-review    # transition agent-review → human-review
+crloop open                  # open the crloop review UI in the browser
+crloop wait                  # block until human finishes (exit 0) or marks complete (exit 2)
+crloop export                # print all comments as plain text
+crloop export --file src/server/server.ts   # filter to one file
+```
+
+### crloop view
+
+`crloop open` opens `http://localhost:<port>/crloop/<repoId>` — a focused review view that:
+
+- Shows the same diff/comment UI as the standard view
+- Hides the repository selector (repo is fixed by URL)
+- Shows a **"Finish Review"** button that transitions the session to `agent-addressing`, unblocking `crloop wait`
+
+Navigating to `http://localhost:<port>` (root) shows the standard UI unchanged.
+
+### Typical agentic workflow
+
+```bash
+# Start the server (writes ~/.crloop/server.json)
+crloop serve --repo /path/to/project
+
+# Register if not already registered
+crloop add-repo /path/to/project
+
+# Post findings (from inside the project directory — repo is auto-detected)
+crloop comment --from-file findings.json
+
+# Hand off to the human
+crloop finish-self-review
+crloop open
+
+# Wait for human to finish review
+crloop wait   # exits 0 when human clicks "Finish Review"
+
+# Read feedback and address it
+crloop export
+```
+
 ## Upgrading
 
 Check the current installed version:

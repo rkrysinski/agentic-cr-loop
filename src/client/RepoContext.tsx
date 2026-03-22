@@ -33,13 +33,17 @@ function writeStorage(value: string): void {
   }
 }
 
-export function RepoProvider({ children }: { children: ReactNode }) {
+export function RepoProvider({ children, crloopRepoId }: { children: ReactNode; crloopRepoId?: string | null }) {
   const [repos, setRepos] = useState<RepoEntry[]>([]);
-  const [activeRepoId, setActiveRepoIdState] = useState<string | null>(null);
+  const [activeRepoId, setActiveRepoIdState] = useState<string | null>(crloopRepoId ?? null);
 
   const refreshRepos = useCallback(async () => {
     const nextRepos = await getRepos();
     setRepos(nextRepos);
+    if (crloopRepoId) {
+      setActiveRepoIdState(crloopRepoId);
+      return;
+    }
     setActiveRepoIdState((current) => {
       // Keep current selection if still valid
       if (current && nextRepos.some((r) => r.id === current)) {
@@ -52,16 +56,17 @@ export function RepoProvider({ children }: { children: ReactNode }) {
       }
       return nextRepos[0]?.id ?? null;
     });
-  }, []);
+  }, [crloopRepoId]);
 
   useEffect(() => {
     void refreshRepos();
   }, [refreshRepos]);
 
   const setActiveRepoId = useCallback((id: string) => {
+    if (crloopRepoId) return; // Don't allow switching in crloop view
     setActiveRepoIdState(id);
     writeStorage(id);
-  }, []);
+  }, [crloopRepoId]);
 
   const apiClient = useMemo(
     () => (activeRepoId ? createApiClient(activeRepoId) : null),

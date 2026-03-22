@@ -169,7 +169,7 @@ function collapseDirectory(directory: ChangeTreeDirectoryNode): { key: string; l
 
 // ─── App ──────────────────────────────────────────────────────
 
-export function App() {
+export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
   const { apiClient, activeRepoId } = useRepo();
   const layoutRef = useRef<HTMLElement | null>(null);
   const selectedChangeIdRef = useRef<string | null>(null);
@@ -687,7 +687,7 @@ export function App() {
           </div>
 
           {/* Repo selector */}
-          {!isSidebarCollapsed ? <RepoSelector /> : null}
+          {!isSidebarCollapsed && !crloopRepoId ? <RepoSelector /> : null}
 
           {/* Repo / stats info */}
           {!isSidebarCollapsed ? (
@@ -909,6 +909,22 @@ export function App() {
               <IconExport />
               <span>export_comments</span>
             </button>
+
+            {crloopRepoId ? (
+              <button
+                type="button"
+                className="toolbar-pill-btn toolbar-pill-btn-labeled"
+                style={{ background: "var(--accent-bg)", color: "var(--accent-fg, #fff)", fontWeight: 600 }}
+                onClick={() => {
+                  if (apiClient && confirm("Finish review and hand back to the agent?")) {
+                    void apiClient.transitionSession("agent-addressing");
+                  }
+                }}
+              >
+                <IconGitPullRequest />
+                <span>finish_review</span>
+              </button>
+            ) : null}
           </div>
 
           {/* File header — breadcrumb + line counts */}

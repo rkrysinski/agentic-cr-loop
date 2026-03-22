@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createTempGitRepo } from "./testUtils.js";
 
@@ -37,7 +39,7 @@ describe("crloop CLI — info flags", () => {
   it("--help exits 0 and documents all commands", () => {
     const { status, stdout } = runCli(["--help"]);
     expect(status).toBe(0);
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait"]) {
       expect(stdout).toContain(cmd);
     }
   });
@@ -90,7 +92,7 @@ describe("crloop CLI — serve daemon behaviour", () => {
     const { status, stdout } = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
 
     expect(status).toBe(0);
-    expect(stdout).toMatch(/Server started \(pid \d+\) on http:\/\/localhost:\d+/);
+    expect(stdout).toMatch(/Server running \(pid \d+\) on http:\/\/localhost:\d+/);
 
     const pidMatch = stdout.match(/pid (\d+)/);
     expect(pidMatch).not.toBeNull();
@@ -108,6 +110,33 @@ describe("crloop CLI — serve daemon behaviour", () => {
     }
     expect(ready).toBe(true);
   }, 20_000);
+
+  it("exits 0 and prints 'Server running' without spawning a second daemon when called again on the same port", async () => {
+    repoPath = await createTempGitRepo();
+    const port = 19874;
+
+    // First invocation — start the daemon
+    const first = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
+    expect(first.status).toBe(0);
+    const pidMatch = first.stdout.match(/pid (\d+)/);
+    expect(pidMatch).not.toBeNull();
+    daemonPid = Number(pidMatch![1]);
+
+    // Wait for the lock file to be written
+    for (let i = 0; i < 25; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      try { const res = await fetch(`http://localhost:${port}/api/repos`); if (res.ok) break; } catch { /* not ready */ }
+    }
+
+    // Second invocation — should detect live server and bail
+    const second = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
+    expect(second.status).toBe(0);
+    expect(second.stdout).toMatch(/Server running \(pid \d+\) on http:\/\/localhost:\d+/);
+
+    // Same PID reported — no second daemon was spawned
+    const secondPidMatch = second.stdout.match(/pid (\d+)/);
+    expect(Number(secondPidMatch![1])).toBe(daemonPid);
+  }, 20_000);
 });
 
 describe("crloop CLI — schema command", () => {
@@ -115,7 +144,7 @@ describe("crloop CLI — schema command", () => {
     const { status, stdout } = runCli(["schema"]);
     expect(status).toBe(0);
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait"]) {
       expect(parsed).toHaveProperty(cmd);
     }
   });
@@ -221,5 +250,96 @@ describe("crloop CLI — --json flag (live server)", () => {
     const result = JSON.parse(stdout.trim()) as { stopped: boolean };
     expect(result.stopped).toBe(true);
     daemonPid = null; // already stopped, skip kill in afterAll
+  });
+});
+
+describe("crloop CLI — url command", () => {
+  const lockDir = path.join(os.homedir(), ".crloop");
+  const lockFile = path.join(lockDir, "server.json");
+  let existedBefore = false;
+  let originalContent: string | null = null;
+
+  beforeAll(async () => {
+    try {
+      originalContent = await fs.readFile(lockFile, "utf8");
+      existedBefore = true;
+    } catch {
+      existedBefore = false;
+    }
+  });
+
+  afterAll(async () => {
+    if (existedBefore && originalContent !== null) {
+      await fs.writeFile(lockFile, originalContent, "utf8");
+    } else if (!existedBefore) {
+      try { await fs.unlink(lockFile); } catch { /* ignore */ }
+    }
+  });
+
+  it("exits 1 when lock file is absent", async () => {
+    // Temporarily remove the lock file
+    try { await fs.unlink(lockFile); } catch { /* might not exist */ }
+    const { status, stderr } = runCli(["url"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("No running server");
+  });
+
+  it("exits 1 when lock file PID is dead", async () => {
+    await fs.mkdir(lockDir, { recursive: true });
+    await fs.writeFile(lockFile, JSON.stringify({ port: 9999, pid: 999999, startedAt: new Date().toISOString() }), "utf8");
+    const { status, stderr } = runCli(["url"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("No running server");
+  });
+
+  it("prints URL when lock file is valid and PID is alive", async () => {
+    await fs.mkdir(lockDir, { recursive: true });
+    await fs.writeFile(lockFile, JSON.stringify({ port: 4567, pid: process.pid, startedAt: new Date().toISOString() }), "utf8");
+    const { status, stdout } = runCli(["url"]);
+    expect(status).toBe(0);
+    expect(stdout.trim()).toBe("http://localhost:4567");
+  });
+
+  it("--json outputs { url, port, pid }", async () => {
+    await fs.mkdir(lockDir, { recursive: true });
+    await fs.writeFile(lockFile, JSON.stringify({ port: 4567, pid: process.pid, startedAt: new Date().toISOString() }), "utf8");
+    const { status, stdout } = runCli(["url", "--json"]);
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { url: string; port: number; pid: number };
+    expect(parsed.url).toBe("http://localhost:4567");
+    expect(parsed.port).toBe(4567);
+    expect(parsed.pid).toBe(process.pid);
+  });
+});
+
+describe("crloop CLI — input validation", () => {
+  it("comment with --file containing .. exits 1", () => {
+    const { status, stderr } = runCli(["comment", "--file", "../etc/passwd", "--side", "new", "--line", "1", "--body", "test", "--url", "http://localhost:1"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Invalid file path");
+  });
+
+  it("comment with absolute --file exits 1", () => {
+    const { status, stderr } = runCli(["comment", "--file", "/etc/passwd", "--side", "new", "--line", "1", "--body", "test", "--url", "http://localhost:1"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Invalid file path");
+  });
+
+  it("comment with invalid --side exits 1", () => {
+    const { status, stderr } = runCli(["comment", "--file", "foo.ts", "--side", "both", "--line", "1", "--body", "test", "--url", "http://localhost:1"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Invalid side");
+  });
+
+  it("comment with invalid --line exits 1", () => {
+    const { status, stderr } = runCli(["comment", "--file", "foo.ts", "--side", "new", "--line", "abc", "--body", "test", "--url", "http://localhost:1"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Invalid line number");
+  });
+
+  it("comment with negative --line exits 1", () => {
+    const { status, stderr } = runCli(["comment", "--file", "foo.ts", "--side", "new", "--line", "-5", "--body", "test", "--url", "http://localhost:1"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Invalid line number");
   });
 });

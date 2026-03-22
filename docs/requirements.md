@@ -1,6 +1,6 @@
 # Requirements Specification
 
-Version 1.7
+Version 2.0
 
 ## Purpose
 
@@ -82,6 +82,23 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-47**: The CLI MUST support a `--dry-run` flag on `add-repo` and `remove-repo`, causing the command to validate its arguments and print a preview of the action without contacting the server or making any changes.
 - **FR-48**: The CLI MUST provide a `schema` command that prints a machine-readable JSON description of all commands and their accepted arguments and options.
 
+## Agentic Review Loop
+
+- **FR-50**: The system MUST maintain a per-repo session state machine with the following states and transitions: `agent-review → human-review → agent-addressing | complete`, `agent-addressing → agent-review` (iteration increment).
+- **FR-51**: The system MUST persist session state in `.local-code-review/session.json` inside the reviewed repository.
+- **FR-52**: The CLI MUST provide a `status` command that prints the current session state, iteration number, and comment counts.
+- **FR-53**: The CLI MUST provide a `finish-self-review` command that transitions the session from `agent-review` to `human-review`, with `--dry-run` support.
+- **FR-54**: The CLI MUST provide a `wait` command that blocks (polls) until the session transitions to `agent-addressing` (exit 0) or `complete` (exit 2).
+- **FR-55**: The CLI MUST provide a `comment` command that adds a comment to a changed line, supporting single-comment mode (`--file`, `--side`, `--line`, `--body`) and bulk mode (`--from-file`), with `--dry-run` support.
+- **FR-56**: The CLI MUST provide an `export` command that prints all comments as plain text to stdout, with `--file` filter support.
+- **FR-57**: The CLI MUST provide a `url` command that prints the running server's base URL from the lock file without making a network call.
+- **FR-58**: The CLI MUST provide an `open` command that opens the crloop review view in the default browser.
+- **FR-59**: The `serve` command MUST write a lock file (`~/.crloop/server.json`) containing `{ port, pid, startedAt }` on daemon start, and the `stop-server` command MUST remove it on shutdown.
+- **FR-60**: The CLI MUST resolve the server URL via the chain: `--url` flag → `CODE_REVIEW_URL` env var → lock file → default `http://localhost:3000`.
+- **FR-61**: The CLI MUST auto-detect the target repository by matching the current working directory against registered repo paths when `--repo` is omitted.
+- **FR-62**: The system MUST serve a crloop view at `/crloop/<repoId>` that shows the same diff/comment UI without the repository selector and with a "Finish Review" button that transitions the session to `agent-addressing`.
+- **FR-63**: The CLI MUST validate all agent-supplied inputs (`--file`, `--side`, `--line`, `--repo`) before making HTTP calls and exit with code 1 on validation failure.
+
 ## Non-Functional
 
 - **NFR-01**: The system MUST operate without requiring network access beyond localhost.
@@ -100,3 +117,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.7: Added FR-45 for file-tree status coloring — added/untracked files shown in teal, deleted in red, renamed in amber, consistent with the diff view palette, in both dark and light themes.
 - 1.8: Added FR-46, FR-47, FR-48 for AI-agent CLI affordances — `--json` flag for machine-readable output on all read/write commands, `--dry-run` flag for previewing mutations without side effects, and `schema` command for runtime introspection of command parameters.
 - 1.9: Added FR-49 for file-tree viewed/unviewed state — unviewed files shown in bold, viewed files in normal weight, viewed set persisted in localStorage per-repo and invalidated on HEAD change. Also added `headShortId` to `GET /api/repos/:repoId/repo` response to support client-side cache-key invalidation.
+- 2.0: Added FR-50 through FR-63 for agentic review loop — session state machine, session CLI commands (`status`, `finish-self-review`, `wait`), `comment` and `export` CLI commands, `url`/`open` CLI commands, lock file behaviour, URL resolution chain, repo auto-detection, crloop view UI with "Finish Review" button, input validation.

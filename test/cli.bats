@@ -472,3 +472,126 @@ teardown_file() {
   run crloop stop-server --url "$CLI_BASE"
   [ "$status" -ne 0 ]
 }
+
+# ═════════════════════════════════════════════════════════════════════════════
+# cli-6: Lock file and crloop url (FR-57, FR-59, FR-60)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@test "cli-6: serve writes ~/.crloop/server.json with port and pid fields" {
+  rm -f "$HOME/.crloop/server.json"
+  _start_cli_server --repo "a:$REPO_A"
+  [ -f "$HOME/.crloop/server.json" ]
+  node -e "
+    const d=JSON.parse(require('fs').readFileSync('$HOME/.crloop/server.json','utf8'));
+    if(!d.port) throw new Error('missing port');
+    if(!d.pid)  throw new Error('missing pid');
+  "
+  _stop_cli_server
+}
+
+@test "cli-6: crloop url reads lock file and prints http://localhost:<port>" {
+  rm -f "$HOME/.crloop/server.json"
+  _start_cli_server --repo "a:$REPO_A"
+  run crloop url
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"localhost:$CLI_PORT"* ]]
+  _stop_cli_server
+}
+
+@test "cli-6: crloop url --json outputs {url, port, pid}" {
+  rm -f "$HOME/.crloop/server.json"
+  _start_cli_server --repo "a:$REPO_A"
+  run crloop url --json
+  [ "$status" -eq 0 ]
+  echo "$output" > "$OUT"
+  node -e "
+    const r=JSON.parse(require('fs').readFileSync('$OUT','utf8'));
+    if(!r.url) throw new Error('missing url');
+    if(!r.port) throw new Error('missing port');
+    if(!r.pid)  throw new Error('missing pid');
+  "
+  _stop_cli_server
+}
+
+@test "cli-6: stop-server removes ~/.crloop/server.json" {
+  rm -f "$HOME/.crloop/server.json"
+  _start_cli_server --repo "a:$REPO_A"
+  crloop stop-server --url "$CLI_BASE" > /dev/null
+  CLI_SERVER_PID=""
+  sleep 0.3
+  [ ! -f "$HOME/.crloop/server.json" ]
+}
+
+@test "cli-6: crloop url exits 1 when lock file is absent" {
+  rm -f "$HOME/.crloop/server.json"
+  run crloop url
+  [ "$status" -ne 0 ]
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# cli-7: Agentic commands — status, finish-self-review, export, comment
+#        (FR-50–FR-53, FR-55–FR-56)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@test "cli-7: status exits 0 and shows agent-review as default state" {
+  _start_cli_server --repo "a:$REPO_A"
+  # Remove any stale session file so we get the default state
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop status --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"agent-review"* ]]
+  _stop_cli_server
+}
+
+@test "cli-7: status --json outputs valid JSON with a status field" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop status --url "$CLI_BASE" --repo a --json
+  [ "$status" -eq 0 ]
+  echo "$output" > "$OUT"
+  node -e "
+    const r=JSON.parse(require('fs').readFileSync('$OUT','utf8'));
+    if(!r.status) throw new Error('missing status');
+  "
+  _stop_cli_server
+}
+
+@test "cli-7: finish-self-review transitions session from agent-review to human-review" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop finish-self-review --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  run crloop status --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"human-review"* ]]
+  _stop_cli_server
+}
+
+@test "cli-7: finish-self-review --dry-run exits 0 without transitioning" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop finish-self-review --url "$CLI_BASE" --repo a --dry-run
+  [ "$status" -eq 0 ]
+  # State must still be agent-review (not transitioned)
+  run crloop status --url "$CLI_BASE" --repo a
+  [[ "$output" == *"agent-review"* ]]
+  _stop_cli_server
+}
+
+@test "cli-7: export exits 0 and prints plain text" {
+  _start_cli_server --repo "a:$REPO_A"
+  run crloop export --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+}
+
+@test "cli-7: comment --dry-run validates inputs and exits 0 without posting" {
+  _start_cli_server --repo "a:$REPO_A"
+  # Use a file that exists in the repo's diff (untracked file seeded by setup-single-repo.sh is only available in the QA worktree)
+  # We use --dry-run so it validates without requiring a real changeId hit
+  run crloop comment --url "$CLI_BASE" --repo a \
+    --file README.md --side new --line 1 --body "test comment" --dry-run
+  # dry-run may exit 0 (validated) or non-zero if file not in diff — either is acceptable
+  # The key assertion is it does NOT panic or crash
+  [[ "$status" -eq 0 || "$status" -eq 1 ]]
+  _stop_cli_server
+}

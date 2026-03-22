@@ -36,16 +36,16 @@ crloop --version | -v    Print installed version
 | `repos` | ✅ Implemented | |
 | `add-repo` | ✅ Implemented | |
 | `remove-repo` | ✅ Implemented | |
-| `schema` | ✅ Implemented | |
-| `serve` | 🔶 Partial | Works; lock file write not yet implemented |
-| `stop-server` | 🔶 Partial | Works; lock file removal not yet implemented |
-| `url` | 🔲 Planned | Requires lock file |
-| `open` | 🔲 Planned | Requires lock file; opens `/crloop/<repoId>` view |
-| `comment` | 🔲 Planned | CLI not yet implemented; uses existing endpoints; supports `--dry-run` |
-| `export` | 🔲 Planned | CLI not yet implemented; uses existing endpoint; supports `--file` filter |
-| `status` | 🔲 Planned | Requires new session endpoint |
-| `finish-self-review` | 🔲 Planned | Requires new session endpoint; supports `--dry-run` |
-| `wait` | 🔲 Planned | Requires new session endpoint |
+| `schema` | ✅ Implemented | Updated with all agentic commands |
+| `serve` | ✅ Implemented | Idempotent; lock file written after successful bind |
+| `stop-server` | ✅ Implemented | Lock file removal on stop |
+| `url` | ✅ Implemented | Reads lock file, verifies PID |
+| `open` | ✅ Implemented | Opens `/crloop/<repoId>` view cross-platform |
+| `comment` | ✅ Implemented | Single + bulk (`--from-file`) + `--dry-run` |
+| `export` | ✅ Implemented | Plain text to stdout, `--file` filter |
+| `status` | ✅ Implemented | Human-readable + `--json` |
+| `finish-self-review` | ✅ Implemented | Transitions to `human-review`, `--dry-run` |
+| `wait` | ✅ Implemented | Polls session, exit 0/2 |
 
 > **Why no `changes` or `diff` commands?** The agent runs inside the git repository it is reviewing and already has `git status`, `git diff`, and file-reading tools. There is no value in routing diffs through the crloop server and back. The agent reviews changes natively; crloop is only used to record findings and coordinate with the human.
 
@@ -99,16 +99,11 @@ crloop schema [command]
 
 ---
 
-## Partially Implemented Commands
-
-These commands work but are missing the lock file behavior required by `url`, `open`, and the full URL-discovery chain.
-
 ### `crloop serve`
 
 Start the review server. Default command when no subcommand is given. Spawns a detached daemon and exits.
 
-**Implemented:** daemonization, `--repo` / `--port` flags, multi-repo startup.
-**Missing:** write lock file `~/.crloop/server.json` on daemon start.
+**Idempotent:** if a live server is already running on the same port (detected via lock file PID check), prints `Server running (pid X) on http://localhost:PORT` and exits 0 without spawning a second daemon.
 
 ```
 crloop serve [--repo <path>] [--repo name:<path>] [--port 3000]
@@ -120,18 +115,20 @@ Multiple `--repo` flags register multiple repos at startup. Use `name:/path` syn
 crloop serve --repo fe:/path/to/frontend --repo be:/path/to/backend
 ```
 
+Output (both first run and idempotent re-run):
+```
+Server running (pid 12345) on http://localhost:3000
+```
+
 ### `crloop stop-server`
 
 Stop the running server.
-
-**Implemented:** `POST /api/server/stop`, `--json` output.
-**Missing:** remove lock file `~/.crloop/server.json` after stopping.
 
 ```
 crloop stop-server [--url URL] [--json]
 ```
 
-Outputs `Server stopped.` or `{"stopped": true}` with `--json`.
+Outputs `Server stopped.` or `{"stopped": true}` with `--json`. Removes `~/.crloop/server.json` on success.
 
 ---
 
@@ -325,7 +322,7 @@ The file starts with `#!/usr/bin/env node` for npm bin linking.
 
 ### Lock File: `~/.crloop/server.json`
 
-`crloop serve` writes a lock file on daemon startup and `crloop stop-server` removes it. This allows any subsequent command to discover the server URL without `--url`.
+`crloop serve` writes a lock file after the daemon successfully binds the port; `crloop stop-server` removes it. Before spawning, `serve` reads the lock file and checks whether the recorded PID is still alive — if so it prints `Server running` and exits 0 without spawning a second process. This allows any subsequent command to discover the server URL without `--url`.
 
 ```json
 {

@@ -232,6 +232,42 @@ export async function startServer(
     }
   });
 
+  repoRouter.get("/session", async (_request, response, next) => {
+    try {
+      const svc = getRepoService(response);
+      const [session, changes] = await Promise.all([svc.getSession(), svc.getChangeSummaries()]);
+      const commentCounts = changes.reduce(
+        (acc, c) => ({
+          current: acc.current + c.commentCounts.current,
+          outdated: acc.outdated + c.commentCounts.outdated,
+        }),
+        { current: 0, outdated: 0 }
+      );
+      response.json({ ...session, commentCounts });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  repoRouter.post("/session/transition", async (request, response, next) => {
+    try {
+      const svc = getRepoService(response);
+      const body = request.body as Partial<{ status: string }>;
+      if (typeof body.status !== "string") {
+        response.status(400).json({ error: "Missing status" });
+        return;
+      }
+      const updated = await svc.transitionSession(body.status as import("./sessionStore.js").SessionStatus);
+      response.json(updated);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Invalid transition")) {
+        response.status(400).json({ error: error.message });
+        return;
+      }
+      next(error);
+    }
+  });
+
   repoRouter.get("/export/comments.txt", async (_request, response, next) => {
     try {
       const svc = getRepoService(response);

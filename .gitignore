@@ -11,3 +11,4 @@ bin/crloop
 .worktree
 test-results
 cspell.json
+.claude/dev-workflow.md

@@ -43,8 +43,8 @@ npm run test:cli
 ```
 
 **Expected baselines:**
-- Playwright: `43 passed, 0 skipped`
-- BATS: `40 passed, 0 failed`
+- Playwright: `44 passed, 0 skipped`
+- BATS: `51 passed, 0 failed`
 
 ---
 
@@ -59,6 +59,7 @@ npm run test:cli
 | `e2e/zero-repo.spec.ts` | `npx playwright test e2e/zero-repo.spec.ts` | ui-40 |
 | `e2e/ui-prefs.spec.ts` | `npx playwright test e2e/ui-prefs.spec.ts` | ui-41 |
 | `e2e/file-tree.spec.ts` | `npx playwright test e2e/file-tree.spec.ts` | ui-42, ui-43 |
+| `e2e/crloop-view.spec.ts` | `npx playwright test e2e/crloop-view.spec.ts` | ui-44 |
 
 To re-run a single failing test by name:
 ```bash
@@ -76,7 +77,7 @@ Server lifecycle (setup/teardown, worktree creation, multi/zero mode switching) 
 
 | Test file | Command | Scenarios |
 |---|---|---|
-| `test/cli.bats` | `npm run test:cli` | cli-1–cli-5 |
+| `test/cli.bats` | `npm run test:cli` | cli-1–cli-7 |
 
 To re-run a single failing BATS test by name:
 ```bash
@@ -142,6 +143,20 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-47 | CLI --dry-run flag | cli-5 | `test/cli.bats` — `cli-5, sec 3c` |
 | FR-48 | CLI schema command | cli-5 | `test/cli.bats` — `cli-5, sec 3b` |
 | FR-49 | File-tree viewed/unviewed state | ui-38, ui-43 | `multi-repo.spec.ts` — ui-38; `file-tree.spec.ts` — ui-43 |
+| FR-50 | Session state machine | cli-7 | `test/cli.bats` — cli-7; `src/server/sessionStore.test.ts` — valid/invalid transitions |
+| FR-51 | Session state persisted to `.local-code-review/session.json` | cli-7 | `src/server/sessionStore.test.ts` — readSession/writeSession |
+| FR-52 | CLI `status` command | cli-7 | `test/cli.bats` — cli-7 |
+| FR-53 | CLI `finish-self-review` command | cli-7 | `test/cli.bats` — cli-7 |
+| FR-54 | CLI `wait` command | — | `src/server/server.test.ts` — session transition endpoint; no blocking integration test (skipped per impl-plan) |
+| FR-55 | CLI `comment` command | cli-7 | `test/cli.bats` — cli-7 (`--dry-run`); `src/server/server.test.ts` — POST comments |
+| FR-56 | CLI `export` command | cli-7 | `test/cli.bats` — cli-7; `src/server/server.test.ts` — export endpoint |
+| FR-57 | CLI `url` command | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
+| FR-58 | CLI `open` command | — | No automated coverage — requires OS browser/desktop interaction |
+| FR-59 | Lock file written by `serve`, removed by `stop-server` | cli-6 | `test/cli.bats` — cli-6 |
+| FR-60 | URL resolution chain (`--url` → env → lock file → default) | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
+| FR-61 | Repo auto-detection from CWD | — | `src/server/cli.test.ts` — resolveRepoId logic |
+| FR-62 | crloop view at `/crloop/<repoId>` | ui-44 | `e2e/crloop-view.spec.ts` — ui-44; `src/client/App.test.tsx` — Finish Review button |
+| FR-63 | Input validation for `--file`, `--side`, `--line`, `--repo` | — | `src/server/cli.test.ts` — input validation group |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | ui-7 | `single-repo.spec.ts` — ui-7 |

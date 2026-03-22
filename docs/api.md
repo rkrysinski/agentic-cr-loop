@@ -29,6 +29,8 @@ All resource routes are scoped under `/api/repos/:repoId/`.
 | `PATCH` | `/api/repos/:repoId/comments/:commentId` | Update a comment body |
 | `DELETE` | `/api/repos/:repoId/comments/:commentId` | Delete a comment (204) |
 | `GET` | `/api/repos/:repoId/export/comments.txt` | Export all comments as plain text |
+| `GET` | `/api/repos/:repoId/session` | Get review session state with comment counts |
+| `POST` | `/api/repos/:repoId/session/transition` | Transition session state |
 
 ### `GET /api/repos` response
 
@@ -69,6 +71,39 @@ Error responses:
 ```
 
 `id` is new relative to the old flat `/api/repo` endpoint; `path`, `baseRef`, and `changeCount` are unchanged. `headShortId` is the 12-character short SHA of the current HEAD commit; the client uses it as a cache key to invalidate the viewed-file set when HEAD changes.
+
+### `GET /api/repos/:repoId/session` response
+
+```json
+{
+  "status": "human-review",
+  "iteration": 2,
+  "headId": "",
+  "startedAt": "2026-03-22T10:00:00.000Z",
+  "updatedAt": "2026-03-22T10:01:30.000Z",
+  "commentCounts": { "current": 5, "outdated": 1 }
+}
+```
+
+`status` is one of: `agent-review`, `human-review`, `agent-addressing`, `complete`. Returns a default `agent-review` state if no session file exists.
+
+### `POST /api/repos/:repoId/session/transition` request / response
+
+Request body:
+```json
+{ "status": "human-review" }
+```
+
+Success (`200`): returns the updated session state (same shape as the GET response, without `commentCounts`).
+
+Error responses:
+- `400` — invalid transition (e.g. `agent-review → complete`) or missing `status` field
+
+Valid transitions:
+- `agent-review → human-review`
+- `human-review → agent-addressing`
+- `human-review → complete`
+- `agent-addressing → agent-review` (increments `iteration`)
 
 ## Comment Storage
 

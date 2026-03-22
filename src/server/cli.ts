@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { spawn } from "node:child_process";
+import { homedir } from "node:os";
+import { spawn, exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { deriveRepoId, parseServerOptions } from "./args.js";
 import { logFatalError, runServer } from "./runServer.js";
@@ -47,6 +48,99 @@ async function checkForUpdate(): Promise<string | null> {
 }
 
 const DEFAULT_URL = "http://localhost:3000";
+const LOCK_DIR = join(homedir(), ".crloop");
+const LOCK_FILE = join(LOCK_DIR, "server.json");
+
+type LockFileData = { port: number; pid: number; startedAt: string };
+
+function writeLockFile(port: number, pid: number): void {
+  mkdirSync(LOCK_DIR, { recursive: true });
+  const data: LockFileData = { port, pid, startedAt: new Date().toISOString() };
+  writeFileSync(LOCK_FILE, JSON.stringify(data, null, 2) + "\n", "utf8");
+}
+
+function removeLockFile(): void {
+  try {
+    unlinkSync(LOCK_FILE);
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
+function readLockFile(): LockFileData | null {
+  try {
+    if (!existsSync(LOCK_FILE)) return null;
+    const data = JSON.parse(readFileSync(LOCK_FILE, "utf8")) as LockFileData;
+    // Verify PID is alive
+    try {
+      process.kill(data.pid, 0);
+    } catch {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function resolveBaseUrl(args: string[]): string {
+  const explicit = getFlag(args, "--url");
+  if (explicit) return explicit;
+  const envUrl = process.env["CODE_REVIEW_URL"];
+  if (envUrl) return envUrl;
+  const lock = readLockFile();
+  if (lock) return `http://localhost:${lock.port}`;
+  return DEFAULT_URL;
+}
+
+function validateFilePath(file: string): string {
+  if (file.includes("..") || file.startsWith("/")) {
+    console.error(`Invalid file path: ${file}`);
+    process.exit(1);
+  }
+  return file.replace(/\\/g, "/");
+}
+
+function validateSide(side: string | undefined): "new" | "old" {
+  if (side !== "new" && side !== "old") {
+    console.error(`Invalid side: ${side ?? "(missing)"}. Must be "new" or "old".`);
+    process.exit(1);
+  }
+  return side;
+}
+
+function validateLine(line: string | undefined): number {
+  const n = Number(line);
+  if (!Number.isInteger(n) || n <= 0) {
+    console.error(`Invalid line number: ${line ?? "(missing)"}. Must be a positive integer.`);
+    process.exit(1);
+  }
+  return n;
+}
+
+function validateRepoId(id: string): string {
+  if (!/^[a-zA-Z0-9-]+$/.test(id)) {
+    console.error(`Invalid repo ID: ${id}. Must be alphanumeric and hyphens only.`);
+    process.exit(1);
+  }
+  return id;
+}
+
+async function resolveRepoId(args: string[], baseUrl: string): Promise<string> {
+  const explicit = getFlag(args, "--repo");
+  if (explicit) return explicit;
+
+  const result = await apiFetch(`${baseUrl}/api/repos`, "GET");
+  const repos = result.data as Array<{ id: string; path: string }>;
+  const cwd = process.cwd();
+  const match = repos.find((r) => cwd === r.path || cwd.startsWith(r.path + "/"));
+  if (!match) {
+    console.error("Cannot detect repo from current directory. Use --repo <repoId>.");
+    console.error(`Registered repos: ${repos.map((r) => r.id).join(", ") || "(none)"}`);
+    process.exit(1);
+  }
+  return match.id;
+}
 
 function getFlag(args: string[], flag: string): string | undefined {
   const idx = args.indexOf(flag);
@@ -72,7 +166,7 @@ async function apiFetch(
 }
 
 async function cmdRepos(args: string[]): Promise<void> {
-  const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const baseUrl = resolveBaseUrl(args);
   const json = hasFlag(args, "--json");
   let result: { status: number; data: unknown };
   try {
@@ -101,7 +195,7 @@ async function cmdRepos(args: string[]): Promise<void> {
 async function cmdAddRepo(args: string[]): Promise<void> {
   const repoPath = args[0];
   const id = getFlag(args, "--id");
-  const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const baseUrl = resolveBaseUrl(args);
   const json = hasFlag(args, "--json");
   const dryRun = hasFlag(args, "--dry-run");
 
@@ -146,11 +240,12 @@ async function cmdAddRepo(args: string[]): Promise<void> {
 }
 
 async function cmdStopServer(args: string[]): Promise<void> {
-  const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const baseUrl = resolveBaseUrl(args);
   const json = hasFlag(args, "--json");
   try {
     const response = await fetch(`${baseUrl}/api/server/stop`, { method: "POST" });
     if (response.status === 204) {
+      removeLockFile();
       if (json) {
         console.log(JSON.stringify({ stopped: true }));
       } else {
@@ -168,7 +263,7 @@ async function cmdStopServer(args: string[]): Promise<void> {
 
 async function cmdRemoveRepo(args: string[]): Promise<void> {
   const repoId = args[0];
-  const baseUrl = getFlag(args, "--url") ?? DEFAULT_URL;
+  const baseUrl = resolveBaseUrl(args);
   const json = hasFlag(args, "--json");
   const dryRun = hasFlag(args, "--dry-run");
 
@@ -204,6 +299,248 @@ async function cmdRemoveRepo(args: string[]): Promise<void> {
     const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
     console.error(error);
     process.exit(1);
+  }
+}
+
+function cmdUrl(args: string[]): void {
+  const json = hasFlag(args, "--json");
+  const lock = readLockFile();
+  if (!lock) {
+    console.error("No running server found (lock file missing or PID dead).");
+    process.exit(1);
+  }
+  if (json) {
+    console.log(JSON.stringify({ url: `http://localhost:${lock.port}`, port: lock.port, pid: lock.pid }));
+  } else {
+    console.log(`http://localhost:${lock.port}`);
+  }
+}
+
+async function cmdOpen(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const url = `${baseUrl}/crloop/${encodeURIComponent(repoId)}`;
+
+  const platform = process.platform;
+  const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
+  exec(`${cmd} ${JSON.stringify(url)}`, (error) => {
+    if (error) {
+      console.error(`Failed to open browser: ${error.message}`);
+      process.exit(1);
+    }
+  });
+}
+
+async function cmdComment(args: string[]): Promise<void> {
+  const dryRun = hasFlag(args, "--dry-run");
+  const fromFile = getFlag(args, "--from-file");
+
+  // Validate single-comment inputs early (before any network calls)
+  let singleComment: { filePath: string; side: "new" | "old"; line: number; body: string } | null = null;
+  if (!fromFile) {
+    const file = getFlag(args, "--file");
+    const sideRaw = getFlag(args, "--side");
+    const lineRaw = getFlag(args, "--line");
+    const body = getFlag(args, "--body");
+
+    if (!file || !sideRaw || !lineRaw || !body) {
+      console.error("Usage: crloop comment --file <path> --side <new|old> --line <number> --body <text>");
+      console.error("       crloop comment --from-file <path>");
+      process.exit(1);
+    }
+
+    singleComment = {
+      filePath: validateFilePath(file),
+      side: validateSide(sideRaw),
+      line: validateLine(lineRaw),
+      body,
+    };
+  }
+
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+
+  // Fetch changes to resolve file paths to changeIds
+  const changesResult = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/changes`, "GET");
+  const changes = changesResult.data as Array<{ changeId: string; oldPath: string | null; newPath: string | null }>;
+
+  function resolveChangeId(file: string): string | null {
+    const match = changes.find((c) => c.newPath === file || c.oldPath === file);
+    return match?.changeId ?? null;
+  }
+
+  if (fromFile) {
+    // Bulk mode
+    const content = readFileSync(fromFile, "utf8");
+    const entries = JSON.parse(content) as Array<{ file: string; side: string; line: number; body: string }>;
+    let created = 0;
+    let failed = 0;
+
+    for (const entry of entries) {
+      const filePath = validateFilePath(entry.file);
+      const side = validateSide(entry.side);
+      const line = entry.line;
+      if (!Number.isInteger(line) || line <= 0) {
+        console.error(`Invalid line number for ${filePath}: ${line}`);
+        failed++;
+        continue;
+      }
+
+      const changeId = resolveChangeId(filePath);
+      if (!changeId) {
+        console.error(`File not found in changes: ${filePath}`);
+        failed++;
+        continue;
+      }
+
+      if (dryRun) {
+        console.log(`Would create: ${filePath}:${line} (${side}) — ${entry.body.slice(0, 60)}`);
+        created++;
+        continue;
+      }
+
+      try {
+        const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/comments`, "POST", {
+          changeId, side, lineNumber: line, body: entry.body,
+        });
+        if (result.status === 201) {
+          created++;
+        } else {
+          const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
+          console.error(`Failed for ${filePath}:${line}: ${error}`);
+          failed++;
+        }
+      } catch {
+        console.error(`Failed for ${filePath}:${line}: Connection error`);
+        failed++;
+      }
+    }
+
+    console.log(`${created} created, ${failed} failed`);
+  } else {
+    // Single-comment mode (already validated above)
+    const { filePath, side, line, body } = singleComment!;
+
+    const changeId = resolveChangeId(filePath);
+    if (!changeId) {
+      console.error(`File not found in changes: ${filePath}`);
+      process.exit(1);
+    }
+
+    if (dryRun) {
+      console.log(`Would create comment on ${filePath}:${line} (${side})`);
+      return;
+    }
+
+    const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/comments`, "POST", {
+      changeId, side, lineNumber: line, body,
+    });
+    if (result.status === 201) {
+      const comment = result.data as { commentId: string };
+      console.log(comment.commentId);
+    } else {
+      const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
+      console.error(error);
+      process.exit(1);
+    }
+  }
+}
+
+async function cmdExport(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const fileFilter = getFlag(args, "--file");
+
+  let url = `${baseUrl}/api/repos/${encodeURIComponent(repoId)}/export/comments.txt`;
+  if (fileFilter) {
+    url += `?file=${encodeURIComponent(fileFilter)}`;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    console.error(`Export failed: ${response.status}`);
+    process.exit(1);
+  }
+  const text = await response.text();
+  process.stdout.write(text);
+}
+
+async function cmdStatus(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const json = hasFlag(args, "--json");
+
+  const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session`, "GET");
+  if (result.status !== 200) {
+    console.error(`Failed to get session: ${result.status}`);
+    process.exit(1);
+  }
+
+  const session = result.data as {
+    status: string; iteration: number; headId: string;
+    commentCounts: { current: number; outdated: number };
+  };
+
+  if (json) {
+    console.log(JSON.stringify(session));
+  } else {
+    console.log(`Status:     ${session.status}`);
+    console.log(`Iteration:  ${session.iteration}`);
+    console.log(`Comments:   ${session.commentCounts.current} current, ${session.commentCounts.outdated} outdated`);
+    console.log(`Head:       ${session.headId}`);
+  }
+}
+
+async function cmdFinishSelfReview(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const dryRun = hasFlag(args, "--dry-run");
+
+  if (dryRun) {
+    const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session`, "GET");
+    const session = result.data as { status: string };
+    if (session.status === "agent-review") {
+      console.log("Would transition: agent-review → human-review");
+    } else {
+      console.error(`Cannot transition: current status is "${session.status}", expected "agent-review".`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  const result = await apiFetch(
+    `${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session/transition`,
+    "POST",
+    { status: "human-review" }
+  );
+
+  if (result.status === 200) {
+    console.log("Handed off to human review.");
+  } else {
+    const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+async function cmdWait(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const interval = Number(getFlag(args, "--poll-interval") ?? "3") * 1000;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session`, "GET");
+    const session = result.data as { status: string };
+
+    if (session.status === "agent-addressing") {
+      process.exit(0);
+    }
+    if (session.status === "complete") {
+      process.exit(2);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 }
 
@@ -254,6 +591,64 @@ function cmdSchema(args: string[]): void {
       description: "Print machine-readable schema for all commands or a single command",
       args: [{ name: "command", required: false, description: "Command name to describe (omit for all)" }],
     },
+    url: {
+      description: "Print the base URL of the running server (reads lock file, no network call)",
+      options: {
+        "--json": { type: "boolean", description: "Output JSON: {url, port, pid}" },
+      },
+    },
+    open: {
+      description: "Open the review UI in the default browser",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID (auto-detected from CWD if omitted)" },
+        "--url": { type: "string", description: "Server URL" },
+      },
+    },
+    comment: {
+      description: "Add a comment to a changed line (single or bulk mode)",
+      options: {
+        "--file": { type: "string", description: "File path (relative to repo root)" },
+        "--side": { type: "string", enum: ["new", "old"], description: "Diff side" },
+        "--line": { type: "number", description: "Line number (positive integer)" },
+        "--body": { type: "string", description: "Comment body text" },
+        "--from-file": { type: "string", description: "Path to JSON file with array of comments for bulk import" },
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--dry-run": { type: "boolean", description: "Validate without creating comments" },
+      },
+    },
+    export: {
+      description: "Export all comments as plain text",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--file": { type: "string", description: "Filter output to comments on a single file" },
+      },
+    },
+    status: {
+      description: "Show review session status",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--json": { type: "boolean", description: "Output raw JSON from session endpoint" },
+      },
+    },
+    "finish-self-review": {
+      description: "Signal that the agent has finished self-review (transitions to human-review)",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--dry-run": { type: "boolean", description: "Validate without transitioning" },
+      },
+    },
+    wait: {
+      description: "Block until the human finishes review",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--poll-interval": { type: "number", default: 3, description: "Polling interval in seconds" },
+      },
+    },
   };
 
   if (command && command in schema) {
@@ -273,36 +668,59 @@ Usage:
   crloop add-repo <path> [--id <repoId>] [--url URL] [--json] [--dry-run]
   crloop remove-repo <repoId> [--url URL] [--json] [--dry-run]
   crloop schema [command]
+  crloop url [--json]
+  crloop open [--repo <repoId>] [--url URL]
+  crloop comment --file <path> --side <new|old> --line <n> --body <text> [--repo <repoId>] [--url URL] [--dry-run]
+  crloop comment --from-file <path> [--repo <repoId>] [--url URL] [--dry-run]
+  crloop export [--repo <repoId>] [--url URL] [--file <path>]
+  crloop status [--repo <repoId>] [--url URL] [--json]
+  crloop finish-self-review [--repo <repoId>] [--url URL] [--dry-run]
+  crloop wait [--repo <repoId>] [--url URL] [--poll-interval <seconds>]
 
-Commands:
-  serve        Start the review server (default when no command given)
-  stop-server  Stop the running server
-  repos        List repos registered with the running server
-  add-repo     Register a repo with the running server at runtime
-  remove-repo  Unregister a repo from the running server
-  schema       Print machine-readable JSON schema for commands
+Server management:
+  serve              Start the review server (default when no command given)
+  stop-server        Stop the running server
+  url                Print the running server's base URL (reads lock file)
+
+Repository management:
+  repos              List repos registered with the running server
+  add-repo           Register a repo with the running server at runtime
+  remove-repo        Unregister a repo from the running server
+
+Review workflow:
+  open               Open the review UI in the default browser
+  comment            Add a comment to a changed line (single or bulk)
+  export             Export all comments as plain text
+  status             Show review session status
+  finish-self-review Signal self-review complete, hand off to human
+  wait               Block until the human finishes review
+
+Introspection:
+  schema             Print machine-readable JSON schema for commands
 
 Flags available on most commands:
   --json       Output machine-readable JSON instead of human text
-  --dry-run    (add-repo, remove-repo) Preview action without executing it
+  --dry-run    Preview action without executing it
+  --repo       Target a specific repo (auto-detected from CWD if omitted)
+  --url        Server URL (auto-discovered from lock file if omitted)
 
-Repo ID derivation:
-  Directory basename lowercased, non-alphanumeric chars replaced with "-"
-  Override with name:/path syntax:  --repo fe:/path/to/frontend
+URL resolution order:
+  --url flag → CODE_REVIEW_URL env var → lock file (~/.crloop/server.json) → http://localhost:3000
 
 Examples:
   crloop serve --repo /path/to/project
   crloop serve --repo fe:/path/to/frontend --repo be:/path/to/backend
   crloop add-repo /path/to/repo --id my-api
-  crloop add-repo /path/to/repo --dry-run
-  crloop repos --url http://localhost:4000
   crloop repos --json
-  crloop remove-repo my-api
-  crloop schema add-repo
-
-ID derivation examples:
-  my_frontend  →  my-frontend   (${deriveRepoId("my_frontend")})
-  Backend.API  →  backend-api   (${deriveRepoId("Backend.API")})
+  crloop url
+  crloop open
+  crloop comment --file src/main.ts --side new --line 42 --body "Fix this"
+  crloop comment --from-file comments.json --dry-run
+  crloop export --file src/main.ts
+  crloop status --json
+  crloop finish-self-review
+  crloop wait --poll-interval 5
+  crloop schema comment
 `);
 }
 
@@ -318,10 +736,17 @@ async function main(): Promise<void> {
     const argv = command === "serve" ? args.slice(1) : args;
     if (process.env["CRLOOP_DAEMON"] === "1") {
       // Running as daemon — start server and keep process alive
-      await runServer({ argv });
+      const port = await runServer({ argv });
+      writeLockFile(port, process.pid);
     } else {
       // Validate args in the foreground so errors surface before spawning
-      parseServerOptions(argv);
+      const parsedOpts = parseServerOptions(argv);
+      // Idempotency: bail if a live server is already on the same port
+      const existing = readLockFile();
+      if (existing && existing.port === parsedOpts.port) {
+        console.log(`Server running (pid ${existing.pid}) on http://localhost:${existing.port}`);
+        return;
+      }
       // Spawn detached daemon and exit
       const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
         detached: true,
@@ -333,7 +758,7 @@ async function main(): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const portFlag = argv.indexOf("--port");
       const port = portFlag !== -1 ? argv[portFlag + 1] : "3000";
-      console.log(`Server started (pid ${child.pid}) on http://localhost:${port}`);
+      console.log(`Server running (pid ${child.pid}) on http://localhost:${port}`);
       checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     }
   } else if (command === "schema") {
@@ -362,6 +787,32 @@ async function main(): Promise<void> {
     await cmdRemoveRepo(subArgs);
     const notice = await updateCheck;
     if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
+  } else if (command === "url") {
+    cmdUrl(args.slice(1));
+  } else if (command === "open") {
+    await cmdOpen(args.slice(1));
+  } else if (command === "comment") {
+    const subArgs = args.slice(1);
+    const updateCheck = checkForUpdate();
+    await cmdComment(subArgs);
+    const notice = await updateCheck;
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
+  } else if (command === "export") {
+    await cmdExport(args.slice(1));
+  } else if (command === "status") {
+    const subArgs = args.slice(1);
+    const updateCheck = checkForUpdate();
+    await cmdStatus(subArgs);
+    const notice = await updateCheck;
+    if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
+  } else if (command === "finish-self-review") {
+    const subArgs = args.slice(1);
+    const updateCheck = checkForUpdate();
+    await cmdFinishSelfReview(subArgs);
+    const notice = await updateCheck;
+    if (notice) console.log(notice);
+  } else if (command === "wait") {
+    await cmdWait(args.slice(1));
   } else {
     console.error(`Unknown command: ${command}\nRun "crloop --help" for usage.`);
     process.exit(1);

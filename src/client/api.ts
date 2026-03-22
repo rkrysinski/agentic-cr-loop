@@ -101,6 +101,18 @@ export function createApiClient(repoId: string) {
 
     exportComments(): Promise<string> {
       return request<string>(`${base}/export/comments.txt`);
+    },
+
+    getSession(): Promise<{ status: string; iteration: number; headId: string; startedAt: string; updatedAt: string; commentCounts: { current: number; outdated: number } }> {
+      return request(`${base}/session`);
+    },
+
+    transitionSession(status: string): Promise<{ status: string; iteration: number }> {
+      return request(`${base}/session/transition`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
     }
   };
 }

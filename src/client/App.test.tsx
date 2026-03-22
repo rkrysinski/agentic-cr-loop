@@ -16,6 +16,14 @@ function renderApp() {
   );
 }
 
+function renderCrloopApp(crloopRepoId: string) {
+  return render(
+    <RepoProvider crloopRepoId={crloopRepoId}>
+      <App crloopRepoId={crloopRepoId} />
+    </RepoProvider>
+  );
+}
+
 describe("App", () => {
   it("renders changed files as a filesystem tree", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -609,6 +617,48 @@ describe("App", () => {
     const bSecondButton = screen.getByRole("button", { name: /b-second\.txt/ });
     expect(bSecondButton.querySelector(".path-text")).toHaveClass("change-tree-filename--unviewed");
     expect(bSecondButton.querySelector(".path-text")).not.toHaveClass("change-tree-filename--viewed");
+  });
+
+  it("renders Finish Review button and suppresses RepoSelector in crloop view", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test-repo", path: "/repo" }]);
+      }
+
+      if (url.pathname === "/api/repos/test-repo/repo") {
+        return jsonResponse({ id: "test-repo", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test-repo/changes" && !url.search) {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: { current: 0, outdated: 0 }
+          }
+        ]);
+      }
+
+      if (url.pathname === "/api/repos/test-repo/session/transition" && init?.method === "POST") {
+        return jsonResponse({ status: "agent-addressing", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderCrloopApp("test-repo");
+
+    await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
+
+    expect(screen.getByRole("button", { name: /finish_review/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Active repository" })).not.toBeInTheDocument();
   });
 
   it("loads export text from the server endpoint instead of rebuilding it in the client", async () => {

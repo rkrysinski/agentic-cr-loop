@@ -368,6 +368,49 @@ describe("server API", () => {
     });
     expect(response.statusCode).toBe(400);
   });
+
+  it("GET /api/repos/:repoId/session returns default session state", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/test/session");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      status: "agent-review",
+      iteration: 1,
+      commentCounts: { current: 0, outdated: 0 }
+    });
+  });
+
+  it("POST /api/repos/:repoId/session/transition transitions agent-review → human-review", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos/test/session/transition", {
+      body: { status: "human-review" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({ status: "human-review" });
+  });
+
+  it("POST /api/repos/:repoId/session/transition rejects invalid transition with 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos/test/session/transition", {
+      body: { status: "complete" }
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({ error: expect.stringContaining("Invalid transition") });
+  });
+
+  it("POST /api/repos/:repoId/session/transition with missing status returns 400", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "post", "/api/repos/test/session/transition", {
+      body: {}
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("GET /api/repos/:repoId/session on nonexistent repo returns 404", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const response = await invokeRoute(app, "get", "/api/repos/nonexistent/session");
+    expect(response.statusCode).toBe(404);
+  });
 });
 
 // ── Route invocation helper ──────────────────────────────────

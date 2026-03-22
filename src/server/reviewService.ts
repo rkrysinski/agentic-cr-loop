@@ -8,6 +8,8 @@ import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } 
 import { renderReviewCommentsText } from "../shared/export.js";
 import { runGit } from "./git.js";
 import { ClientError } from "./errors.js";
+import { readSession, transitionSession as transitionSessionStore } from "./sessionStore.js";
+import type { SessionState, SessionStatus } from "./sessionStore.js";
 
 const SUMMARY_CONTEXT: DiffContextValue = "0";
 const FULL_CONTEXT_LINES = 1_000_000;
@@ -113,6 +115,16 @@ export class ReviewService {
   async deleteComment(commentId: string): Promise<boolean> {
     await this.syncReviewSession();
     return this.commentStore.delete(commentId);
+  }
+
+  async getSession(): Promise<SessionState> {
+    await this.syncReviewSession();
+    return readSession(this.repoPath);
+  }
+
+  async transitionSession(targetStatus: SessionStatus): Promise<SessionState> {
+    await this.syncReviewSession();
+    return transitionSessionStore(this.repoPath, targetStatus);
   }
 
   async exportComments(): Promise<string> {
