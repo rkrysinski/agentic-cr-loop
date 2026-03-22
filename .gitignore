@@ -10,3 +10,4 @@ crloop-*.tgz
 bin/crloop
 .worktree
 test-results
+cspell.json
