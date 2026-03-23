@@ -584,6 +584,49 @@ teardown_file() {
   [ "$status" -eq 0 ]
 }
 
+@test "cli-7: finish-addressing transitions session from agent-addressing to agent-review" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  # Advance to agent-addressing via finish-self-review then simulating human finish
+  run crloop finish-self-review --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  # Transition human-review → agent-addressing (simulates "Finish Review" button)
+  node -e "
+    fetch('$CLI_BASE/api/repos/a/session/transition', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status:'agent-addressing'})
+    }).then(r => r.json()).then(d => { if(d.status!=='agent-addressing') throw new Error(JSON.stringify(d)); })
+  "
+  run crloop finish-addressing --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  run crloop status --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"agent-review"* ]]
+  _stop_cli_server
+}
+
+@test "cli-7: finish-addressing --dry-run exits 0 without transitioning" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  # Advance to agent-addressing
+  run crloop finish-self-review --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  node -e "
+    fetch('$CLI_BASE/api/repos/a/session/transition', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status:'agent-addressing'})
+    }).then(r => r.json()).then(d => { if(d.status!=='agent-addressing') throw new Error(JSON.stringify(d)); })
+  "
+  run crloop finish-addressing --url "$CLI_BASE" --repo a --dry-run
+  [ "$status" -eq 0 ]
+  # State must still be agent-addressing (not transitioned)
+  run crloop status --url "$CLI_BASE" --repo a
+  [[ "$output" == *"agent-addressing"* ]]
+  _stop_cli_server
+}
+
 @test "cli-7: comment --dry-run validates inputs and exits 0 without posting" {
   _start_cli_server --repo "a:$REPO_A"
   # Use a file that exists in the repo's diff (untracked file seeded by setup-single-repo.sh is only available in the QA worktree)

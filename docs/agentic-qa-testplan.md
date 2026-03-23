@@ -158,6 +158,7 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-62 | crloop view at `/crloop/<repoId>` | ui-44 | `e2e/crloop-view.spec.ts` — ui-44; `src/client/App.test.tsx` — Finish Review button |
 | FR-63 | Input validation for `--file`, `--side`, `--line`, `--repo` | — | `src/server/cli.test.ts` — input validation group |
 | FR-64 | CLI `skill --install` command | — | `src/server/cli.test.ts` — skill command group (created/unchanged/skipped/force/dry-run/json/scope) |
+| FR-65 | CLI `finish-addressing` command | cli-7 | `test/cli.bats` — cli-7 (transition + `--dry-run`) |
 | NFR-01 | Localhost only | All | Implicit — no external network calls |
 | NFR-02 | No authentication | All | Implicit — no auth in any scenario |
 | NFR-03 | Dark/light themes | ui-7 | `single-repo.spec.ts` — ui-7 |

@@ -204,7 +204,8 @@ crloop remove-repo shared-libs
 1. **Agent self-reviews** — the agent reads the diff natively (`git diff`, `git status`) and posts findings via `crloop comment`.
 2. **Agent hands off** — `crloop finish-self-review` transitions the session to `human-review` and `crloop open` opens the review UI in the browser.
 3. **Agent waits** — `crloop wait` blocks and polls until the human finishes review.
-4. **Agent addresses feedback** — `crloop export` prints the comments and the agent iterates.
+4. **Agent addresses feedback** — `crloop export` prints the comments and the agent fixes the code.
+5. **Agent signals done** — `crloop finish-addressing` transitions back to `agent-review`, starting the next iteration. If the human left no comments, `crloop wait` exits 2 and the loop ends.
 
 ### Lock file and server discovery
 
@@ -219,7 +220,7 @@ crloop url --json   # → {"url":"http://localhost:3000","port":3000,"pid":12345
 
 ### Repo auto-detection
 
-Agentic commands (`comment`, `open`, `export`, `status`, `finish-self-review`, `wait`) automatically detect the target repo by matching the current working directory against registered repo paths. Use `--repo <repoId>` to override.
+Agentic commands (`comment`, `open`, `export`, `status`, `finish-self-review`, `finish-addressing`, `wait`) automatically detect the target repo by matching the current working directory against registered repo paths. Use `--repo <repoId>` to override.
 
 ### Posting comments
 
@@ -259,6 +260,7 @@ crloop open                  # open the crloop review UI in the browser
 crloop wait                  # block until human finishes (exit 0) or marks complete (exit 2)
 crloop export                # print all comments as plain text
 crloop export --file src/server/server.ts   # filter to one file
+crloop finish-addressing     # transition agent-addressing → agent-review (begin next iteration)
 ```
 
 ### crloop view
@@ -292,6 +294,9 @@ crloop wait   # exits 0 when human clicks "Finish Review"
 
 # Read feedback and address it
 crloop export
+
+# Signal addressing is complete; begin next self-review iteration
+crloop finish-addressing
 ```
 
 ## Installing the agent skill

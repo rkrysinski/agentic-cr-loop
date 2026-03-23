@@ -2,10 +2,11 @@
 
 ## [0.2.1] — 2026-03-23
 
-### Added — Skill install command
+### Added — Skill install command and finish-addressing
 
 - `crloop skill --install` — copies `skill/SKILL.md` from the installed package to `~/.claude/skills/crloop/SKILL.md`; supports `--scope project` to install into `.claude/skills/crloop/SKILL.md` relative to the current directory; idempotent (skips write when content is unchanged); protects user edits (warns and skips when file differs, unless `--force` is passed); supports `--dry-run` and `--json`
 - `crloop skill --print` — prints the skill content to stdout without any filesystem writes
+- `crloop finish-addressing` — transitions session from `agent-addressing` back to `agent-review`, enabling the next self-review iteration after the agent has addressed human feedback; supports `--dry-run`
 
 ## [0.2.0] — 2026-03-22
 

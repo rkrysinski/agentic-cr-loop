@@ -537,6 +537,38 @@ async function cmdFinishSelfReview(args: string[]): Promise<void> {
   }
 }
 
+async function cmdFinishAddressing(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const dryRun = hasFlag(args, "--dry-run");
+
+  if (dryRun) {
+    const result = await apiFetch(`${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session`, "GET");
+    const session = result.data as { status: string };
+    if (session.status === "agent-addressing") {
+      console.log("Would transition: agent-addressing → agent-review");
+    } else {
+      console.error(`Cannot transition: current status is "${session.status}", expected "agent-addressing".`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  const result = await apiFetch(
+    `${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session/transition`,
+    "POST",
+    { status: "agent-review" }
+  );
+
+  if (result.status === 200) {
+    console.log("Ready for next self-review iteration.");
+  } else {
+    const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
+    console.error(error);
+    process.exit(1);
+  }
+}
+
 async function cmdWait(args: string[]): Promise<void> {
   const baseUrl = resolveBaseUrl(args);
   const repoId = await resolveRepoId(args, baseUrl);
@@ -740,6 +772,14 @@ function cmdSchema(args: string[]): void {
         "--dry-run": { type: "boolean", description: "Validate without transitioning" },
       },
     },
+    "finish-addressing": {
+      description: "Signal that the agent has finished addressing feedback (transitions back to agent-review for next iteration)",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--dry-run": { type: "boolean", description: "Validate without transitioning" },
+      },
+    },
     wait: {
       description: "Block until the human finishes review",
       options: {
@@ -785,6 +825,7 @@ Usage:
   crloop export [--repo <repoId>] [--url URL] [--file <path>]
   crloop status [--repo <repoId>] [--url URL] [--json]
   crloop finish-self-review [--repo <repoId>] [--url URL] [--dry-run]
+  crloop finish-addressing [--repo <repoId>] [--url URL] [--dry-run]
   crloop wait [--repo <repoId>] [--url URL] [--poll-interval <seconds>]
   crloop skill --install [--scope global|project] [--force] [--dry-run] [--json]
   crloop skill --print
@@ -805,6 +846,7 @@ Review workflow:
   export             Export all comments as plain text
   status             Show review session status
   finish-self-review Signal self-review complete, hand off to human
+  finish-addressing  Signal addressing complete, begin next self-review iteration
   wait               Block until the human finishes review
 
 Skill management:
@@ -835,6 +877,7 @@ Examples:
   crloop export --file src/main.ts
   crloop status --json
   crloop finish-self-review
+  crloop finish-addressing
   crloop wait --poll-interval 5
   crloop schema comment
 `);
@@ -925,6 +968,12 @@ async function main(): Promise<void> {
     const subArgs = args.slice(1);
     const updateCheck = checkForUpdate();
     await cmdFinishSelfReview(subArgs);
+    const notice = await updateCheck;
+    if (notice) console.log(notice);
+  } else if (command === "finish-addressing") {
+    const subArgs = args.slice(1);
+    const updateCheck = checkForUpdate();
+    await cmdFinishAddressing(subArgs);
     const notice = await updateCheck;
     if (notice) console.log(notice);
   } else if (command === "wait") {

@@ -45,6 +45,7 @@ crloop --version | -v    Print installed version
 | `export` | ✅ Implemented | Plain text to stdout, `--file` filter |
 | `status` | ✅ Implemented | Human-readable + `--json` |
 | `finish-self-review` | ✅ Implemented | Transitions to `human-review`, `--dry-run` |
+| `finish-addressing` | ✅ Implemented | Transitions back to `agent-review`, `--dry-run` |
 | `wait` | ✅ Implemented | Polls session, exit 0/2 |
 
 > **Why no `changes` or `diff` commands?** The agent runs inside the git repository it is reviewing and already has `git status`, `git diff`, and file-reading tools. There is no value in routing diffs through the crloop server and back. The agent reviews changes natively; crloop is only used to record findings and coordinate with the human.
@@ -416,7 +417,44 @@ The SKILL.md will be finalized once the agentic CLI commands are implemented.
 
 See [skill/SKILL.md](./skill/SKILL.md) for the current draft content.
 
-## Workflow Sequence (Planned)
+## Session State Machine
+
+The review loop is driven by a four-state finite state machine persisted at `.local-code-review/session.json` in the reviewed repository. Each state represents whose turn it is to act and what action is expected.
+
+```mermaid
+stateDiagram-v2
+    [*] --> agent_review : session created (default)
+
+    agent_review --> human_review : crloop finish-self-review (agent posts comments, hands off)
+    human_review --> agent_addressing : "Finish Review" button (human done, left feedback)
+    human_review --> complete : "Finish Review" button (human done, no comments)
+    agent_addressing --> agent_review : crloop finish-addressing (agent fixed issues, iteration++)
+    complete --> [*]
+```
+
+### States
+
+| State | Who acts | What happens |
+|---|---|---|
+| `agent-review` | Agent | Reads diff, posts findings via `crloop comment`, calls `crloop finish-self-review` |
+| `human-review` | Human | Views diff and comments in the browser, edits/dismisses, clicks "Finish Review" |
+| `agent-addressing` | Agent | Reads feedback via `crloop export`, fixes code, calls `crloop finish-addressing` |
+| `complete` | — | Human clicked "Finish Review" with no active comments; loop ends |
+
+### Transitions
+
+| From | To | Trigger | CLI command |
+|---|---|---|---|
+| `agent-review` | `human-review` | Agent finished self-review | `crloop finish-self-review` |
+| `human-review` | `agent-addressing` | Human clicked "Finish Review" (comments remain) | Browser button → `POST /session/transition` |
+| `human-review` | `complete` | Human clicked "Finish Review" (no comments) | Browser button → `POST /session/transition` |
+| `agent-addressing` | `agent-review` | Agent finished addressing; iteration increments | `crloop finish-addressing` |
+
+The `iteration` counter starts at 1 and increments on every `agent-addressing → agent-review` transition, so comments and exports carry an iteration number for tracing.
+
+---
+
+## Workflow Sequence
 
 The agent runs **inside** the repository it is reviewing and uses its native git and file tools to read diffs — no crloop commands are needed for that step. crloop is used only for startup, recording findings, coordinating handoff, and reading feedback.
 
@@ -441,13 +479,13 @@ sequenceDiagram
 
     Note over Agent: git diff, git status,<br/>reads files natively,<br/>applies user instructions
 
-    Agent->>CLI: crloop comment --from-file findings.json
+    Agent->>CLI: crloop comment --from-file /tmp/findings.json
     CLI->>Server: POST /api/repos/:id/comments (per comment)
     Server-->>CLI: 201
     CLI-->>Agent: "N created, 0 failed"
 
     Agent->>CLI: crloop finish-self-review
-    CLI->>Server: POST /api/repos/:id/session/transition
+    CLI->>Server: POST /api/repos/:id/session/transition { status: "human-review" }
     Server-->>CLI: ok
     CLI-->>Agent: "Handed off to human"
 
@@ -459,17 +497,26 @@ sequenceDiagram
     Agent->>CLI: crloop wait (blocks, polls every 3s)
     CLI->>Server: GET /api/repos/:id/session
 
-    Note over Browser: human reviews,<br/>edits comments
+    Note over Browser: human reviews,<br/>edits/dismisses comments
 
-    Browser->>Server: POST /api/repos/:id/session/transition<br/>{ status: "agent-addressing" }
+    Browser->>Server: POST /api/repos/:id/session/transition<br/>{ status: "agent-addressing" | "complete" }
     Note over Browser: triggered by "Finish Review" button
-    Server-->>CLI: status: agent-addressing
-    CLI-->>Agent: exit 0
+    Server-->>CLI: status: agent-addressing (or complete)
+    CLI-->>Agent: exit 0 (feedback) or exit 2 (approved)
+
+    Note over Agent: exit 2 → loop ends
 
     Agent->>CLI: crloop export
     CLI->>Server: GET /api/repos/:id/export/comments.txt
     Server-->>CLI: text/plain
     CLI-->>Agent: plain text feedback
 
-    Note over Agent: addresses comments,<br/>loops back OR stops
+    Note over Agent: addresses comments<br/>using Edit tool
+
+    Agent->>CLI: crloop finish-addressing
+    CLI->>Server: POST /api/repos/:id/session/transition { status: "agent-review" }
+    Server-->>CLI: ok (iteration incremented)
+    CLI-->>Agent: "Ready for next self-review iteration"
+
+    Note over Agent: loop back to self-review
 ```
