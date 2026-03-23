@@ -21,6 +21,20 @@ function getCurrentVersion(): string {
   return "0.0.0";
 }
 
+export function findPackageRoot(startUrl: string): string {
+  let dir = dirname(fileURLToPath(startUrl));
+  for (let i = 0; i < 8; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: string };
+      if (pkg.name === "crloop") return dir;
+    } catch { /* keep walking up */ }
+    const parent = dirname(dir);
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
+  }
+  throw new Error("Cannot locate crloop package root. Try reinstalling crloop.");
+}
+
 function isNewer(latest: string, current: string): boolean {
   const parse = (v: string): number[] => v.split(".").map(Number);
   const [la, lb, lc] = parse(latest);
@@ -544,6 +558,91 @@ async function cmdWait(args: string[]): Promise<void> {
   }
 }
 
+function cmdSkill(args: string[]): void {
+  const install = hasFlag(args, "--install");
+  const print = hasFlag(args, "--print");
+  const force = hasFlag(args, "--force");
+  const dryRun = hasFlag(args, "--dry-run");
+  const json = hasFlag(args, "--json");
+  const scope = getFlag(args, "--scope") ?? "global";
+
+  if (install && print) {
+    console.error("--install and --print are mutually exclusive.");
+    process.exit(4);
+  }
+  if (!install && !print) {
+    console.error("Usage: crloop skill --install [--scope global|project] [--force] [--dry-run] [--json]");
+    console.error("       crloop skill --print");
+    process.exit(1);
+  }
+  if (scope !== "global" && scope !== "project") {
+    console.error(`Invalid scope: ${scope}. Must be "global" or "project".`);
+    process.exit(1);
+  }
+
+  // Resolve source
+  let packageRoot: string;
+  try {
+    packageRoot = findPackageRoot(import.meta.url);
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exit(1);
+  }
+  const source = join(packageRoot, "skill", "SKILL.md");
+  if (!existsSync(source)) {
+    console.error("Skill file not found — try reinstalling crloop");
+    process.exit(2);
+  }
+  const content = readFileSync(source, "utf8");
+
+  if (print) {
+    process.stdout.write(content);
+    return;
+  }
+
+  // --install branch
+  const target = scope === "global"
+    ? join(homedir(), ".claude", "skills", "crloop", "SKILL.md")
+    : join(process.cwd(), ".claude", "skills", "crloop", "SKILL.md");
+
+  const version = getCurrentVersion();
+  let status: "created" | "updated" | "unchanged" | "skipped";
+
+  if (existsSync(target)) {
+    const existing = readFileSync(target, "utf8");
+    if (existing === content) {
+      status = "unchanged";
+    } else if (force) {
+      status = "updated";
+    } else {
+      status = "skipped";
+    }
+  } else {
+    status = "created";
+  }
+
+  if (!dryRun && (status === "created" || status === "updated")) {
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content, "utf8");
+  }
+
+  if (json) {
+    console.log(JSON.stringify({ status: dryRun ? "dry-run" : status, source, target, version, dryRun }));
+  } else if (dryRun) {
+    console.log(`[dry-run] Would write crloop skill to ${target}`);
+  } else if (status === "unchanged") {
+    console.log(`crloop skill is already up to date (v${version}).`);
+  } else if (status === "skipped") {
+    console.log(`Skill file exists and differs from current version.`);
+    console.log(`  Target: ${target}`);
+    console.log(`  Run with --force to overwrite.`);
+  } else {
+    console.log(`${status === "created" ? "Installed" : "Updated"} crloop skill → ${target}`);
+    console.log(`  Status:  ${status}`);
+    console.log(`  Version: ${version}`);
+  }
+}
+
 function cmdSchema(args: string[]): void {
   const command = args[0];
   const schema = {
@@ -649,6 +748,17 @@ function cmdSchema(args: string[]): void {
         "--poll-interval": { type: "number", default: 3, description: "Polling interval in seconds" },
       },
     },
+    skill: {
+      description: "Install or print the crloop agent skill",
+      options: {
+        "--install": { type: "boolean", description: "Install skill to Claude Code skills directory" },
+        "--print": { type: "boolean", description: "Print skill content to stdout" },
+        "--scope": { type: "string", enum: ["global", "project"], default: "global", description: "Install scope: global (~/.claude/skills/) or project (.claude/skills/)" },
+        "--force": { type: "boolean", description: "Overwrite existing skill file even if content differs" },
+        "--dry-run": { type: "boolean", description: "Preview without writing" },
+        "--json": { type: "boolean", description: "Output JSON: {status, source, target, version, dryRun}" },
+      },
+    },
   };
 
   if (command && command in schema) {
@@ -676,6 +786,8 @@ Usage:
   crloop status [--repo <repoId>] [--url URL] [--json]
   crloop finish-self-review [--repo <repoId>] [--url URL] [--dry-run]
   crloop wait [--repo <repoId>] [--url URL] [--poll-interval <seconds>]
+  crloop skill --install [--scope global|project] [--force] [--dry-run] [--json]
+  crloop skill --print
 
 Server management:
   serve              Start the review server (default when no command given)
@@ -694,6 +806,10 @@ Review workflow:
   status             Show review session status
   finish-self-review Signal self-review complete, hand off to human
   wait               Block until the human finishes review
+
+Skill management:
+  skill --install    Install the crloop agent skill to Claude Code
+  skill --print      Print the skill file to stdout
 
 Introspection:
   schema             Print machine-readable JSON schema for commands
@@ -813,6 +929,8 @@ async function main(): Promise<void> {
     if (notice) console.log(notice);
   } else if (command === "wait") {
     await cmdWait(args.slice(1));
+  } else if (command === "skill") {
+    cmdSkill(args.slice(1));
   } else {
     console.error(`Unknown command: ${command}\nRun "crloop --help" for usage.`);
     process.exit(1);

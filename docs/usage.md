@@ -294,6 +294,33 @@ crloop wait   # exits 0 when human clicks "Finish Review"
 crloop export
 ```
 
+## Installing the agent skill
+
+`crloop skill --install` installs the bundled `SKILL.md` into your AI agent's skills directory so it is automatically available in future sessions.
+
+```bash
+# Install globally (default) — writes to ~/.claude/skills/crloop/SKILL.md
+crloop skill --install
+
+# Install into the current project — writes to .claude/skills/crloop/SKILL.md
+crloop skill --install --scope project
+
+# Preview without writing
+crloop skill --install --dry-run
+
+# Overwrite if you have customized the file and want the latest version
+crloop skill --install --force
+
+# Machine-readable output
+crloop skill --install --json
+# → {"status":"created","source":"...","target":"...","version":"0.2.1","dryRun":false}
+
+# Print skill content to stdout (no filesystem writes)
+crloop skill --print
+```
+
+The command is idempotent: re-running after the file is installed reports `unchanged` and writes nothing. If the installed file differs from the package version (e.g. after manual edits), it warns and skips — pass `--force` to accept the update.
+
 ## Upgrading
 
 Check the current installed version:

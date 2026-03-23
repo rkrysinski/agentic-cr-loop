@@ -182,21 +182,30 @@ Or add to the project's `package.json` scripts:
 
 ## Skill Distribution
 
-The `skill/SKILL.md` file is included in the published package. Users can copy it to their agent's skill directory:
+The `skill/SKILL.md` file is included in the published package. Install it with:
 
 ```bash
-# Find where the package is installed
-npm root -g
-
-# Copy skill to agent skill directory (example for Claude Code)
-cp $(npm root -g)/crloop/skill/SKILL.md ~/.claude/skills/crloop/SKILL.md
-```
-
-Or the CLI could provide a convenience command (future):
-
-```bash
+# Install globally (default) — writes to ~/.claude/skills/crloop/SKILL.md
 crloop skill --install
+
+# Install into the current project — writes to .claude/skills/crloop/SKILL.md
+crloop skill --install --scope project
+
+# Preview without writing
+crloop skill --install --dry-run
+
+# Overwrite if you've customized the file and want the latest version
+crloop skill --install --force
+
+# Machine-readable output
+crloop skill --install --json
+# → {"status":"created","source":"...","target":"...","version":"0.2.0","dryRun":false}
+
+# Print skill content to stdout (no filesystem writes)
+crloop skill --print
 ```
+
+The command is idempotent: re-running after the file is already installed reports `unchanged` and writes nothing. If the installed file differs from the package version (e.g. user edits), it warns and skips unless `--force` is passed.
 
 ## Versioning
 

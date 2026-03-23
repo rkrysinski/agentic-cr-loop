@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1] — 2026-03-23
+
+### Added — Skill install command
+
+- `crloop skill --install` — copies `skill/SKILL.md` from the installed package to `~/.claude/skills/crloop/SKILL.md`; supports `--scope project` to install into `.claude/skills/crloop/SKILL.md` relative to the current directory; idempotent (skips write when content is unchanged); protects user edits (warns and skips when file differs, unless `--force` is passed); supports `--dry-run` and `--json`
+- `crloop skill --print` — prints the skill content to stdout without any filesystem writes
+
 ## [0.2.0] — 2026-03-22
 
 ### Added — Agentic Review Loop

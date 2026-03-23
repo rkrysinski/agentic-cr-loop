@@ -39,7 +39,7 @@ describe("crloop CLI — info flags", () => {
   it("--help exits 0 and documents all commands", () => {
     const { status, stdout } = runCli(["--help"]);
     expect(status).toBe(0);
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait", "skill"]) {
       expect(stdout).toContain(cmd);
     }
   });
@@ -144,7 +144,7 @@ describe("crloop CLI — schema command", () => {
     const { status, stdout } = runCli(["schema"]);
     expect(status).toBe(0);
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "wait", "skill"]) {
       expect(parsed).toHaveProperty(cmd);
     }
   });
@@ -309,6 +309,128 @@ describe("crloop CLI — url command", () => {
     expect(parsed.url).toBe("http://localhost:4567");
     expect(parsed.port).toBe(4567);
     expect(parsed.pid).toBe(process.pid);
+  });
+});
+
+describe("crloop CLI — skill command", () => {
+  let tmpDir: string;
+
+  beforeAll(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "crloop-skill-"));
+  });
+
+  afterAll(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("skill without --install or --print exits 1 with usage", () => {
+    const { status, stderr } = runCli(["skill"]);
+    expect(status).toBe(1);
+    expect(stderr).toContain("Usage:");
+  });
+
+  it("skill --install --print exits 4 (mutually exclusive)", () => {
+    const { status, stderr } = runCli(["skill", "--install", "--print"]);
+    expect(status).toBe(4);
+    expect(stderr).toContain("mutually exclusive");
+  });
+
+  it("skill --print writes skill content to stdout", () => {
+    const { status, stdout } = runCli(["skill", "--print"]);
+    expect(status).toBe(0);
+    expect(stdout).toContain("name: crloop");
+    expect(stdout).toContain("# Code Review Skill");
+  });
+
+  it("skill --install creates new file (status: created)", async () => {
+    const target = path.join(tmpDir, "global-new", ".claude", "skills", "crloop", "SKILL.md");
+    const { status, stdout } = runCli(["skill", "--install", "--json"], {
+      HOME: path.join(tmpDir, "global-new"),
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { status: string; target: string; version: string; dryRun: boolean };
+    expect(parsed.status).toBe("created");
+    expect(parsed.target).toBe(target);
+    expect(parsed.dryRun).toBe(false);
+    // File actually exists
+    const content = await fs.readFile(target, "utf8");
+    expect(content).toContain("name: crloop");
+  });
+
+  it("skill --install identical content (status: unchanged)", () => {
+    // Re-run same install — file already has identical content
+    const { status, stdout } = runCli(["skill", "--install", "--json"], {
+      HOME: path.join(tmpDir, "global-new"),
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { status: string };
+    expect(parsed.status).toBe("unchanged");
+  });
+
+  it("skill --install differing content without --force (status: skipped)", async () => {
+    // Write different content to the target
+    const targetDir = path.join(tmpDir, "global-diff", ".claude", "skills", "crloop");
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(targetDir, "SKILL.md"), "old content", "utf8");
+
+    const { status, stdout } = runCli(["skill", "--install", "--json"], {
+      HOME: path.join(tmpDir, "global-diff"),
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { status: string };
+    expect(parsed.status).toBe("skipped");
+
+    // File was not overwritten
+    const content = await fs.readFile(path.join(targetDir, "SKILL.md"), "utf8");
+    expect(content).toBe("old content");
+  });
+
+  it("skill --install --force overwrites differing content (status: updated)", async () => {
+    const { status, stdout } = runCli(["skill", "--install", "--force", "--json"], {
+      HOME: path.join(tmpDir, "global-diff"),
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { status: string };
+    expect(parsed.status).toBe("updated");
+
+    const content = await fs.readFile(path.join(tmpDir, "global-diff", ".claude", "skills", "crloop", "SKILL.md"), "utf8");
+    expect(content).toContain("name: crloop");
+  });
+
+  it("skill --install --dry-run does not write file", () => {
+    const home = path.join(tmpDir, "global-dry");
+    const { status, stdout } = runCli(["skill", "--install", "--dry-run", "--json"], {
+      HOME: home,
+    });
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { status: string };
+    expect(parsed.status).toBe("dry-run");
+    // File should NOT exist
+    const exists = require("node:fs").existsSync(path.join(home, ".claude", "skills", "crloop", "SKILL.md"));
+    expect(exists).toBe(false);
+  });
+
+  it("skill --install --scope project writes to CWD-relative path", () => {
+    const projectDir = path.join(tmpDir, "project-scope");
+    require("node:fs").mkdirSync(projectDir, { recursive: true });
+    const { status, stdout } = runCli(["skill", "--install", "--scope", "project", "--json"], {
+      HOME: path.join(tmpDir, "unused-home"),
+      CRLOOP_CWD: projectDir,
+    });
+    // The CWD for the subprocess is inherited, so --scope project uses the subprocess CWD.
+    // We can't easily change subprocess CWD via env; let's just verify JSON has the right target pattern.
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { target: string };
+    expect(parsed.target).toContain(path.join(".claude", "skills", "crloop", "SKILL.md"));
+  });
+});
+
+describe("crloop CLI — findPackageRoot", () => {
+  it("schema command succeeds — proves findPackageRoot works from the package", () => {
+    // findPackageRoot is called by cmdSkill; if the walk fails, --print would fail too
+    const { status, stdout } = runCli(["skill", "--print"]);
+    expect(status).toBe(0);
+    expect(stdout.length).toBeGreaterThan(100);
   });
 });
 

@@ -98,6 +98,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-61**: The CLI MUST auto-detect the target repository by matching the current working directory against registered repo paths when `--repo` is omitted.
 - **FR-62**: The system MUST serve a crloop view at `/crloop/<repoId>` that shows the same diff/comment UI without the repository selector and with a "Finish Review" button that transitions the session to `agent-addressing`.
 - **FR-63**: The CLI MUST validate all agent-supplied inputs (`--file`, `--side`, `--line`, `--repo`) before making HTTP calls and exit with code 1 on validation failure.
+- **FR-64**: `crloop skill --install` MUST copy `skill/SKILL.md` from the installed package to `~/.claude/skills/crloop/SKILL.md` (global, default) or `.claude/skills/crloop/SKILL.md` (project, via `--scope project`). The command MUST be idempotent (skip write when content is unchanged), protect user edits (warn and skip without `--force` when content differs), support `--dry-run`, `--json`, and `--force` flags, and support `crloop skill --print` to emit skill content to stdout without filesystem writes.
 
 ## Non-Functional
 
@@ -118,3 +119,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 1.8: Added FR-46, FR-47, FR-48 for AI-agent CLI affordances — `--json` flag for machine-readable output on all read/write commands, `--dry-run` flag for previewing mutations without side effects, and `schema` command for runtime introspection of command parameters.
 - 1.9: Added FR-49 for file-tree viewed/unviewed state — unviewed files shown in bold, viewed files in normal weight, viewed set persisted in localStorage per-repo and invalidated on HEAD change. Also added `headShortId` to `GET /api/repos/:repoId/repo` response to support client-side cache-key invalidation.
 - 2.0: Added FR-50 through FR-63 for agentic review loop — session state machine, session CLI commands (`status`, `finish-self-review`, `wait`), `comment` and `export` CLI commands, `url`/`open` CLI commands, lock file behaviour, URL resolution chain, repo auto-detection, crloop view UI with "Finish Review" button, input validation.
+- 2.1: Added FR-64 for `crloop skill --install` — copies the agent skill from the installed package to the Claude Code skills directory, with `--scope`, `--force`, `--dry-run`, `--json`, and `--print` flags.
