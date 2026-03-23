@@ -97,6 +97,28 @@ function readLockFile(): LockFileData | null {
   }
 }
 
+async function waitForDaemonStartup(child: ReturnType<typeof spawn>, port: number, timeoutMs = 5_000): Promise<LockFileData> {
+  let childExitCode: number | null = null;
+
+  child.once("exit", (code) => {
+    childExitCode = code;
+  });
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const lock = readLockFile();
+    if (lock && lock.port === port && lock.pid === child.pid) {
+      return lock;
+    }
+    if (childExitCode !== null) {
+      throw new Error(`Server failed to start (daemon exited with code ${childExitCode}).`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error("Server failed to start before the startup timeout elapsed.");
+}
+
 function resolveBaseUrl(args: string[]): string {
   const explicit = getFlag(args, "--url");
   if (explicit) return explicit;
@@ -913,11 +935,13 @@ async function main(): Promise<void> {
         env: { ...process.env, CRLOOP_DAEMON: "1" },
       });
       child.unref();
-      // Wait briefly to let the server bind, then confirm
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const portFlag = argv.indexOf("--port");
-      const port = portFlag !== -1 ? argv[portFlag + 1] : "3000";
-      console.log(`Server running (pid ${child.pid}) on http://localhost:${port}`);
+      try {
+        const lock = await waitForDaemonStartup(child, parsedOpts.port);
+        console.log(`Server running (pid ${lock.pid}) on http://localhost:${lock.port}`);
+      } catch (error) {
+        console.error((error as Error).message);
+        process.exit(1);
+      }
       checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     }
   } else if (command === "schema") {

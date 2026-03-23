@@ -137,6 +137,19 @@ describe("crloop CLI — serve daemon behaviour", () => {
     const secondPidMatch = second.stdout.match(/pid (\d+)/);
     expect(Number(secondPidMatch![1])).toBe(daemonPid);
   }, 20_000);
+
+  it("exits 1 when the daemon dies during startup instead of printing a false success message", async () => {
+    const nonRepoPath = await fs.mkdtemp(path.join(os.tmpdir(), "crloop-non-repo-"));
+
+    try {
+      const { status, stdout, stderr } = runCli(["serve", "--repo", nonRepoPath, "--port", "19873"]);
+      expect(status).toBe(1);
+      expect(stdout).toBe("");
+      expect(stderr).toContain("Server failed to start");
+    } finally {
+      await fs.rm(nonRepoPath, { recursive: true, force: true });
+    }
+  }, 20_000);
 });
 
 describe("crloop CLI — schema command", () => {
