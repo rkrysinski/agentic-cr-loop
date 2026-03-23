@@ -1383,6 +1383,8 @@ button, a, textarea, select, input {
 }
 
 .comment-card-inline {
+  width: 100%;
+  max-width: 100%;
   border-radius: var(--radius-xs);
   border-color: var(--comment-border);
   background: var(--comment-bg);
@@ -1432,7 +1434,12 @@ button, a, textarea, select, input {
 }
 
 .comment-body {
+  display: block;
   white-space: pre-wrap;
+  min-width: 100%;
+  max-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-size: 12px;
   color: var(--text-primary);
   line-height: 1.5;
@@ -1451,6 +1458,8 @@ button, a, textarea, select, input {
 /* ─── Inline composer ────────────────────────────────────────── */
 
 .inline-composer {
+  width: 100%;
+  max-width: 100%;
   border-radius: var(--radius-xs);
   border: 1px solid var(--comment-border);
   background: var(--comment-bg);
