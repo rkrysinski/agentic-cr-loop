@@ -940,6 +940,17 @@ button, a, textarea, select, input {
   background: #fff0e8;
 }
 
+.toolbar-pill-btn-cta {
+  background: var(--color-orange);
+  color: #000;
+  font-weight: 600;
+}
+
+.toolbar-pill-btn-cta:hover {
+  opacity: 0.85;
+  color: #000;
+}
+
 .toolbar-pill-btn svg {
   width: 14px;
   height: 14px;

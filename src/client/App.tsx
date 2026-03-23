@@ -913,8 +913,7 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
             {crloopRepoId ? (
               <button
                 type="button"
-                className="toolbar-pill-btn toolbar-pill-btn-labeled"
-                style={{ background: "var(--accent-bg)", color: "var(--accent-fg, #fff)", fontWeight: 600 }}
+                className="toolbar-pill-btn toolbar-pill-btn-labeled toolbar-pill-btn-cta"
                 onClick={() => {
                   if (apiClient && confirm("Finish review and hand back to the agent?")) {
                     void apiClient.transitionSession("agent-addressing");
