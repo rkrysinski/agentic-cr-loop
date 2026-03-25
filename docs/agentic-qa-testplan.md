@@ -40,11 +40,15 @@ npx playwright test --reporter=list
 
 # Run all CLI tests (BATS)
 npm run test:cli
+
+# Cleanup (MUST run after all test suites finish)
+bash scripts/qa/cleanup.sh
+npm unlink -g crloop
 ```
 
 **Expected baselines:**
-- Playwright: `44 passed, 0 skipped`
-- BATS: `51 passed, 0 failed`
+- Playwright: all passed, 0 failed
+- BATS: all passed, 0 failed
 
 ---
 
@@ -168,16 +172,20 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 
 ## Post-Run Cleanup
 
-Playwright's global teardown handles cleanup automatically. If anything is left behind:
+**IMPORTANT: The agent MUST run these cleanup steps after all test suites have finished, regardless of pass/fail outcome.**
+
+Playwright's global teardown handles most cleanup automatically. Run the cleanup script to catch anything left behind, then unlink the globally linked binary:
 
 ```bash
 bash scripts/qa/cleanup.sh
+npm unlink -g crloop
 ```
 
 After all test suites have finished, unlink the binary:
 
 ```bash
-npm unlink -g crloop
+ls /tmp/crloop-tmp/ 2>/dev/null && echo "WARNING: tmp dir still exists" || echo "OK: tmp dir clean"
+which crloop 2>/dev/null && echo "WARNING: crloop still linked" || echo "OK: crloop unlinked"
 ```
 
 ---
