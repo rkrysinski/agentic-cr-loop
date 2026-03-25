@@ -1,9 +1,9 @@
 import { parseServerOptions } from "./args.js";
 import { startServer } from "./server.js";
 
-export async function runServer(options: { dev?: boolean; argv?: string[] } = {}): Promise<number> {
+export async function runServer(options: { dev?: boolean; verbose?: boolean; argv?: string[] } = {}): Promise<number> {
   const parsedOptions = parseServerOptions(options.argv ?? process.argv.slice(2));
-  const { server, port } = await startServer({ repos: parsedOptions.repos, port: parsedOptions.port }, { dev: options.dev });
+  const { server, port } = await startServer({ repos: parsedOptions.repos, port: parsedOptions.port }, { dev: options.dev, verbose: options.verbose });
   const label = options.dev ? "API" : "Review tool";
 
   await new Promise<void>((resolve, reject) => {

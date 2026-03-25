@@ -57,6 +57,22 @@ crloop serve
 
 Register repos at runtime with the CLI (see below).
 
+### Foreground / debug mode
+
+By default `crloop serve` runs the server as a background daemon — it prints a confirmation line and returns the terminal. When you need to see what the server is doing (e.g. diagnosing issues on a client machine), add `--foreground`:
+
+```bash
+crloop serve --foreground --repo /path/to/project
+```
+
+In foreground mode:
+
+- The server runs in the **current process** instead of spawning a daemon.
+- Every HTTP request is logged to stdout (`METHOD /url STATUS DURATIONms`).
+- Press **Ctrl-C** (or send SIGTERM) to stop the server; the lock file is cleaned up automatically.
+
+This is the recommended mode when collecting logs for a bug report.
+
 ## Managing repos at runtime
 
 These commands talk to a running server over HTTP — the server does not need to be restarted.

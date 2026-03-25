@@ -728,6 +728,7 @@ function cmdSchema(args: string[]): void {
       options: {
         "--repo": { type: "string", multiple: true, description: "Add a repository. Use name:/path for explicit ID." },
         "--port": { type: "number", default: 3000, description: "Server port (must be > 0)" },
+        "--foreground": { type: "boolean", description: "Run in the current process with request logging to stdout (for debugging)" },
       },
     },
     "stop-server": {
@@ -857,7 +858,7 @@ function printHelp(): void {
   console.log(`crloop — agentic code review loop
 
 Usage:
-  crloop serve [--repo <path>] [--repo name:<path>] [--port <number>]
+  crloop serve [--repo <path>] [--repo name:<path>] [--port <number>] [--foreground]
   crloop stop-server [--url URL] [--json]
   crloop repos [--url URL] [--json]
   crloop add-repo <path> [--id <repoId>] [--url URL] [--json] [--dry-run]
@@ -877,6 +878,7 @@ Usage:
 
 Server management:
   serve              Start the review server (default when no command given)
+                       --foreground   Run in the current process with request logging (for debugging)
   stop-server        Stop the running server
   url                Print the running server's base URL (reads lock file)
 
@@ -952,21 +954,31 @@ async function main(): Promise<void> {
         console.log(`Server running (pid ${existing.pid}) on http://localhost:${existing.port}`);
         return;
       }
-      // Spawn detached daemon and exit
-      const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
-        detached: true,
-        stdio: "ignore",
-        env: { ...process.env, CRLOOP_DAEMON: "1" },
-      });
-      child.unref();
-      try {
-        const lock = await waitForDaemonStartup(child, parsedOpts.port);
-        console.log(`Server running (pid ${lock.pid}) on http://localhost:${lock.port}`);
-      } catch (error) {
-        console.error((error as Error).message);
-        process.exit(1);
+
+      if (parsedOpts.foreground) {
+        // Foreground mode — run server in current process with verbose logging
+        const port = await runServer({ argv, verbose: true });
+        writeLockFile(port, process.pid);
+        const cleanup = () => { removeLockFile(); process.exit(0); };
+        process.on("SIGINT", cleanup);
+        process.on("SIGTERM", cleanup);
+      } else {
+        // Spawn detached daemon and exit
+        const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
+          detached: true,
+          stdio: "ignore",
+          env: { ...process.env, CRLOOP_DAEMON: "1" },
+        });
+        child.unref();
+        try {
+          const lock = await waitForDaemonStartup(child, parsedOpts.port);
+          console.log(`Server running (pid ${lock.pid}) on http://localhost:${lock.port}`);
+        } catch (error) {
+          console.error((error as Error).message);
+          process.exit(1);
+        }
+        checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
       }
-      checkForUpdate().then((notice) => { if (notice) console.log(notice); }).catch(() => {});
     }
   } else if (command === "schema") {
     cmdSchema(args.slice(1));

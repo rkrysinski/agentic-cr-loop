@@ -3,6 +3,7 @@ import path from "node:path";
 export type ServerOptions = {
   repos: Array<{ id: string; path: string }>;
   port: number;
+  foreground: boolean;
 };
 
 export function deriveRepoId(repoPath: string): string {
@@ -16,9 +17,15 @@ export function deriveRepoId(repoPath: string): string {
 export function parseServerOptions(argv: string[]): ServerOptions {
   const rawRepos: Array<{ id: string; path: string }> = [];
   let port = 3000;
+  let foreground = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg === "--foreground") {
+      foreground = true;
+      continue;
+    }
 
     if (arg === "--repo") {
       const value = argv[index + 1] ?? null;
@@ -62,5 +69,5 @@ export function parseServerOptions(argv: string[]): ServerOptions {
     seen.set(repo.id, repo.path);
   }
 
-  return { repos: rawRepos, port };
+  return { repos: rawRepos, port, foreground };
 }

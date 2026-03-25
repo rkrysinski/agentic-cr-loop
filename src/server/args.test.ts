@@ -29,8 +29,8 @@ describe("deriveRepoId", () => {
 });
 
 describe("parseServerOptions", () => {
-  it("defaults to port 3000 and empty repo list", () => {
-    expect(parseServerOptions([])).toEqual({ repos: [], port: 3000 });
+  it("defaults to port 3000, empty repo list, and foreground false", () => {
+    expect(parseServerOptions([])).toEqual({ repos: [], port: 3000, foreground: false });
   });
 
   it("parses --repo with a plain path and derives the id", () => {
@@ -76,5 +76,15 @@ describe("parseServerOptions", () => {
   it("ignores --repo with no following value", () => {
     const result = parseServerOptions(["--repo"]);
     expect(result.repos).toHaveLength(0);
+  });
+
+  it("returns foreground true when --foreground is present", () => {
+    const result = parseServerOptions(["--foreground"]);
+    expect(result.foreground).toBe(true);
+  });
+
+  it("returns foreground false when --foreground is absent", () => {
+    const result = parseServerOptions(["--repo", "/some/path"]);
+    expect(result.foreground).toBe(false);
   });
 });

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2] — 2026-03-25
+
+### Added — Foreground / debug mode
+
+- `crloop serve --foreground` — runs the server in the current process instead of spawning a background daemon; logs every HTTP request to stdout (`METHOD /url STATUS DURATIONms`); cleans up the lock file on Ctrl-C / SIGTERM. Intended for diagnosing issues on client machines.
+
 ## [0.2.1] — 2026-03-23
 
 ### Added — Skill install command and finish-addressing

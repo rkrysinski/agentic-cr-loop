@@ -10,6 +10,7 @@ import { ReviewService } from "./reviewService.js";
 
 type StartOptions = {
   dev?: boolean;
+  verbose?: boolean;
 };
 
 function getRepoService(response: express.Response): ReviewService {
@@ -34,6 +35,17 @@ export async function startServer(
 
   const app = express();
   app.use(express.json());
+
+  if (options.verbose) {
+    app.use((request, response, next) => {
+      const start = Date.now();
+      response.on("finish", () => {
+        const duration = Date.now() - start;
+        console.log(`${request.method} ${request.url} ${response.statusCode} ${duration}ms`);
+      });
+      next();
+    });
+  }
 
   // ── Flat repo-management endpoints ──────────────────────────
 

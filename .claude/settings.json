@@ -3,5 +3,10 @@
     "feature-dev@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "example-skills@anthropic-agent-skills": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(node dist/server/server/cli.js serve --repo /Users/romankrysinski/work/repositories/code-review)"
+    ]
   }
 }

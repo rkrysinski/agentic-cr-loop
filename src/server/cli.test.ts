@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -42,6 +42,7 @@ describe("crloop CLI — info flags", () => {
     for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "finish-addressing", "wait", "skill"]) {
       expect(stdout).toContain(cmd);
     }
+    expect(stdout).toContain("--foreground");
   });
 
   it("unknown command exits 1 and suggests --help", () => {
@@ -152,6 +153,47 @@ describe("crloop CLI — serve daemon behaviour", () => {
   }, 20_000);
 });
 
+describe("crloop CLI — serve --foreground", () => {
+  let repoPath: string | null = null;
+
+  afterEach(async () => {
+    if (repoPath) {
+      await fs.rm(repoPath, { recursive: true, force: true });
+      repoPath = null;
+    }
+  });
+
+  it("runs the server in the current process, prints 'listening on', and stays alive until killed", async () => {
+    repoPath = await createTempGitRepo();
+    const port = 19877;
+
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx/esm", new URL("./cli.ts", import.meta.url).pathname, "serve", "--foreground", "--repo", repoPath, "--port", String(port)],
+      { env: { ...process.env, NODE_OPTIONS: "--import tsx/esm" }, stdio: ["ignore", "pipe", "pipe"] }
+    );
+
+    let stdout = "";
+    child.stdout!.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+
+    // Wait for the server to be ready
+    let ready = false;
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      if (stdout.includes("listening on")) { ready = true; break; }
+    }
+    expect(ready).toBe(true);
+    expect(stdout).toContain(`http://localhost:${port}`);
+
+    // Server should still be running (not exited)
+    expect(child.exitCode).toBeNull();
+
+    // Kill the process
+    child.kill("SIGTERM");
+    await new Promise<void>((resolve) => { child.on("exit", () => resolve()); });
+  }, 20_000);
+});
+
 describe("crloop CLI — schema command", () => {
   it("exits 0 and emits valid JSON covering all commands", () => {
     const { status, stdout } = runCli(["schema"]);
@@ -169,6 +211,13 @@ describe("crloop CLI — schema command", () => {
     expect(parsed).toHaveProperty("description");
     expect(parsed.options["--json"]).toBeDefined();
     expect(parsed.options["--dry-run"]).toBeDefined();
+  });
+
+  it("schema serve includes --foreground option", () => {
+    const { status, stdout } = runCli(["schema", "serve"]);
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { options: Record<string, unknown> };
+    expect(parsed.options["--foreground"]).toBeDefined();
   });
 });
 
