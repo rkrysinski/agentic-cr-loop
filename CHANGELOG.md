@@ -4,7 +4,7 @@
 
 ### Added — Skill install command and finish-addressing
 
-- `crloop skill --install` — copies `skill/SKILL.md` from the installed package to `~/.claude/skills/crloop/SKILL.md`; supports `--scope project` to install into `.claude/skills/crloop/SKILL.md` relative to the current directory; idempotent (skips write when content is unchanged); protects user edits (warns and skips when file differs, unless `--force` is passed); supports `--dry-run` and `--json`
+- `crloop skill --install` — copies the `skill/crloop/` directory (SKILL.md and references/) from the installed package to `~/.claude/skills/crloop/` (global) or `.claude/skills/crloop/` (project, via `--scope project`); idempotent (skips write when content is unchanged); protects user edits (warns and skips when file differs, unless `--force` is passed); supports `--dry-run` and `--json`
 - `crloop skill --print` — prints the skill content to stdout without any filesystem writes
 - `crloop finish-addressing` — transitions session from `agent-addressing` back to `agent-review`, enabling the next self-review iteration after the agent has addressed human feedback; supports `--dry-run`
 
@@ -39,7 +39,7 @@ Complete agent-human review loop supporting AI agents that self-review, post com
 
 **Input validation** — all agent-supplied CLI inputs (`--file`, `--side`, `--line`, `--repo`) are validated before any HTTP calls; exits with code 1 on failure.
 
-**SKILL.md** — skill file at `skill/SKILL.md` teaching AI agents the CLI vocabulary and review loop workflow, included in the npm tarball.
+**SKILL.md** — skill file at `skill/crloop/SKILL.md` (with `references/` companion directory) teaching AI agents the CLI vocabulary and review loop workflow, included in the npm tarball.
 
 ## [0.1.2] — 2026-03-22
 

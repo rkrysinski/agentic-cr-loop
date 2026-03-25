@@ -301,7 +301,7 @@ crloop finish-addressing
 
 ## Installing the agent skill
 
-`crloop skill --install` installs the bundled `SKILL.md` into your AI agent's skills directory so it is automatically available in future sessions.
+`crloop skill --install` installs the bundled skill directory (`SKILL.md` and `references/`) into your AI agent's skills directory so it is automatically available in future sessions.
 
 ```bash
 # Install globally (default) — writes to ~/.claude/skills/crloop/SKILL.md

@@ -368,6 +368,12 @@ describe("crloop CLI — skill command", () => {
     // File actually exists
     const content = await fs.readFile(target, "utf8");
     expect(content).toContain("name: crloop");
+    // References directory was copied alongside SKILL.md
+    const refsDir = path.join(tmpDir, "global-new", ".claude", "skills", "crloop", "references");
+    const refFile = path.join(refsDir, "code-review.md");
+    expect(require("node:fs").existsSync(refFile)).toBe(true);
+    const refContent = await fs.readFile(refFile, "utf8");
+    expect(refContent).toContain("code reviewer");
   });
 
   it("skill --install identical content (status: unchanged)", () => {
@@ -396,6 +402,9 @@ describe("crloop CLI — skill command", () => {
     // File was not overwritten
     const content = await fs.readFile(path.join(targetDir, "SKILL.md"), "utf8");
     expect(content).toBe("old content");
+    // References directory was not created either
+    const refsDir = path.join(targetDir, "references");
+    expect(require("node:fs").existsSync(refsDir)).toBe(false);
   });
 
   it("skill --install --force overwrites differing content (status: updated)", async () => {
@@ -408,6 +417,9 @@ describe("crloop CLI — skill command", () => {
 
     const content = await fs.readFile(path.join(tmpDir, "global-diff", ".claude", "skills", "crloop", "SKILL.md"), "utf8");
     expect(content).toContain("name: crloop");
+    // References directory was also written on force update
+    const refFile = path.join(tmpDir, "global-diff", ".claude", "skills", "crloop", "references", "code-review.md");
+    expect(require("node:fs").existsSync(refFile)).toBe(true);
   });
 
   it("skill --install --dry-run does not write file", () => {
@@ -421,6 +433,9 @@ describe("crloop CLI — skill command", () => {
     // File should NOT exist
     const exists = require("node:fs").existsSync(path.join(home, ".claude", "skills", "crloop", "SKILL.md"));
     expect(exists).toBe(false);
+    // References directory should NOT exist either
+    const refsExists = require("node:fs").existsSync(path.join(home, ".claude", "skills", "crloop", "references"));
+    expect(refsExists).toBe(false);
   });
 
   it("skill --install --scope project writes to CWD-relative path", () => {

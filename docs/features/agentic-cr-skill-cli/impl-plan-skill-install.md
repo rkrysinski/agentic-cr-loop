@@ -7,7 +7,8 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md) · [distribution.
 | File | Current role |
 |------|-------------|
 | `src/server/cli.ts` | CLI entry point. No `skill` command exists yet. |
-| `skill/SKILL.md` | Agent skill definition. Already in npm `files` whitelist; ships with the package. |
+| `skill/crloop/SKILL.md` | Agent skill definition. Already in npm `files` whitelist; ships with the package. |
+| `skill/crloop/references/code-review.md` | Review criteria and confidence scoring guidelines referenced by the skill. |
 | `docs/features/agentic-cr-skill-cli/distribution.md` | Documents skill install as a `cp` manual step; notes `crloop skill --install` as a "future" command. |
 | `docs/requirements.md` | Functional requirements FR-01 – FR-63. No skill install FR yet. |
 
@@ -20,7 +21,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md) · [distribution.
 ### `src/server/cli.ts` — `skill` command
 
 - [x] Add `cmdSkill(args: string[]): void` — parses `--install`, `--print`, `--scope global|project`, `--force`, `--dry-run`, `--json`; exits with code 4 if `--install` and `--print` are both present
-- [x] In `cmdSkill`: resolve source path as `path.join(findPackageRoot(import.meta.url), 'skill', 'SKILL.md')`; throw with actionable message `"Skill file not found — try reinstalling crloop"` if file is absent
+- [x] In `cmdSkill`: resolve source directory as `path.join(findPackageRoot(import.meta.url), 'skill', 'crloop')` and source file as `SKILL.md` within it; throw with actionable message `"Skill file not found — try reinstalling crloop"` if file is absent
 - [x] In `cmdSkill` `--print` branch: read source and write to `process.stdout`; no filesystem writes
 - [x] In `cmdSkill` `--install` branch: resolve target path — global (default): `path.join(os.homedir(), '.claude', 'skills', 'crloop', 'SKILL.md')`; project (`--scope project`): `path.join(process.cwd(), '.claude', 'skills', 'crloop', 'SKILL.md')`
 - [x] In `cmdSkill` `--install` branch: create target directory with `mkdirSync(..., { recursive: true })` before writing

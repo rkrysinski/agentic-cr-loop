@@ -182,7 +182,7 @@ Or add to the project's `package.json` scripts:
 
 ## Skill Distribution
 
-The `skill/SKILL.md` file is included in the published package. Install it with:
+The `skill/crloop/` directory (SKILL.md and `references/`) is included in the published package. Install it with:
 
 ```bash
 # Install globally (default) — writes to ~/.claude/skills/crloop/SKILL.md

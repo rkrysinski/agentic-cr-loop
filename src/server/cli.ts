@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, cpSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { spawn, exec } from "node:child_process";
@@ -642,7 +642,8 @@ function cmdSkill(args: string[]): void {
     console.error((error as Error).message);
     process.exit(1);
   }
-  const source = join(packageRoot, "skill", "SKILL.md");
+  const sourceDir = join(packageRoot, "skill", "crloop");
+  const source = join(sourceDir, "SKILL.md");
   if (!existsSync(source)) {
     console.error("Skill file not found — try reinstalling crloop");
     process.exit(2);
@@ -655,9 +656,10 @@ function cmdSkill(args: string[]): void {
   }
 
   // --install branch
-  const target = scope === "global"
-    ? join(homedir(), ".claude", "skills", "crloop", "SKILL.md")
-    : join(process.cwd(), ".claude", "skills", "crloop", "SKILL.md");
+  const targetDir = scope === "global"
+    ? join(homedir(), ".claude", "skills", "crloop")
+    : join(process.cwd(), ".claude", "skills", "crloop");
+  const target = join(targetDir, "SKILL.md");
 
   const version = getCurrentVersion();
   let status: "created" | "updated" | "unchanged" | "skipped";
@@ -676,8 +678,20 @@ function cmdSkill(args: string[]): void {
   }
 
   if (!dryRun && (status === "created" || status === "updated")) {
-    mkdirSync(dirname(target), { recursive: true });
+    mkdirSync(targetDir, { recursive: true });
     writeFileSync(target, content, "utf8");
+    // Copy reference files (e.g. references/) alongside SKILL.md
+    const entries = readdirSync(sourceDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === "SKILL.md") continue;
+      const src = join(sourceDir, entry.name);
+      const dst = join(targetDir, entry.name);
+      if (entry.isDirectory()) {
+        cpSync(src, dst, { recursive: true, force: true });
+      } else {
+        writeFileSync(dst, readFileSync(src), "utf8");
+      }
+    }
   }
 
   if (json) {
