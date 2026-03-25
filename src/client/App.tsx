@@ -928,8 +928,15 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
                 type="button"
                 className="toolbar-pill-btn toolbar-pill-btn-labeled toolbar-pill-btn-cta"
                 onClick={() => {
-                  if (apiClient && confirm("Finish review and hand back to the agent?")) {
-                    void apiClient.transitionSession("agent-addressing");
+                  const hasCurrentComments = changes.some((c) =>
+                    c.commentCounts.current > 0 || (!skipOutdated && c.commentCounts.outdated > 0)
+                  );
+                  const targetStatus = hasCurrentComments ? "agent-addressing" : "complete";
+                  const message = hasCurrentComments
+                    ? "Finish review and hand back to the agent?"
+                    : "No comments — mark review as complete?";
+                  if (apiClient && confirm(message)) {
+                    void apiClient.transitionSession(targetStatus);
                   }
                 }}
               >

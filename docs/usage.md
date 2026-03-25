@@ -286,7 +286,7 @@ crloop finish-addressing     # transition agent-addressing → agent-review (beg
 
 - Shows the same diff/comment UI as the standard view
 - Hides the repository selector (repo is fixed by URL)
-- Shows a **"Finish Review"** button that transitions the session to `agent-addressing`, unblocking `crloop wait`
+- Shows a **"Finish Review"** button that transitions the session to `agent-addressing` (when there are comments) or `complete` (when there are no comments), unblocking `crloop wait`
 
 Navigating to `http://localhost:<port>` (root) shows the standard UI unchanged.
 

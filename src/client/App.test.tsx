@@ -661,6 +661,118 @@ describe("App", () => {
     expect(screen.queryByRole("tablist", { name: "Active repository" })).not.toBeInTheDocument();
   });
 
+  it("Finish Review transitions to 'complete' when there are no current comments", async () => {
+    let transitionBody: unknown;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test-repo", path: "/repo" }]);
+      }
+      if (url.pathname === "/api/repos/test-repo/repo") {
+        return jsonResponse({ id: "test-repo", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+      if (url.pathname === "/api/repos/test-repo/changes" && !url.search) {
+        return jsonResponse([
+          { changeId: "c1", changeType: "modified", oldPath: "a.txt", newPath: "a.txt", isBinary: false, commentCounts: { current: 0, outdated: 0 } }
+        ]);
+      }
+      if (url.pathname === "/api/repos/test-repo/session" && init?.method !== "POST") {
+        return jsonResponse({ status: "human-review", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      if (url.pathname === "/api/repos/test-repo/session/transition" && init?.method === "POST") {
+        transitionBody = JSON.parse(init.body as string);
+        return jsonResponse({ status: "complete", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+
+    renderCrloopApp("test-repo");
+    await waitFor(() => expect(screen.getByText("a.txt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /finish_review/ }));
+
+    await waitFor(() => expect(transitionBody).toEqual({ status: "complete" }));
+  });
+
+  it("Finish Review transitions to 'agent-addressing' when there are current comments", async () => {
+    let transitionBody: unknown;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test-repo", path: "/repo" }]);
+      }
+      if (url.pathname === "/api/repos/test-repo/repo") {
+        return jsonResponse({ id: "test-repo", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+      if (url.pathname === "/api/repos/test-repo/changes" && !url.search) {
+        return jsonResponse([
+          { changeId: "c1", changeType: "modified", oldPath: "a.txt", newPath: "a.txt", isBinary: false, commentCounts: { current: 2, outdated: 0 } }
+        ]);
+      }
+      if (url.pathname === "/api/repos/test-repo/session" && init?.method !== "POST") {
+        return jsonResponse({ status: "human-review", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      if (url.pathname === "/api/repos/test-repo/session/transition" && init?.method === "POST") {
+        transitionBody = JSON.parse(init.body as string);
+        return jsonResponse({ status: "agent-addressing", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+
+    renderCrloopApp("test-repo");
+    await waitFor(() => expect(screen.getByText("a.txt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /finish_review/ }));
+
+    await waitFor(() => expect(transitionBody).toEqual({ status: "agent-addressing" }));
+  });
+
+  it("Finish Review treats outdated-only comments as 'no comments' when skipOutdated is on", async () => {
+    let transitionBody: unknown;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test-repo", path: "/repo" }]);
+      }
+      if (url.pathname === "/api/repos/test-repo/repo") {
+        return jsonResponse({ id: "test-repo", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+      if (url.pathname === "/api/repos/test-repo/changes" && !url.search) {
+        return jsonResponse([
+          { changeId: "c1", changeType: "modified", oldPath: "a.txt", newPath: "a.txt", isBinary: false, commentCounts: { current: 0, outdated: 3 } }
+        ]);
+      }
+      if (url.pathname === "/api/repos/test-repo/session" && init?.method !== "POST") {
+        return jsonResponse({ status: "human-review", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      if (url.pathname === "/api/repos/test-repo/session/transition" && init?.method === "POST") {
+        transitionBody = JSON.parse(init.body as string);
+        return jsonResponse({ status: "complete", iteration: 1, headId: "", startedAt: "", updatedAt: "" });
+      }
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+
+    renderCrloopApp("test-repo");
+    await waitFor(() => expect(screen.getByText("a.txt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /finish_review/ }));
+
+    // skipOutdated defaults to true, so outdated-only comments → complete
+    await waitFor(() => expect(transitionBody).toEqual({ status: "complete" }));
+  });
+
   it("loads export text from the server endpoint instead of rebuilding it in the client", async () => {
     let exportRequestCount = 0;
 
