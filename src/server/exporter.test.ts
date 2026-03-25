@@ -43,20 +43,6 @@ describe("renderReviewCommentsText", () => {
     expect(output).toContain("NOTE 2 SIDE new LINE 10 STATUS current\nSecond\nEND NOTE");
   });
 
-  it("renders the header block when provided", () => {
-    const output = renderReviewCommentsText([], {
-      header: { repoName: "my-repo", baseRef: "HEAD", date: "2026-03-20" }
-    });
-
-    expect(output).toContain("CODE REVIEW  ·  my-repo  ·  branch: HEAD  ·  2026-03-20");
-    expect(output).toContain("━".repeat(50));
-  });
-
-  it("omits the header block when not provided", () => {
-    const output = renderReviewCommentsText([]);
-    expect(output).not.toContain("CODE REVIEW");
-  });
-
   it("skips files that have no comments", () => {
     const output = renderReviewCommentsText([
       { path: "empty.ts", comments: [] },

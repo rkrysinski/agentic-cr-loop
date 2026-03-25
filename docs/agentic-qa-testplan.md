@@ -110,7 +110,7 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-14 | Outdated comment detection | ui-19 | `single-repo.spec.ts` — ui-19 |
 | FR-15 | Store comments locally, scoped to commit | ui-8, ui-19 | `single-repo.spec.ts` — ui-8, ui-19 |
 | FR-16 | Carry forward comments on HEAD change | ui-20 | `single-repo.spec.ts` — ui-20 |
-| FR-17 | Export with structured fields | ui-9 | `single-repo.spec.ts` — ui-9 |
+| FR-17 | Export with structured fields; skip outdated by default with toggle | ui-9 | `single-repo.spec.ts` — ui-9; `src/client/App.test.tsx` — skip-outdated toggle |
 | FR-18 | Plain text for AI | ui-9 | `single-repo.spec.ts` — ui-9 |
 | FR-19 | Preview, copy, download | ui-9, ui-10 | `single-repo.spec.ts` — ui-9, ui-10 |
 | FR-20 | Hierarchical file tree | ui-2 | `single-repo.spec.ts` — ui-2 |
@@ -149,7 +149,7 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-53 | CLI `finish-self-review` command | cli-7 | `test/cli.bats` — cli-7 |
 | FR-54 | CLI `wait` command | — | `src/server/server.test.ts` — session transition endpoint; no blocking integration test (skipped per impl-plan) |
 | FR-55 | CLI `comment` command | cli-7 | `test/cli.bats` — cli-7 (`--dry-run`); `src/server/server.test.ts` — POST comments |
-| FR-56 | CLI `export` command | cli-7 | `test/cli.bats` — cli-7; `src/server/server.test.ts` — export endpoint |
+| FR-56 | CLI `export` command; `--include-outdated` flag | cli-7 | `test/cli.bats` — cli-7; `src/server/server.test.ts` — export endpoint (default skip + includeOutdated param) |
 | FR-57 | CLI `url` command | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
 | FR-58 | CLI `open` command | — | No automated coverage — requires OS browser/desktop interaction |
 | FR-59 | Lock file written by `serve`, removed by `stop-server` | cli-6 | `test/cli.bats` — cli-6 |

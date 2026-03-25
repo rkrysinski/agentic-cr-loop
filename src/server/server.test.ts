@@ -159,7 +159,7 @@ describe("server API", () => {
     expect(commentsResponse.body.outdated).toHaveLength(0);
   });
 
-  it("exports orphaned stale comments even after a file leaves the diff", async () => {
+  it("exports orphaned stale comments when includeOutdated is set", async () => {
     const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
     const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
     const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
@@ -179,13 +179,43 @@ describe("server API", () => {
 
     await fs.writeFile(path.join(repoPath, "tracked.txt"), "before\nstay\n", "utf8");
 
+    // Default export skips outdated
+    const defaultExport = await invokeRoute(app, "get", "/api/repos/test/export/comments.txt");
+    expect(defaultExport.headers["content-type"]).toBe("text/plain");
+    expect(defaultExport.body).not.toContain("Persist in export");
+
+    // With includeOutdated=true, outdated comments are included
+    const fullExport = await invokeRoute(app, "get", "/api/repos/test/export/comments.txt", {
+      query: { includeOutdated: "true" }
+    });
+    expect(fullExport.headers["content-type"]).toBe("text/plain");
+    expect(fullExport.body).toContain("REVIEW tracked.txt");
+    expect(fullExport.body).toContain("SIDE new LINE 1 STATUS outdated");
+    expect(fullExport.body).toContain("Persist in export");
+    expect(fullExport.body).toContain("END NOTE");
+  });
+
+  it("export without includeOutdated skips outdated comments but keeps current", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    const changesResponse = await invokeRoute(app, "get", "/api/repos/test/changes");
+    const trackedChange = changesResponse.body.find((change: { newPath: string | null }) => change.newPath === "tracked.txt");
+    const detailResponse = await invokeRoute(app, "get", "/api/repos/test/changes/:changeId", {
+      params: { changeId: trackedChange.changeId }
+    });
+    const line = detailResponse.body.hunks[0].lines.find((entry: { commentableSide: string | null }) => entry.commentableSide === "new");
+
+    await invokeRoute(app, "post", "/api/repos/test/comments", {
+      body: {
+        changeId: trackedChange.changeId,
+        side: "new",
+        lineNumber: line.newLineNumber,
+        body: "Current comment"
+      }
+    });
+
     const exportResponse = await invokeRoute(app, "get", "/api/repos/test/export/comments.txt");
-    expect(exportResponse.headers["content-type"]).toBe("text/plain");
-    expect(exportResponse.body).toContain("REVIEW tracked.txt");
-    expect(exportResponse.body).toContain("NOTE");
-    expect(exportResponse.body).toContain("SIDE new LINE 1 STATUS outdated");
-    expect(exportResponse.body).toContain("Persist in export");
-    expect(exportResponse.body).toContain("END NOTE");
+    expect(exportResponse.body).toContain("Current comment");
+    expect(exportResponse.body).toContain("STATUS current");
   });
 
   it("GET /api/repos returns array with registered repo", async () => {

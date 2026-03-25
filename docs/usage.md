@@ -147,7 +147,7 @@ Use `id:/path` syntax to override: `--repo fe:/path/to/frontend`
 3. Select a changed file from the sidebar.
 4. Switch between unified and side-by-side diff views using the toggle.
 5. Click a changed line to add a comment.
-6. Use the export button to copy all comments as Markdown.
+6. Use the export button to copy comments as plain text. Use the "Skip outdated" toggle to include or exclude outdated comments.
 
 The diff shows working directory changes relative to `HEAD` — staged, unstaged, and untracked text files.
 
@@ -258,8 +258,9 @@ crloop status                # show session state, iteration, and comment counts
 crloop finish-self-review    # transition agent-review → human-review
 crloop open                  # open the crloop review UI in the browser
 crloop wait                  # block until human finishes (exit 0) or marks complete (exit 2)
-crloop export                # print all comments as plain text
-crloop export --file src/server/server.ts   # filter to one file
+crloop export                # print comments as plain text (skips outdated)
+crloop export --include-outdated             # include outdated comments
+crloop export --file src/server/server.ts    # filter to one file
 crloop finish-addressing     # transition agent-addressing → agent-review (begin next iteration)
 ```
 

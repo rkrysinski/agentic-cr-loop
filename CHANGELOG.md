@@ -22,7 +22,7 @@ Complete agent-human review loop supporting AI agents that self-review, post com
 - `crloop url` — prints the running server's base URL from the lock file without a network call
 - `crloop open` — opens the crloop review view in the default browser
 - `crloop comment` — adds a comment to a changed line; supports `--from-file` for bulk import and `--dry-run`
-- `crloop export` — prints all comments as plain text to stdout; supports `--file` filter
+- `crloop export` — prints comments as plain text to stdout (skips outdated by default); supports `--file` filter and `--include-outdated`
 - `crloop status` — shows session state, iteration number, and comment counts
 - `crloop finish-self-review` — transitions session from `agent-review` to `human-review`; supports `--dry-run`
 - `crloop wait` — blocks and polls until session transitions to `agent-addressing` (exit 0) or `complete` (exit 2)
@@ -86,8 +86,8 @@ Initial public release covering the full local code-review workflow.
 - Comments carried forward from prior commit when HEAD advances
 
 **Comment export** (FR-17–FR-19):
-- Export all comments as structured plain text (file path, line number, diff side, body, outdated status)
-- Preview, copy to clipboard, and download from the UI
+- Export comments as structured plain text (file path, line number, diff side, body, outdated status); outdated comments excluded by default with option to include them
+- Preview, copy to clipboard, and download from the UI; "Skip outdated" toggle in export view
 
 **File navigation** (FR-20–FR-23, FR-45):
 - Hierarchical file tree with collapsible folders

@@ -33,7 +33,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 
 ## Comment Export
 
-- **FR-17**: The system MUST allow the reviewer to export all review comments as structured text that includes, for each comment: file path, line number, diff side, comment body, and outdated status.
+- **FR-17**: The system MUST allow the reviewer to export review comments as structured text that includes, for each comment: file path, line number, diff side, comment body, and outdated status. By default, outdated comments MUST be excluded from the export; the system MUST provide an option to include them.
 - **FR-18**: The exported text MUST be plain text parseable by an AI agent without additional context.
 - **FR-19**: The system SHOULD provide a way to preview, copy to clipboard, and download the exported comments.
 
@@ -90,7 +90,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-53**: The CLI MUST provide a `finish-self-review` command that transitions the session from `agent-review` to `human-review`, with `--dry-run` support.
 - **FR-54**: The CLI MUST provide a `wait` command that blocks (polls) until the session transitions to `agent-addressing` (exit 0) or `complete` (exit 2).
 - **FR-55**: The CLI MUST provide a `comment` command that adds a comment to a changed line, supporting single-comment mode (`--file`, `--side`, `--line`, `--body`) and bulk mode (`--from-file`), with `--dry-run` support.
-- **FR-56**: The CLI MUST provide an `export` command that prints all comments as plain text to stdout, with `--file` filter support.
+- **FR-56**: The CLI MUST provide an `export` command that prints comments as plain text to stdout, with `--file` filter support. Outdated comments MUST be excluded by default; the `--include-outdated` flag MUST include them.
 - **FR-57**: The CLI MUST provide a `url` command that prints the running server's base URL from the lock file without making a network call.
 - **FR-58**: The CLI MUST provide an `open` command that opens the crloop review view in the default browser.
 - **FR-59**: The `serve` command MUST write a lock file (`~/.crloop/server.json`) containing `{ port, pid, startedAt }` on daemon start, and the `stop-server` command MUST remove it on shutdown.

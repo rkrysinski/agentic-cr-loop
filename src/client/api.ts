@@ -99,8 +99,11 @@ export function createApiClient(repoId: string) {
       return request<void>(`${base}/comments/${encodeURIComponent(commentId)}`, { method: "DELETE" });
     },
 
-    exportComments(): Promise<string> {
-      return request<string>(`${base}/export/comments.txt`);
+    exportComments(options?: { includeOutdated?: boolean }): Promise<string> {
+      const url = options?.includeOutdated
+        ? `${base}/export/comments.txt?includeOutdated=true`
+        : `${base}/export/comments.txt`;
+      return request<string>(url);
     },
 
     getSession(): Promise<{ status: string; iteration: number; headId: string; startedAt: string; updatedAt: string; commentCounts: { current: number; outdated: number } }> {

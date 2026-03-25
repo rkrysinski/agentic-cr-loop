@@ -151,7 +151,7 @@ Responsibilities:
 
 Implementation notes:
 - Export is generated on demand rather than treated as the primary storage format.
-- Default export format is Markdown text with repository path, base reference, file path, anchor, and comment body.
+- Default export format is Markdown text with file path, anchor side and line number, status, and comment body.
 
 #### API Layer
 
@@ -268,16 +268,14 @@ type ReviewComment = {
 
 ## Export Format
 
-The initial export format is Markdown text with deterministic ordering:
+The export format is plain text with deterministic ordering:
 
-1. Repository metadata.
-2. One section per changed file in path order.
-3. One subsection per comment in line-order within the file.
+1. One section per changed file in path order.
+2. One subsection per comment in line-order within the file.
 
 Each comment block contains:
 - File path.
-- Anchor side and line number.
-- Hunk header.
+- Comment ID, anchor side, line number, and status (current/outdated).
 - Comment body.
 
 This keeps the export readable and machine-friendly without introducing a second canonical review format.

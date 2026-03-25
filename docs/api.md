@@ -28,7 +28,7 @@ All resource routes are scoped under `/api/repos/:repoId/`.
 | `POST` | `/api/repos/:repoId/comments` | Create a comment |
 | `PATCH` | `/api/repos/:repoId/comments/:commentId` | Update a comment body |
 | `DELETE` | `/api/repos/:repoId/comments/:commentId` | Delete a comment (204) |
-| `GET` | `/api/repos/:repoId/export/comments.txt` | Export all comments as plain text |
+| `GET` | `/api/repos/:repoId/export/comments.txt` | Export comments as plain text (skips outdated by default; `?includeOutdated=true` to include all) |
 | `GET` | `/api/repos/:repoId/session` | Get review session state with comment counts |
 | `POST` | `/api/repos/:repoId/session/transition` | Transition session state |
 

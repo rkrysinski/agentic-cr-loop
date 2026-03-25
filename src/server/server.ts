@@ -268,10 +268,11 @@ export async function startServer(
     }
   });
 
-  repoRouter.get("/export/comments.txt", async (_request, response, next) => {
+  repoRouter.get("/export/comments.txt", async (request, response, next) => {
     try {
       const svc = getRepoService(response);
-      response.type("text/plain").send(await svc.exportComments());
+      const skipOutdated = request.query.includeOutdated !== "true";
+      response.type("text/plain").send(await svc.exportComments({ skipOutdated }));
     } catch (error) {
       next(error);
     }

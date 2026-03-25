@@ -486,10 +486,19 @@ async function cmdExport(args: string[]): Promise<void> {
   const baseUrl = resolveBaseUrl(args);
   const repoId = await resolveRepoId(args, baseUrl);
   const fileFilter = getFlag(args, "--file");
+  const includeOutdated = hasFlag(args, "--include-outdated");
 
   let url = `${baseUrl}/api/repos/${encodeURIComponent(repoId)}/export/comments.txt`;
+  const params = new URLSearchParams();
   if (fileFilter) {
-    url += `?file=${encodeURIComponent(fileFilter)}`;
+    params.set("file", fileFilter);
+  }
+  if (includeOutdated) {
+    params.set("includeOutdated", "true");
+  }
+  const qs = params.toString();
+  if (qs) {
+    url += `?${qs}`;
   }
 
   const response = await fetch(url);
@@ -879,7 +888,8 @@ Repository management:
 Review workflow:
   open               Open the review UI in the default browser
   comment            Add a comment to a changed line (single or bulk)
-  export             Export all comments as plain text
+  export             Export comments as plain text (skips outdated by default)
+                       --include-outdated   Include outdated comments in export
   status             Show review session status
   finish-self-review Signal self-review complete, hand off to human
   finish-addressing  Signal addressing complete, begin next self-review iteration

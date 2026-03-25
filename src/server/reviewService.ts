@@ -127,7 +127,8 @@ export class ReviewService {
     return transitionSessionStore(this.repoPath, targetStatus);
   }
 
-  async exportComments(): Promise<string> {
+  async exportComments(options?: { skipOutdated?: boolean }): Promise<string> {
+    const skipOutdated = options?.skipOutdated ?? true;
     await this.syncReviewSession();
     const [changes, comments] = await Promise.all([this.getChanges(), this.commentStore.list()]);
     const matchedFileIds = new Set<string>();
@@ -140,6 +141,7 @@ export class ReviewService {
             comment,
             status: comment.diffFingerprint === change.diffFingerprint ? ("current" as const) : ("outdated" as const)
           }))
+          .filter((entry) => !skipOutdated || entry.status !== "outdated")
       }))
       .filter((file) => {
         const hasComments = file.comments.length > 0;
@@ -149,23 +151,19 @@ export class ReviewService {
         return hasComments;
       });
 
-    const orphanedFiles = Array.from(groupCommentsByFilePath(comments).entries())
-      .filter(([fileId]) => !matchedFileIds.has(fileId))
-      .map(([fileId, groupedComments]) => ({
-        path: fileId,
-        comments: groupedComments.map((comment) => ({
-          comment,
-          status: "outdated" as const
-        }))
-      }));
+    const orphanedFiles = skipOutdated
+      ? []
+      : Array.from(groupCommentsByFilePath(comments).entries())
+          .filter(([fileId]) => !matchedFileIds.has(fileId))
+          .map(([fileId, groupedComments]) => ({
+            path: fileId,
+            comments: groupedComments.map((comment) => ({
+              comment,
+              status: "outdated" as const
+            }))
+          }));
 
-    return renderReviewCommentsText([...files, ...orphanedFiles], {
-      header: {
-        repoName: path.basename(this.repoPath) || this.repoPath,
-        baseRef: "HEAD",
-        date: new Date().toISOString().slice(0, 10)
-      }
-    });
+    return renderReviewCommentsText([...files, ...orphanedFiles]);
   }
 
   private async syncReviewSession(): Promise<void> {

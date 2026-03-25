@@ -222,6 +222,7 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
   const [exportText, setExportText] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   const [copyConfirm, setCopyConfirm] = useState(false);
+  const [skipOutdated, setSkipOutdated] = useState(true);
 
   useEffect(() => {
     selectedChangeIdRef.current = selectedChangeId;
@@ -409,18 +410,12 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
     setDraftComment("");
   }
 
-  async function enterExportMode() {
-    setExportMode(true);
-    setCopyConfirm(false);
-    setExportText("");
-    if (!apiClient) {
-      return;
-    }
-
+  async function fetchExport(includeOutdated: boolean) {
+    if (!apiClient) return;
     setExportLoading(true);
     try {
       setError(null);
-      setExportText(await apiClient.exportComments());
+      setExportText(await apiClient.exportComments(includeOutdated ? { includeOutdated: true } : undefined));
     } catch (nextError: unknown) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -428,10 +423,24 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
     }
   }
 
+  async function enterExportMode() {
+    setExportMode(true);
+    setCopyConfirm(false);
+    setExportText("");
+    setSkipOutdated(true);
+    await fetchExport(false);
+  }
+
   function exitExportMode() {
     setExportMode(false);
     setExportText("");
     setCopyConfirm(false);
+  }
+
+  function handleToggleSkipOutdated() {
+    const next = !skipOutdated;
+    setSkipOutdated(next);
+    void fetchExport(!next);
   }
 
   const selectedAnchorKey = pendingAnchor
@@ -790,6 +799,10 @@ export function App({ crloopRepoId }: { crloopRepoId?: string | null }) {
                 <span className="export-header-title">review_comments.txt</span>
                 <span className="export-header-subtitle">// {totalCommentCount} comment{totalCommentCount !== 1 ? "s" : ""} · {filesWithComments.length} file{filesWithComments.length !== 1 ? "s" : ""}</span>
                 <div className="export-header-spacer" />
+                <label className="export-skip-outdated-toggle">
+                  <input type="checkbox" checked={skipOutdated} onChange={handleToggleSkipOutdated} />
+                  <span>Skip outdated</span>
+                </label>
                 <button type="button" className="export-copy-btn" onClick={handleCopy} disabled={exportLoading || exportText.length === 0}>
                   <IconClipboard />
                   {copyConfirm ? "copied!" : "copy"}

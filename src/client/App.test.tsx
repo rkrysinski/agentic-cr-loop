@@ -737,6 +737,79 @@ describe("App", () => {
     expect(exportPreview).toBeInTheDocument();
     expect(exportPreview).toHaveTextContent("Check this");
   });
+
+  it("export view shows 'Skip outdated' toggle that re-fetches when toggled", async () => {
+    let lastExportUrl = "";
+    let exportRequestCount = 0;
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = parseRequestUrl(input);
+
+      if (url.pathname === "/api/repos") {
+        return jsonResponse([{ id: "test", path: "/repo" }]);
+      }
+
+      if (url.pathname === "/api/repos/test/repo") {
+        return jsonResponse({ id: "test", path: "/repo", baseRef: "HEAD", changeCount: 1 });
+      }
+
+      if (url.pathname === "/api/repos/test/changes" && !url.search) {
+        return jsonResponse([
+          {
+            changeId: "change-1",
+            changeType: "modified",
+            oldPath: "tracked.txt",
+            newPath: "tracked.txt",
+            isBinary: false,
+            commentCounts: { current: 1, outdated: 0 }
+          }
+        ]);
+      }
+
+      if (url.pathname === "/api/repos/test/changes/change-1" && url.searchParams.get("context") === "full") {
+        return jsonResponse({
+          changeId: "change-1",
+          changeType: "modified",
+          oldPath: "tracked.txt",
+          newPath: "tracked.txt",
+          isBinary: false,
+          diffFingerprint: "fp",
+          hunks: []
+        });
+      }
+
+      if (url.pathname === "/api/repos/test/comments" && url.searchParams.get("changeId") === "change-1") {
+        return jsonResponse({ current: [], outdated: [] });
+      }
+
+      if (url.pathname === "/api/repos/test/export/comments.txt") {
+        exportRequestCount += 1;
+        lastExportUrl = url.search;
+        return textResponse("REVIEW tracked.txt\n\nNOTE 1 SIDE new LINE 1 STATUS current\nTest\nEND NOTE\n");
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp();
+
+    await waitFor(() => expect(screen.getByText("tracked.txt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "export_comments" }));
+
+    await waitFor(() => expect(exportRequestCount).toBe(1));
+    // Default: no includeOutdated param
+    expect(lastExportUrl).toBe("");
+
+    // Toggle skip outdated off
+    const toggle = screen.getByLabelText("Skip outdated");
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(exportRequestCount).toBe(2));
+    expect(lastExportUrl).toBe("?includeOutdated=true");
+  });
 });
 
 function parseRequestUrl(input: RequestInfo | URL): URL {

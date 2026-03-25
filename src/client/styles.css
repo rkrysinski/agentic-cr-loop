@@ -1627,6 +1627,24 @@ button {
   flex: 1 1 auto;
 }
 
+.export-skip-outdated-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.export-skip-outdated-toggle input[type="checkbox"] {
+  accent-color: var(--color-orange);
+  cursor: pointer;
+}
+
 .export-copy-btn,
 .export-download-btn {
   display: inline-flex;

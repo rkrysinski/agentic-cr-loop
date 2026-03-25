@@ -191,4 +191,18 @@ describe("createApiClient", () => {
       expect.objectContaining({ method: "DELETE" })
     );
   });
+
+  it("exportComments without options calls URL without query param", async () => {
+    const stub = textFetch("export text");
+    vi.stubGlobal("fetch", stub);
+    await client.exportComments();
+    expect(stub).toHaveBeenCalledWith("/api/repos/test-repo/export/comments.txt", undefined);
+  });
+
+  it("exportComments with includeOutdated appends query param", async () => {
+    const stub = textFetch("export text");
+    vi.stubGlobal("fetch", stub);
+    await client.exportComments({ includeOutdated: true });
+    expect(stub).toHaveBeenCalledWith("/api/repos/test-repo/export/comments.txt?includeOutdated=true", undefined);
+  });
 });
