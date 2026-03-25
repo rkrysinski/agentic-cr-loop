@@ -36,7 +36,10 @@ export function parseServerOptions(argv: string[]): ServerOptions {
       let id: string;
       let repoPath: string;
 
-      if (colonIndex > 0) {
+      // On Windows, C:\ is a drive letter, not an id:path separator.
+      // Require backslash after the colon to distinguish from single-char ids like "a:/repos/a".
+      const isDriveLetter = colonIndex === 1 && /^[a-zA-Z]$/.test(value[0]!) && value[2] === "\\";
+      if (colonIndex > 0 && !isDriveLetter) {
         id = value.slice(0, colonIndex);
         repoPath = value.slice(colonIndex + 1);
       } else {

@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, cpSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { spawn, exec } from "node:child_process";
+import { spawn, exec, execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { deriveRepoId, parseServerOptions } from "./args.js";
 import { logFatalError, runServer } from "./runServer.js";
@@ -69,6 +69,11 @@ type LockFileData = { port: number; pid: number; startedAt: string };
 
 function writeLockFile(port: number, pid: number): void {
   mkdirSync(LOCK_DIR, { recursive: true });
+  // Hide dotfile directory on Windows where dotfiles aren't hidden by default.
+  // Use execFile (no shell) to avoid metacharacter issues with homedir paths.
+  if (process.platform === "win32") {
+    execFile("attrib", ["+h", LOCK_DIR], () => {});
+  }
   const data: LockFileData = { port, pid, startedAt: new Date().toISOString() };
   writeFileSync(LOCK_FILE, JSON.stringify(data, null, 2) + "\n", "utf8");
 }
@@ -88,8 +93,9 @@ function readLockFile(): LockFileData | null {
     // Verify PID is alive
     try {
       process.kill(data.pid, 0);
-    } catch {
-      return null;
+    } catch (error: unknown) {
+      // EPERM means the process exists but we lack permission (common on Windows) — treat as alive
+      if ((error as NodeJS.ErrnoException).code !== "EPERM") return null;
     }
     return data;
   } catch {
@@ -130,7 +136,7 @@ function resolveBaseUrl(args: string[]): string {
 }
 
 function validateFilePath(file: string): string {
-  if (file.includes("..") || file.startsWith("/")) {
+  if (file.includes("..") || file.startsWith("/") || /^[a-zA-Z]:/.test(file)) {
     console.error(`Invalid file path: ${file}`);
     process.exit(1);
   }
@@ -169,7 +175,12 @@ async function resolveRepoId(args: string[], baseUrl: string): Promise<string> {
   const result = await apiFetch(`${baseUrl}/api/repos`, "GET");
   const repos = result.data as Array<{ id: string; path: string }>;
   const cwd = process.cwd();
-  const match = repos.find((r) => cwd === r.path || cwd.startsWith(r.path + "/"));
+  const toSlash = (p: string) => p.replace(/\\/g, "/");
+  const ncwd = toSlash(cwd);
+  const match = repos.find((r) => {
+    const np = toSlash(r.path);
+    return ncwd === np || ncwd.startsWith(np + "/");
+  });
   if (!match) {
     console.error("Cannot detect repo from current directory. Use --repo <repoId>.");
     console.error(`Registered repos: ${repos.map((r) => r.id).join(", ") || "(none)"}`);
@@ -359,7 +370,9 @@ async function cmdOpen(args: string[]): Promise<void> {
 
   const platform = process.platform;
   const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
-  exec(`${cmd} ${JSON.stringify(url)}`, (error) => {
+  // Windows `start` treats the first quoted arg as a window title — pass empty title first
+  const shellCmd = platform === "win32" ? `start "" ${JSON.stringify(url)}` : `${cmd} ${JSON.stringify(url)}`;
+  exec(shellCmd, (error) => {
     if (error) {
       console.error(`Failed to open browser: ${error.message}`);
       process.exit(1);
@@ -962,8 +975,12 @@ async function main(): Promise<void> {
         const cleanup = () => { removeLockFile(); process.exit(0); };
         process.on("SIGINT", cleanup);
         process.on("SIGTERM", cleanup);
+        // Ensure lock file removal on any exit (covers Windows where SIGTERM doesn't fire)
+        process.on("exit", () => { try { removeLockFile(); } catch { /* best-effort */ } });
       } else {
-        // Spawn detached daemon and exit
+        // Spawn detached daemon and exit.
+        // On Windows, `detached` creates a new process group (no POSIX signals).
+        // Daemon shutdown is handled via the HTTP /api/server/stop endpoint.
         const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
           detached: true,
           stdio: "ignore",

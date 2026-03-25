@@ -167,7 +167,7 @@ export class ReviewService {
   }
 
   private async syncReviewSession(): Promise<void> {
-    const topLevel = (await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim();
+    const topLevel = normalizeGitTopLevel((await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim());
     if (!topLevel) {
       throw new Error("Invalid Git repository");
     }
@@ -247,7 +247,10 @@ function isInternalReviewChange(change: Pick<FileChange, "newPath" | "oldPath">)
 }
 
 function isInternalReviewPath(filePath: string | null): boolean {
-  return typeof filePath === "string" && (filePath === REVIEW_STORAGE_DIRECTORY || filePath.startsWith(`${REVIEW_STORAGE_DIRECTORY}/`));
+  if (typeof filePath !== "string") return false;
+  // Normalize backslashes for Windows where git may return mixed separators
+  const normalized = filePath.replace(/\\/g, "/");
+  return normalized === REVIEW_STORAGE_DIRECTORY || normalized.startsWith(`${REVIEW_STORAGE_DIRECTORY}/`);
 }
 
 function getLineNumberForSide(
@@ -260,4 +263,13 @@ function getLineNumberForSide(
 function isBinaryBuffer(buffer: Buffer): boolean {
   const sample = buffer.subarray(0, Math.min(buffer.length, 8000));
   return sample.includes(0);
+}
+
+/** Normalize git's --show-toplevel output to a native absolute path, handling MSYS-style /c/... paths on Windows. */
+function normalizeGitTopLevel(raw: string): string {
+  if (process.platform === "win32") {
+    const msys = /^\/([a-zA-Z])(\/|$)/.exec(raw);
+    if (msys) return path.resolve(`${msys[1].toUpperCase()}:${raw.slice(2)}`);
+  }
+  return path.resolve(raw);
 }
