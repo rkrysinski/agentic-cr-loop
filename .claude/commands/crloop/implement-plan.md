@@ -132,3 +132,7 @@ Structure:
 
 Omit any tier with zero items. If zero follow-up items exist across all tiers, write instead:
 > No follow-up items found. All changed interfaces appear to be covered by existing docs, tests, and QA scripts.
+
+## Step 6 — Post-implementation check
+
+After completing all phases and writing the checklist, run the `/crloop/impl-check` slash command. This performs an independent cross-reference analysis of the actual git diff to catch anything the phase-by-phase checks may have missed. Print its report as the final output of this command.
