@@ -627,6 +627,75 @@ teardown_file() {
   _stop_cli_server
 }
 
+# ═════════════════════════════════════════════════════════════════════════════
+# cli-8: Session reset — crloop reset (FR-67, FR-68)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@test "cli-8: reset from complete state returns session to agent-review iteration 1" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  # Drive session to complete: agent-review → human-review → complete
+  crloop finish-self-review --url "$CLI_BASE" --repo a > /dev/null
+  node -e "
+    fetch('$CLI_BASE/api/repos/a/session/transition', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status:'complete'})
+    }).then(r => r.json()).then(d => { if(d.status!=='complete') throw new Error(JSON.stringify(d)); })
+  "
+  # Verify we're stuck in complete
+  run crloop status --url "$CLI_BASE" --repo a --json
+  echo "$output" > "$OUT"
+  node -e "const r=JSON.parse(require('fs').readFileSync('$OUT','utf8')); if(r.status!=='complete') throw new Error('not complete: '+r.status)"
+  # Reset
+  run crloop reset --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Session reset"* ]]
+  # Verify default state
+  run crloop status --url "$CLI_BASE" --repo a --json
+  echo "$output" > "$OUT"
+  node -e "
+    const r=JSON.parse(require('fs').readFileSync('$OUT','utf8'));
+    if(r.status!=='agent-review') throw new Error('status: '+r.status);
+    if(r.iteration!==1) throw new Error('iteration: '+r.iteration);
+  "
+  _stop_cli_server
+}
+
+@test "cli-8: reset --dry-run exits 0 without actually resetting" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop reset --url "$CLI_BASE" --repo a --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Would reset"* ]]
+  _stop_cli_server
+}
+
+@test "cli-8: reset with no session file succeeds (no error)" {
+  _start_cli_server --repo "a:$REPO_A"
+  rm -f "$REPO_A/.local-code-review/session.json"
+  run crloop reset --url "$CLI_BASE" --repo a
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Session reset"* ]]
+  _stop_cli_server
+}
+
+@test "cli-8: corrupted session.json recovers to default agent-review state (FR-68)" {
+  _start_cli_server --repo "a:$REPO_A"
+  # Write truncated/invalid JSON to session.json
+  mkdir -p "$REPO_A/.local-code-review"
+  echo '{"status":"human-rev' > "$REPO_A/.local-code-review/session.json"
+  # status should recover gracefully, not crash
+  run crloop status --url "$CLI_BASE" --repo a --json
+  [ "$status" -eq 0 ]
+  echo "$output" > "$OUT"
+  node -e "
+    const r=JSON.parse(require('fs').readFileSync('$OUT','utf8'));
+    if(r.status!=='agent-review') throw new Error('status: '+r.status);
+  "
+  _stop_cli_server
+}
+
 @test "cli-7: comment --dry-run validates inputs and exits 0 without posting" {
   _start_cli_server --repo "a:$REPO_A"
   # Use a file that exists in the repo's diff (untracked file seeded by setup-single-repo.sh is only available in the QA worktree)

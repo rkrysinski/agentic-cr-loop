@@ -39,6 +39,10 @@ npx crloop serve
 # Run this from inside the repo you're reviewing
 npx crloop repos --json          # check if your repo path is already listed
 npx crloop add-repo . --json     # → {"id": "my-repo", "path": "/abs/path"} — note the id
+
+# Reset session — ensures a clean agent-review state regardless of prior runs.
+# Safe to run every time; no-ops if no session file exists.
+npx crloop reset
 ```
 
 After this, commands that target a specific repo auto-detect it by matching your CWD against registered paths. **If you are running inside the reviewed repo, omit `--repo` from all commands.** Only pass `--repo <id>` when your CWD is somewhere else.
@@ -125,6 +129,8 @@ Then loop back to Step 2 for the next self-review iteration.
 
 **If `crloop status` shows an unexpected state:** Check `npx crloop status --json` before any transition. The `status` field must match the expected current state or the transition command will fail.
 
+**If `crloop status` shows `complete` or a transition fails with "Invalid transition":** The session is stuck in a terminal state from a previous review. Run `npx crloop reset` to start a fresh session.
+
 ---
 
 ## Full CLI reference
@@ -136,6 +142,7 @@ npx crloop url                                     # print server URL (reads loc
 npx crloop repos [--json]                          # list registered repos
 npx crloop add-repo <path> [--id <id>] [--json]   # register repo
 npx crloop remove-repo <id>                        # unregister repo
+npx crloop reset [--dry-run]                       # reset session to agent-review (iterations)
 npx crloop status [--json]                         # session state, iteration, comment counts
 npx crloop comment --from-file <path> [--dry-run] # bulk post findings (preferred)
 npx crloop comment --file <f> --side new|old --line <n> --body "<text>"  # single comment

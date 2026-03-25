@@ -613,6 +613,30 @@ async function cmdFinishAddressing(args: string[]): Promise<void> {
   }
 }
 
+async function cmdReset(args: string[]): Promise<void> {
+  const baseUrl = resolveBaseUrl(args);
+  const repoId = await resolveRepoId(args, baseUrl);
+  const dryRun = hasFlag(args, "--dry-run");
+
+  if (dryRun) {
+    console.log("Would reset session to agent-review (iteration 1).");
+    return;
+  }
+
+  const result = await apiFetch(
+    `${baseUrl}/api/repos/${encodeURIComponent(repoId)}/session/reset`,
+    "POST"
+  );
+
+  if (result.status === 200) {
+    console.log("Session reset.");
+  } else {
+    const error = (result.data as { error?: string })?.error ?? `Status ${result.status}`;
+    console.error(error);
+    process.exit(1);
+  }
+}
+
 async function cmdWait(args: string[]): Promise<void> {
   const baseUrl = resolveBaseUrl(args);
   const repoId = await resolveRepoId(args, baseUrl);
@@ -839,6 +863,14 @@ function cmdSchema(args: string[]): void {
         "--dry-run": { type: "boolean", description: "Validate without transitioning" },
       },
     },
+    reset: {
+      description: "Reset the review session to agent-review (iteration 1)",
+      options: {
+        "--repo": { type: "string", description: "Target repo ID" },
+        "--url": { type: "string", description: "Server URL" },
+        "--dry-run": { type: "boolean", description: "Preview without resetting" },
+      },
+    },
     wait: {
       description: "Block until the human finishes review",
       options: {
@@ -885,6 +917,7 @@ Usage:
   crloop status [--repo <repoId>] [--url URL] [--json]
   crloop finish-self-review [--repo <repoId>] [--url URL] [--dry-run]
   crloop finish-addressing [--repo <repoId>] [--url URL] [--dry-run]
+  crloop reset [--repo <repoId>] [--url URL] [--dry-run]
   crloop wait [--repo <repoId>] [--url URL] [--poll-interval <seconds>]
   crloop skill --install [--scope global|project] [--force] [--dry-run] [--json]
   crloop skill --print
@@ -906,6 +939,7 @@ Review workflow:
   export             Export comments as plain text (skips outdated by default)
                        --include-outdated   Include outdated comments in export
   status             Show review session status
+  reset              Reset session to agent-review (iteration 1)
   finish-self-review Signal self-review complete, hand off to human
   finish-addressing  Signal addressing complete, begin next self-review iteration
   wait               Block until the human finishes review
@@ -1053,6 +1087,8 @@ async function main(): Promise<void> {
     await cmdFinishAddressing(subArgs);
     const notice = await updateCheck;
     if (notice) console.log(notice);
+  } else if (command === "reset") {
+    await cmdReset(args.slice(1));
   } else if (command === "wait") {
     await cmdWait(args.slice(1));
   } else if (command === "skill") {

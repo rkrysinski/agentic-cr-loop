@@ -39,7 +39,7 @@ describe("crloop CLI — info flags", () => {
   it("--help exits 0 and documents all commands", () => {
     const { status, stdout } = runCli(["--help"]);
     expect(status).toBe(0);
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "finish-addressing", "wait", "skill"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "reset", "finish-self-review", "finish-addressing", "wait", "skill"]) {
       expect(stdout).toContain(cmd);
     }
     expect(stdout).toContain("--foreground");
@@ -199,7 +199,7 @@ describe("crloop CLI — schema command", () => {
     const { status, stdout } = runCli(["schema"]);
     expect(status).toBe(0);
     const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
-    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "finish-self-review", "finish-addressing", "wait", "skill"]) {
+    for (const cmd of ["serve", "stop-server", "repos", "add-repo", "remove-repo", "schema", "url", "open", "comment", "export", "status", "reset", "finish-self-review", "finish-addressing", "wait", "skill"]) {
       expect(parsed).toHaveProperty(cmd);
     }
   });

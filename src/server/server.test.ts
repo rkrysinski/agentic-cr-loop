@@ -436,6 +436,18 @@ describe("server API", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("POST /api/repos/:repoId/session/reset returns 200 with default session", async () => {
+    const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
+    // First transition to human-review so we're not in default state
+    await invokeRoute(app, "post", "/api/repos/test/session/transition", {
+      body: { status: "human-review" }
+    });
+    // Reset
+    const response = await invokeRoute(app, "post", "/api/repos/test/session/reset");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({ status: "agent-review", iteration: 1 });
+  });
+
   it("GET /api/repos/:repoId/session on nonexistent repo returns 404", async () => {
     const { app } = await startServer({ repos: [{ id: "test", path: repoPath }], port: 3000 }, { dev: true });
     const response = await invokeRoute(app, "get", "/api/repos/nonexistent/session");

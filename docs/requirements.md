@@ -101,6 +101,8 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-64**: `crloop skill --install` MUST copy the `skill/crloop/` directory (SKILL.md and all companion files such as `references/`) from the installed package to `~/.claude/skills/crloop/` (global, default) or `.claude/skills/crloop/` (project, via `--scope project`). The command MUST be idempotent (skip write when content is unchanged), protect user edits (warn and skip without `--force` when content differs), support `--dry-run`, `--json`, and `--force` flags, and support `crloop skill --print` to emit skill content to stdout without filesystem writes.
 - **FR-65**: The CLI MUST provide a `finish-addressing` command that transitions the session from `agent-addressing` to `agent-review`, with `--dry-run` support.
 - **FR-66**: The `serve` command MUST support a `--foreground` flag that runs the server in the current process (instead of spawning a background daemon), with HTTP request logging to stdout, for diagnostic purposes.
+- **FR-67**: The CLI MUST provide a `reset` command that resets the review session to the default `agent-review` state (iteration 1) by deleting `session.json`, with `--dry-run` support. The reset MUST be safe to call regardless of the current session state or whether a session file exists.
+- **FR-68**: The system MUST recover gracefully from corrupted (invalid JSON) session files by returning the default `agent-review` session state instead of throwing an error.
 
 ## Non-Functional
 
@@ -124,3 +126,4 @@ A local code review tool for reviewing changes in Git working directories. The s
 - 2.1: Added FR-64 for `crloop skill --install` — copies the agent skill from the installed package to the Claude Code skills directory, with `--scope`, `--force`, `--dry-run`, `--json`, and `--print` flags.
 - 2.2: Added FR-65 for `crloop finish-addressing` — completes the agent-addressing phase and re-enters agent-review for the next iteration.
 - 2.3: Added FR-66 for `crloop serve --foreground` — runs the server in the current process with request logging to stdout for diagnostics.
+- 2.4: Added FR-67 for `crloop reset` — resets session to default `agent-review` state regardless of current state. Added FR-68 for corrupted session recovery — `readSession` returns default state instead of crashing on invalid JSON.

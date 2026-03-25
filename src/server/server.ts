@@ -280,6 +280,17 @@ export async function startServer(
     }
   });
 
+  repoRouter.post("/session/reset", async (_request, response, next) => {
+    try {
+      const svc = getRepoService(response);
+      await svc.resetSession();
+      const session = await svc.getSession();
+      response.json(session);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   repoRouter.get("/export/comments.txt", async (request, response, next) => {
     try {
       const svc = getRepoService(response);

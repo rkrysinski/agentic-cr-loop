@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.3] — 2026-03-25
+
+### Added — Session reset
+
+- `crloop reset` — resets the review session to the default `agent-review` state (iteration 1) by deleting `session.json`; safe to call at any time, including when no session file exists; supports `--dry-run`
+- `POST /api/repos/:repoId/session/reset` — API endpoint backing `crloop reset`; always returns 200 with the default session state
+
+### Fixed — Corrupted session recovery
+
+- `readSession` now recovers from truncated or invalid `session.json` (e.g. from `kill -9`) by returning the default `agent-review` state instead of crashing with a `SyntaxError`
+
 ## [0.2.2] — 2026-03-25
 
 ### Added — Foreground / debug mode

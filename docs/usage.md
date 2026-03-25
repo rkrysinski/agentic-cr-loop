@@ -270,6 +270,7 @@ Add `--dry-run` to validate inputs without posting.
 ### Session management
 
 ```bash
+crloop reset                 # reset session to agent-review (iteration 1)
 crloop status                # show session state, iteration, and comment counts
 crloop finish-self-review    # transition agent-review → human-review
 crloop open                  # open the crloop review UI in the browser

@@ -8,7 +8,7 @@ import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } 
 import { renderReviewCommentsText } from "../shared/export.js";
 import { runGit } from "./git.js";
 import { ClientError } from "./errors.js";
-import { readSession, transitionSession as transitionSessionStore } from "./sessionStore.js";
+import { readSession, resetSession as resetSessionStore, transitionSession as transitionSessionStore } from "./sessionStore.js";
 import type { SessionState, SessionStatus } from "./sessionStore.js";
 
 const SUMMARY_CONTEXT: DiffContextValue = "0";
@@ -125,6 +125,11 @@ export class ReviewService {
   async transitionSession(targetStatus: SessionStatus): Promise<SessionState> {
     await this.syncReviewSession();
     return transitionSessionStore(this.repoPath, targetStatus);
+  }
+
+  async resetSession(): Promise<void> {
+    await this.syncReviewSession();
+    await resetSessionStore(this.repoPath);
   }
 
   async exportComments(options?: { skipOutdated?: boolean }): Promise<string> {

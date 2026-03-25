@@ -47,6 +47,7 @@ crloop --version | -v    Print installed version
 | `finish-self-review` | ✅ Implemented | Transitions to `human-review`, `--dry-run` |
 | `finish-addressing` | ✅ Implemented | Transitions back to `agent-review`, `--dry-run` |
 | `wait` | ✅ Implemented | Polls session, exit 0/2 |
+| `reset` | ✅ Implemented | Deletes session file, returns to default `agent-review` state |
 
 > **Why no `changes` or `diff` commands?** The agent runs inside the git repository it is reviewing and already has `git status`, `git diff`, and file-reading tools. There is no value in routing diffs through the crloop server and back. The agent reviews changes natively; crloop is only used to record findings and coordinate with the human.
 
@@ -452,6 +453,10 @@ stateDiagram-v2
 
 The `iteration` counter starts at 1 and increments on every `agent-addressing → agent-review` transition, so comments and exports carry an iteration number for tracing.
 
+### Reset (out-of-band)
+
+`crloop reset` is not a state transition — it deletes `session.json` entirely. The next `readSession` call returns the default `agent-review` (iteration 1) state. This is used at the start of every review to ensure a clean session regardless of prior state (including `complete` or corrupted files from process kills).
+
 ---
 
 ## Workflow Sequence
@@ -476,6 +481,11 @@ sequenceDiagram
     CLI->>Server: POST /api/repos
     Server-->>CLI: 201 {id, path}
     CLI-->>Agent: "Registered: my-repo"
+
+    Agent->>CLI: crloop reset
+    CLI->>Server: POST /api/repos/:id/session/reset
+    Server-->>CLI: 200 {status: "agent-review", iteration: 1}
+    CLI-->>Agent: "Session reset."
 
     Note over Agent: git diff, git status,<br/>reads files natively,<br/>applies user instructions
 

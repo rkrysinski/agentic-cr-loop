@@ -41,7 +41,7 @@ export async function readSession(repoPath: string): Promise<SessionState> {
     const content = await fs.readFile(sessionFilePath(repoPath), "utf8");
     return JSON.parse(content) as SessionState;
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT" || error instanceof SyntaxError) {
       return defaultSession();
     }
     throw error;
@@ -52,6 +52,10 @@ export async function writeSession(repoPath: string, state: SessionState): Promi
   const filePath = sessionFilePath(repoPath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(state, null, 2) + "\n", "utf8");
+}
+
+export async function resetSession(repoPath: string): Promise<void> {
+  await fs.rm(sessionFilePath(repoPath), { force: true });
 }
 
 export async function transitionSession(repoPath: string, targetStatus: SessionStatus): Promise<SessionState> {

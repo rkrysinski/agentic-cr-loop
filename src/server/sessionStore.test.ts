@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { REVIEW_STORAGE_DIRECTORY } from "./commentStore.js";
-import { readSession, transitionSession, writeSession } from "./sessionStore.js";
+import { readSession, resetSession, transitionSession, writeSession } from "./sessionStore.js";
 import type { SessionState } from "./sessionStore.js";
 
 let repoPath: string;
@@ -117,5 +117,35 @@ describe("sessionStore", () => {
     });
 
     await expect(transitionSession(repoPath, "agent-review")).rejects.toThrow("Invalid transition");
+  });
+
+  it("readSession returns default state when session file contains corrupted JSON", async () => {
+    const filePath = path.join(repoPath, REVIEW_STORAGE_DIRECTORY, "session.json");
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, '{"status":"comple', "utf8");
+
+    const session = await readSession(repoPath);
+    expect(session.status).toBe("agent-review");
+    expect(session.iteration).toBe(1);
+  });
+
+  it("resetSession deletes session file and readSession returns default", async () => {
+    await writeSession(repoPath, {
+      status: "complete",
+      iteration: 3,
+      headId: "abc",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    await resetSession(repoPath);
+
+    const session = await readSession(repoPath);
+    expect(session.status).toBe("agent-review");
+    expect(session.iteration).toBe(1);
+  });
+
+  it("resetSession is a no-op when session file does not exist", async () => {
+    await expect(resetSession(repoPath)).resolves.toBeUndefined();
   });
 });

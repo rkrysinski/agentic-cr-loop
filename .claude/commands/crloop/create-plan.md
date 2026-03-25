@@ -44,7 +44,8 @@ Also discover project artifacts — search for each category below; note which a
 
 - **Tests**: files matching `*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.js`; config files `vitest.config.*`, `jest.config.*`
 - **QA scripts**: `scripts/qa/*.sh`, `qa/*.sh`, any `verify-*.sh` or `scenario*.sh`
-- **Docs**: `docs/**/*.md`, `README.md`, `CHANGELOG.md`
+- **Docs**: `docs/**/*.md`, `README.md`, `CHANGELOG.md`, `CHANGES.md`
+- **Release**: `release.md`, `CHANGELOG.md`, `package.json`
 - **Requirements**: `docs/requirements.md`, any file matching `*requirements*`; any QA plan with a "Requirement" and "Scenario" column
 
 ## Step 4 — Cross-reference design against current state
@@ -68,6 +69,26 @@ For each design element, determine whether it is already implemented:
 
 **Rule F — Requirements language accuracy**:
 - If a requirements file was found and the design changes existing behavior, check whether the existing FR/NFR language still accurately describes the new behavior. If not: add a `[ ]` task to update the requirement wording.
+
+**Rule G — Bug fix changelog**:
+- If the design describes a bug fix and `CHANGELOG.md` was discovered: add a `[ ]` task to add a changelog entry. Also consider whether an existing test should have caught this → if yes, add a regression test task to "Test coverage".
+
+**Rule H — User-visible change release artifacts**:
+- If the design introduces any user-visible change (new command, changed behavior, new endpoint) and `CHANGELOG.md` or `release.md` was discovered: add a `[ ]` task to add an entry.
+- If `package.json` was discovered: consider whether a version bump is warranted (patch for fixes, minor for new features, major for breaking changes). If so, add a `[ ]` task.
+
+**Rule I — QA script coverage**:
+- If QA scripts were discovered, search them for references to commands/endpoints/flags that the design adds or changes. For new behavior with no QA coverage: add a `[ ]` task. For changed behavior where existing scripts reference the old name/behavior: add a `[ ]` task to update the specific script.
+
+### Prioritization
+
+After applying all rules, classify each resulting task:
+
+- **MUST** — Required before the work is considered done (missing docs for new public interfaces, missing tests for new source files, broken references in existing docs/scripts).
+- **SHOULD** — Important but does not block shipping (changelog entries, requirements traceability updates, version bumps).
+- **CONSIDER** — Low-priority or optional (regression tests for edge cases, requirements matrix entries for minor changes).
+
+Use this classification when writing the "Docs and traceability" section — prefix each item with its priority tier, e.g. `- [ ] **MUST** \`docs/api.md\` — ...`
 
 ## Step 5 — Write the implementation plan
 
@@ -105,7 +126,11 @@ Design reference: [{design filename}](./{design filename})
 
 ## Docs and traceability
 
-- [ ] `docs/some-file.md` — {what entry or section to add}
+- [ ] **MUST** `docs/some-file.md` — {what entry or section to add}
+- [ ] **SHOULD** `CHANGELOG.md` — {reason}
+- [ ] **CONSIDER** `docs/requirements.md` — {reason}
+
+**Artifacts not found:** {list any category searched but absent, e.g. "CHANGELOG.md", "QA scripts"}
 ```
 
 **Task rules:**

@@ -31,6 +31,7 @@ All resource routes are scoped under `/api/repos/:repoId/`.
 | `GET` | `/api/repos/:repoId/export/comments.txt` | Export comments as plain text (skips outdated by default; `?includeOutdated=true` to include all) |
 | `GET` | `/api/repos/:repoId/session` | Get review session state with comment counts |
 | `POST` | `/api/repos/:repoId/session/transition` | Transition session state |
+| `POST` | `/api/repos/:repoId/session/reset` | Reset session to default `agent-review` state |
 
 ### `GET /api/repos` response
 
@@ -104,6 +105,23 @@ Valid transitions:
 - `human-review → agent-addressing`
 - `human-review → complete`
 - `agent-addressing → agent-review` (increments `iteration`)
+
+### `POST /api/repos/:repoId/session/reset` response
+
+No request body required. Deletes the session file and returns the default session state:
+
+```json
+{
+  "status": "agent-review",
+  "iteration": 1,
+  "headId": "",
+  "startedAt": "2026-03-25T12:00:00.000Z",
+  "updatedAt": "2026-03-25T12:00:00.000Z",
+  "commentCounts": { "current": 0, "outdated": 0 }
+}
+```
+
+Always succeeds (`200`). Safe to call even if no session file exists.
 
 ## Comment Storage
 
