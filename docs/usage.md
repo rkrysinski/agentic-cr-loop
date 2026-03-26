@@ -69,7 +69,7 @@ In foreground mode:
 
 - The server runs in the **current process** instead of spawning a daemon.
 - Every HTTP request is logged to stdout (`METHOD /url STATUS DURATIONms`).
-- Press **Ctrl-C** (or send SIGTERM) to stop the server; the lock file is cleaned up automatically.
+- Press **Ctrl-C** (or send SIGTERM) to stop the server.
 
 This is the recommended mode when collecting logs for a bug report.
 
@@ -223,16 +223,16 @@ crloop remove-repo shared-libs
 4. **Agent addresses feedback** — `crloop export` prints the comments and the agent fixes the code.
 5. **Agent signals done** — `crloop finish-addressing` transitions back to `agent-review`, starting the next iteration. If the human left no comments, `crloop wait` exits 2 and the loop ends.
 
-### Lock file and server discovery
+### Server discovery
 
-`crloop serve` writes a lock file at `~/.crloop/server.json` on daemon start. `crloop stop-server` removes it. All agentic commands discover the server URL from this file automatically — no `--url` flag needed when using the default port.
+All CLI commands discover the server URL via: `--url` flag → `CODE_REVIEW_URL` env var → default `http://localhost:3000`. When using the default port, no `--url` flag is needed.
 
 ```bash
 crloop url          # print the base URL of the running server
-crloop url --json   # → {"url":"http://localhost:3000","port":3000,"pid":12345}
+crloop url --json   # → {"url":"http://localhost:3000","port":3000}
 ```
 
-`crloop url` exits 1 if the lock file is missing or the server process is no longer alive.
+`crloop url` probes the server and exits 1 if it is not responding.
 
 ### Repo auto-detection
 
@@ -294,7 +294,7 @@ Navigating to `http://localhost:<port>` (root) shows the standard UI unchanged.
 ### Typical agentic workflow
 
 ```bash
-# Start the server (writes ~/.crloop/server.json)
+# Start the server
 crloop serve --repo /path/to/project
 
 # Register if not already registered

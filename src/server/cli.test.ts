@@ -24,9 +24,11 @@ function runCli(args: string[], env?: Record<string, string>): { stdout: string;
   };
 }
 
-// Kill a daemon by PID, ignoring errors if it already exited
-function killDaemon(pid: number): void {
-  try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ }
+// Stop a daemon by hitting its HTTP shutdown endpoint
+async function stopDaemonOnPort(port: number): Promise<void> {
+  try {
+    await fetch(`http://localhost:${port}/api/server/stop`, { method: "POST" });
+  } catch { /* already gone */ }
 }
 
 describe("crloop CLI — info flags", () => {
@@ -72,13 +74,14 @@ describe("crloop CLI — serve argument validation (runs in foreground before sp
 });
 
 describe("crloop CLI — serve daemon behaviour", () => {
-  let daemonPid: number | null = null;
+  let daemonPort: number | null = null;
   let repoPath: string | null = null;
 
   afterEach(async () => {
-    if (daemonPid !== null) {
-      killDaemon(daemonPid);
-      daemonPid = null;
+    // Stop daemon via HTTP endpoint
+    if (daemonPort !== null) {
+      await stopDaemonOnPort(daemonPort);
+      daemonPort = null;
     }
     if (repoPath !== null) {
       await fs.rm(repoPath, { recursive: true, force: true });
@@ -86,57 +89,35 @@ describe("crloop CLI — serve daemon behaviour", () => {
     }
   });
 
-  it("exits 0, prints pid and URL, and the server becomes reachable", async () => {
+  it("exits 0, prints URL, and the server becomes reachable", async () => {
     // tsx spawns twice (parent → daemon); allow extra time for cold start
     repoPath = await createTempGitRepo();
     const port = 19876;
+    daemonPort = port;
     const { status, stdout } = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
 
     expect(status).toBe(0);
-    expect(stdout).toMatch(/Server running \(pid \d+\) on http:\/\/localhost:\d+/);
+    expect(stdout).toMatch(/Server running on http:\/\/localhost:\d+/);
 
-    const pidMatch = stdout.match(/pid (\d+)/);
-    expect(pidMatch).not.toBeNull();
-    daemonPid = Number(pidMatch![1]);
-
-    // Poll until the server responds (max 5s)
-    const base = `http://localhost:${port}`;
-    let ready = false;
-    for (let i = 0; i < 25; i++) {
-      await new Promise((r) => setTimeout(r, 200));
-      try {
-        const res = await fetch(`${base}/api/repos`);
-        if (res.ok) { ready = true; break; }
-      } catch { /* not ready yet */ }
-    }
-    expect(ready).toBe(true);
+    // The server should already be reachable (waitForDaemonStartup probes it)
+    const res = await fetch(`http://localhost:${port}/api/repos`);
+    expect(res.ok).toBe(true);
   }, 20_000);
 
-  it("exits 0 and prints 'Server running' without spawning a second daemon when called again on the same port", async () => {
+  it("exits 0 and prints 'Server already running' without spawning a second daemon when called again on the same port", async () => {
     repoPath = await createTempGitRepo();
     const port = 19874;
+    daemonPort = port;
 
     // First invocation — start the daemon
     const first = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
     expect(first.status).toBe(0);
-    const pidMatch = first.stdout.match(/pid (\d+)/);
-    expect(pidMatch).not.toBeNull();
-    daemonPid = Number(pidMatch![1]);
-
-    // Wait for the lock file to be written
-    for (let i = 0; i < 25; i++) {
-      await new Promise((r) => setTimeout(r, 200));
-      try { const res = await fetch(`http://localhost:${port}/api/repos`); if (res.ok) break; } catch { /* not ready */ }
-    }
+    expect(first.stdout).toMatch(/Server running on http:\/\/localhost:\d+/);
 
     // Second invocation — should detect live server and bail
     const second = runCli(["serve", "--repo", repoPath, "--port", String(port)]);
     expect(second.status).toBe(0);
-    expect(second.stdout).toMatch(/Server running \(pid \d+\) on http:\/\/localhost:\d+/);
-
-    // Same PID reported — no second daemon was spawned
-    const secondPidMatch = second.stdout.match(/pid (\d+)/);
-    expect(Number(secondPidMatch![1])).toBe(daemonPid);
+    expect(second.stdout).toMatch(/Server already running on http:\/\/localhost:\d+/);
   }, 20_000);
 
   it("exits 1 when the daemon dies during startup instead of printing a false success message", async () => {
@@ -257,7 +238,7 @@ describe("crloop CLI — --dry-run flag (no server required)", () => {
 });
 
 describe("crloop CLI — --json flag (live server)", () => {
-  let daemonPid: number | null = null;
+  let serverStopped = false;
   let repoPathA: string | null = null;
   let repoPathB: string | null = null;
   const port = 19875;
@@ -266,17 +247,11 @@ describe("crloop CLI — --json flag (live server)", () => {
   beforeAll(async () => {
     repoPathA = await createTempGitRepo();
     repoPathB = await createTempGitRepo();
-    const { stdout } = runCli(["serve", "--repo", repoPathA, "--port", String(port)]);
-    const pidMatch = stdout.match(/pid (\d+)/);
-    if (pidMatch) daemonPid = Number(pidMatch[1]);
-    for (let i = 0; i < 25; i++) {
-      await new Promise((r) => setTimeout(r, 200));
-      try { const res = await fetch(`${BASE}/api/repos`); if (res.ok) break; } catch { /* not ready */ }
-    }
+    runCli(["serve", "--repo", repoPathA, "--port", String(port)]);
   }, 20_000);
 
   afterAll(async () => {
-    if (daemonPid !== null) { killDaemon(daemonPid); daemonPid = null; }
+    if (!serverStopped) await stopDaemonOnPort(port);
     if (repoPathA) { await fs.rm(repoPathA, { recursive: true, force: true }); repoPathA = null; }
     if (repoPathB) { await fs.rm(repoPathB, { recursive: true, force: true }); repoPathB = null; }
   });
@@ -306,71 +281,35 @@ describe("crloop CLI — --json flag (live server)", () => {
     expect(result.id).toBe("json-b");
   });
 
+  it("url prints the server URL when server is running", () => {
+    const { status, stdout } = runCli(["url", "--url", BASE]);
+    expect(status).toBe(0);
+    expect(stdout.trim()).toBe(BASE);
+  });
+
+  it("url --json outputs {url, port} when server is running", () => {
+    const { status, stdout } = runCli(["url", "--url", BASE, "--json"]);
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { url: string; port: number };
+    expect(parsed.url).toBe(BASE);
+    expect(parsed.port).toBe(port);
+  });
+
   it("stop-server --json outputs {stopped:true} and update notice is suppressed", () => {
     const { status, stdout } = runCli(["stop-server", "--url", BASE, "--json"]);
     expect(status).toBe(0);
     const result = JSON.parse(stdout.trim()) as { stopped: boolean };
     expect(result.stopped).toBe(true);
-    daemonPid = null; // already stopped, skip kill in afterAll
+    serverStopped = true;
   });
 });
 
 describe("crloop CLI — url command", () => {
-  const lockDir = path.join(os.homedir(), ".crloop");
-  const lockFile = path.join(lockDir, "server.json");
-  let existedBefore = false;
-  let originalContent: string | null = null;
-
-  beforeAll(async () => {
-    try {
-      originalContent = await fs.readFile(lockFile, "utf8");
-      existedBefore = true;
-    } catch {
-      existedBefore = false;
-    }
-  });
-
-  afterAll(async () => {
-    if (existedBefore && originalContent !== null) {
-      await fs.writeFile(lockFile, originalContent, "utf8");
-    } else if (!existedBefore) {
-      try { await fs.unlink(lockFile); } catch { /* ignore */ }
-    }
-  });
-
-  it("exits 1 when lock file is absent", async () => {
-    // Temporarily remove the lock file
-    try { await fs.unlink(lockFile); } catch { /* might not exist */ }
-    const { status, stderr } = runCli(["url"]);
+  it("exits 1 when no server is running on the target port", () => {
+    // Use a port unlikely to have a server
+    const { status, stderr } = runCli(["url", "--url", "http://localhost:19999"]);
     expect(status).toBe(1);
     expect(stderr).toContain("No running server");
-  });
-
-  it("exits 1 when lock file PID is dead", async () => {
-    await fs.mkdir(lockDir, { recursive: true });
-    await fs.writeFile(lockFile, JSON.stringify({ port: 9999, pid: 999999, startedAt: new Date().toISOString() }), "utf8");
-    const { status, stderr } = runCli(["url"]);
-    expect(status).toBe(1);
-    expect(stderr).toContain("No running server");
-  });
-
-  it("prints URL when lock file is valid and PID is alive", async () => {
-    await fs.mkdir(lockDir, { recursive: true });
-    await fs.writeFile(lockFile, JSON.stringify({ port: 4567, pid: process.pid, startedAt: new Date().toISOString() }), "utf8");
-    const { status, stdout } = runCli(["url"]);
-    expect(status).toBe(0);
-    expect(stdout.trim()).toBe("http://localhost:4567");
-  });
-
-  it("--json outputs { url, port, pid }", async () => {
-    await fs.mkdir(lockDir, { recursive: true });
-    await fs.writeFile(lockFile, JSON.stringify({ port: 4567, pid: process.pid, startedAt: new Date().toISOString() }), "utf8");
-    const { status, stdout } = runCli(["url", "--json"]);
-    expect(status).toBe(0);
-    const parsed = JSON.parse(stdout.trim()) as { url: string; port: number; pid: number };
-    expect(parsed.url).toBe("http://localhost:4567");
-    expect(parsed.port).toBe(4567);
-    expect(parsed.pid).toBe(process.pid);
   });
 });
 

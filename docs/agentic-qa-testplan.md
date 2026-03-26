@@ -156,8 +156,8 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-56 | CLI `export` command; `--include-outdated` flag | cli-7 | `test/cli.bats` — cli-7; `src/server/server.test.ts` — export endpoint (default skip + includeOutdated param) |
 | FR-57 | CLI `url` command | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
 | FR-58 | CLI `open` command | — | No automated coverage — requires OS browser/desktop interaction |
-| FR-59 | Lock file written by `serve`, removed by `stop-server` | cli-6 | `test/cli.bats` — cli-6 |
-| FR-60 | URL resolution chain (`--url` → env → lock file → default) | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
+| FR-59 | `serve` idempotency via HTTP probe | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — serve daemon group |
+| FR-60 | URL resolution chain (`--url` → env → default) | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
 | FR-61 | Repo auto-detection from CWD | — | `src/server/cli.test.ts` — resolveRepoId logic |
 | FR-62 | crloop view at `/crloop/<repoId>` | ui-44 | `e2e/crloop-view.spec.ts` — ui-44; `src/client/App.test.tsx` — Finish Review button, conditional transition (comments → `agent-addressing`, no comments → `complete`) |
 | FR-63 | Input validation for `--file`, `--side`, `--line`, `--repo` | — | `src/server/cli.test.ts` — input validation group |

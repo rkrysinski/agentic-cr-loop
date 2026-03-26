@@ -22,14 +22,16 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ## Tasks
 
-### Lock file (`~/.crloop/server.json`)
+### ~~Lock file (`~/.crloop/server.json`)~~ — Superseded by HTTP probing
 
-- [x] `src/server/cli.ts` — Add `writeLockFile(port, pid)` function that writes `{ port, pid, startedAt }` to `~/.crloop/server.json` (create `~/.crloop/` directory if absent)
-- [x] `src/server/cli.ts` — Add `removeLockFile()` function that deletes `~/.crloop/server.json`
-- [x] `src/server/cli.ts` — Add `readLockFile()` function that reads the lock file, verifies PID is alive (via `process.kill(pid, 0)`), and returns `{ port, pid, startedAt }` or `null`
-- [x] `src/server/cli.ts` — In the `serve` daemon branch (line 321), call `writeLockFile()` after `runServer()` resolves successfully
-- [x] `src/server/cli.ts` — In `cmdStopServer`, call `removeLockFile()` after receiving 204 from the server
-- [x] `src/server/cli.ts` — Update `resolveBaseUrl()`: implement the full resolution chain `--url` → `CODE_REVIEW_URL` env var → lock file → default `http://localhost:3000`
+> Lock file removed in favour of HTTP port probing. `probeRunningServer(port)` replaces all lock file reads/writes. See CHANGELOG [Unreleased] entry.
+
+- [x] ~~`src/server/cli.ts` — Add `writeLockFile(port, pid)` function~~ (removed)
+- [x] ~~`src/server/cli.ts` — Add `removeLockFile()` function~~ (removed)
+- [x] ~~`src/server/cli.ts` — Add `readLockFile()` function~~ (removed)
+- [x] ~~`src/server/cli.ts` — In the `serve` daemon branch, call `writeLockFile()`~~ (removed)
+- [x] ~~`src/server/cli.ts` — In `cmdStopServer`, call `removeLockFile()`~~ (removed)
+- [x] `src/server/cli.ts` — Update `resolveBaseUrl()`: resolution chain `--url` → `CODE_REVIEW_URL` env var → default `http://localhost:3000`
 
 ### URL resolution helper
 
@@ -44,12 +46,12 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ### CLI command: `crloop url`
 
-- [x] `src/server/cli.ts` — Add `cmdUrl(args)`: reads lock file via `readLockFile()`, verifies PID alive, prints `http://localhost:<port>` or JSON `{ url, port, pid }` with `--json`; exit 1 if lock file missing or PID dead
+- [x] `src/server/cli.ts` — Add `cmdUrl(args)`: probes server, prints `http://localhost:<port>` or JSON `{ url, port }` with `--json`; exit 1 if server not responding
 - [x] `src/server/cli.ts` — Register `"url"` case in `main()` dispatch
 
 ### CLI command: `crloop open`
 
-- [x] `src/server/cli.ts` — Add `cmdOpen(args)`: resolves base URL (lock file or `--url`), calls `resolveRepoId`, opens `http://localhost:<port>/crloop/<repoId>` via `open` (macOS) / `xdg-open` (Linux) / `start` (Windows) using `child_process.exec`
+- [x] `src/server/cli.ts` — Add `cmdOpen(args)`: resolves base URL (via `--url` or default), calls `resolveRepoId`, opens `http://localhost:<port>/crloop/<repoId>` via `open` (macOS) / `xdg-open` (Linux) / `start` (Windows) using `child_process.exec`
 - [x] `src/server/cli.ts` — Register `"open"` case in `main()` dispatch
 
 ### CLI command: `crloop comment`
@@ -116,7 +118,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 - [x] `src/server/sessionStore.test.ts` — Tests for `readSession`, `writeSession`, `transitionSession` (valid transitions, invalid transitions rejected, default state on missing file)
 - [x] `src/server/server.test.ts` — Tests for `GET /api/repos/:repoId/session` and `POST /api/repos/:repoId/session/transition` (happy path, invalid transition 400, missing repo 404)
-- [x] `src/server/cli.test.ts` — Tests for `url` command (lock file present/absent, PID alive/dead)
+- [x] `src/server/cli.test.ts` — Tests for `url` command (server not responding exits 1; positive test with live server)
 - [ ] `src/server/cli.test.ts` — Tests for `comment` command (`--dry-run` single and `--from-file`, live server single comment creation)
 - [ ] `src/server/cli.test.ts` — Tests for `export` command (plain text output, `--file` filter)
 - [ ] `src/server/cli.test.ts` — Tests for `status`, `finish-self-review`, `wait` commands (with `--dry-run` where applicable)
@@ -125,7 +127,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ## Docs and traceability
 
-- [x] `docs/requirements.md` — Add agentic workflow requirements: session state machine, session CLI commands (`status`, `finish-self-review`, `wait`), `comment` CLI command, `export` CLI command, `url`/`open` CLI commands, crloop view UI, lock file behavior, "Finish Review" button
+- [x] `docs/requirements.md` — Add agentic workflow requirements: session state machine, session CLI commands (`status`, `finish-self-review`, `wait`), `comment` CLI command, `export` CLI command, `url`/`open` CLI commands, crloop view UI, server idempotency, "Finish Review" button
 - [x] `docs/api.md` — Add entries for `GET /api/repos/:repoId/session` and `POST /api/repos/:repoId/session/transition` with request/response schemas
 - [x] `docs/features/agentic-cr-skill-cli/design-skill-cli.md` — Update implementation status table to reflect completed items as work progresses
 
@@ -138,7 +140,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ## Post-implementation checklist
 
-**Implementation summary:** Added complete agentic review loop — session state machine, 7 new CLI commands (url, open, comment, export, status, finish-self-review, wait), lock file server discovery, crloop view UI with "Finish Review" button, input validation, and SKILL.md.
+**Implementation summary:** Added complete agentic review loop — session state machine, 7 new CLI commands (url, open, comment, export, status, finish-self-review, wait), HTTP-probe-based server discovery, crloop view UI with "Finish Review" button, input validation, and SKILL.md.
 
 **Tasks completed:** 39
 **Tasks skipped:** 4 — see Skipped section above
@@ -146,7 +148,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ### MUST — Required before this work is considered done
 
-> No MUST items — all new endpoints are documented in `docs/api.md`, all new CLI commands are in schema and help, requirements are updated in `docs/requirements.md`, and tests cover the session store, session API endpoints, lock file CLI, and input validation.
+> No MUST items — all new endpoints are documented in `docs/api.md`, all new CLI commands are in schema and help, requirements are updated in `docs/requirements.md`, and tests cover the session store, session API endpoints, server discovery CLI, and input validation.
 
 ### SHOULD — Important but does not block shipping
 

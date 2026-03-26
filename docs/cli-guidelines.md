@@ -48,10 +48,9 @@ Commands resolve the server URL in this exact order — do not deviate:
 
 1. `--url` flag
 2. `CODE_REVIEW_URL` environment variable
-3. Lock file `~/.crloop/server.json` (written by `crloop serve`)
-4. Default `http://localhost:3000`
+3. Default `http://localhost:3000`
 
-The lock file contains `{ "port": 3000, "pid": 12345, "startedAt": "..." }`. Commands that read it should verify the PID is still alive before trusting the port. Fall back to the default silently if the file is absent — only `crloop url` should error on a missing/stale lock file.
+There is no lock file. Server liveness is detected by probing the HTTP endpoint (`GET /api/repos`). The `serve` command probes before spawning to ensure idempotency. The `url` command probes and exits 1 if the server is not responding.
 
 ---
 

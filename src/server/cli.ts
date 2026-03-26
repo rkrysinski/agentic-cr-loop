@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, cpSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { spawn, exec, execFile } from "node:child_process";
+import { spawn, exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { deriveRepoId, parseServerOptions } from "./args.js";
 import { logFatalError, runServer } from "./runServer.js";
@@ -62,67 +62,28 @@ async function checkForUpdate(): Promise<string | null> {
 }
 
 const DEFAULT_URL = "http://localhost:3000";
-const LOCK_DIR = join(homedir(), ".crloop");
-const LOCK_FILE = join(LOCK_DIR, "server.json");
+const DEFAULT_PORT = 3000;
 
-type LockFileData = { port: number; pid: number; startedAt: string };
-
-function writeLockFile(port: number, pid: number): void {
-  mkdirSync(LOCK_DIR, { recursive: true });
-  // Hide dotfile directory on Windows where dotfiles aren't hidden by default.
-  // Use execFile (no shell) to avoid metacharacter issues with homedir paths.
-  if (process.platform === "win32") {
-    execFile("attrib", ["+h", LOCK_DIR], () => {});
-  }
-  const data: LockFileData = { port, pid, startedAt: new Date().toISOString() };
-  writeFileSync(LOCK_FILE, JSON.stringify(data, null, 2) + "\n", "utf8");
-}
-
-function removeLockFile(): void {
+/** Probe a port to check if a crloop server is already responding. */
+async function probeRunningServer(port: number): Promise<boolean> {
   try {
-    unlinkSync(LOCK_FILE);
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-}
-
-function readLockFile(): LockFileData | null {
-  try {
-    if (!existsSync(LOCK_FILE)) return null;
-    const data = JSON.parse(readFileSync(LOCK_FILE, "utf8")) as LockFileData;
-    // Verify PID is alive
-    try {
-      process.kill(data.pid, 0);
-    } catch (error: unknown) {
-      // EPERM means the process exists but we lack permission (common on Windows) — treat as alive
-      if ((error as NodeJS.ErrnoException).code !== "EPERM") return null;
-    }
-    return data;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(`http://localhost:${port}/api/repos`, { signal: controller.signal });
+    clearTimeout(timer);
+    return response.ok;
   } catch {
-    return null;
+    return false;
   }
 }
 
-async function waitForDaemonStartup(child: ReturnType<typeof spawn>, port: number, timeoutMs = 5_000): Promise<LockFileData> {
-  let childExitCode: number | null = null;
-
-  child.once("exit", (code) => {
-    childExitCode = code;
-  });
-
+async function waitForDaemonStartup(port: number, timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const lock = readLockFile();
-    if (lock && lock.port === port && lock.pid === child.pid) {
-      return lock;
-    }
-    if (childExitCode !== null) {
-      throw new Error(`Server failed to start (daemon exited with code ${childExitCode}).`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (await probeRunningServer(port)) return;
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
-
-  throw new Error("Server failed to start before the startup timeout elapsed.");
+  throw new Error(`Server failed to start on port ${port} (no response within ${timeoutMs / 1000}s).`);
 }
 
 function resolveBaseUrl(args: string[]): string {
@@ -130,8 +91,6 @@ function resolveBaseUrl(args: string[]): string {
   if (explicit) return explicit;
   const envUrl = process.env["CODE_REVIEW_URL"];
   if (envUrl) return envUrl;
-  const lock = readLockFile();
-  if (lock) return `http://localhost:${lock.port}`;
   return DEFAULT_URL;
 }
 
@@ -251,17 +210,18 @@ async function cmdAddRepo(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const absolutePath = resolve(repoPath);
+
   if (dryRun) {
-    const derivedId = id ?? deriveRepoId(repoPath);
+    const derivedId = id ?? deriveRepoId(absolutePath);
     if (json) {
-      console.log(JSON.stringify({ dryRun: true, id: derivedId, path: repoPath }));
+      console.log(JSON.stringify({ dryRun: true, id: derivedId, path: absolutePath }));
     } else {
-      console.log(`Would register: ${derivedId} → ${repoPath}`);
+      console.log(`Would register: ${derivedId} → ${absolutePath}`);
     }
     return;
   }
-
-  const bodyPayload: { path: string; id?: string } = { path: repoPath };
+  const bodyPayload: { path: string; id?: string } = { path: absolutePath };
   if (id) bodyPayload.id = id;
 
   let result: { status: number; data: unknown };
@@ -292,7 +252,6 @@ async function cmdStopServer(args: string[]): Promise<void> {
   try {
     const response = await fetch(`${baseUrl}/api/server/stop`, { method: "POST" });
     if (response.status === 204) {
-      removeLockFile();
       if (json) {
         console.log(JSON.stringify({ stopped: true }));
       } else {
@@ -349,17 +308,19 @@ async function cmdRemoveRepo(args: string[]): Promise<void> {
   }
 }
 
-function cmdUrl(args: string[]): void {
+async function cmdUrl(args: string[]): Promise<void> {
   const json = hasFlag(args, "--json");
-  const lock = readLockFile();
-  if (!lock) {
-    console.error("No running server found (lock file missing or PID dead).");
+  const baseUrl = resolveBaseUrl(args);
+  // Extract port from the resolved URL
+  const port = Number(new URL(baseUrl).port) || DEFAULT_PORT;
+  if (!await probeRunningServer(port)) {
+    console.error("No running server found.");
     process.exit(1);
   }
   if (json) {
-    console.log(JSON.stringify({ url: `http://localhost:${lock.port}`, port: lock.port, pid: lock.pid }));
+    console.log(JSON.stringify({ url: baseUrl, port }));
   } else {
-    console.log(`http://localhost:${lock.port}`);
+    console.log(baseUrl);
   }
 }
 
@@ -806,9 +767,9 @@ function cmdSchema(args: string[]): void {
       args: [{ name: "command", required: false, description: "Command name to describe (omit for all)" }],
     },
     url: {
-      description: "Print the base URL of the running server (reads lock file, no network call)",
+      description: "Print the base URL of the running server (probes the server)",
       options: {
-        "--json": { type: "boolean", description: "Output JSON: {url, port, pid}" },
+        "--json": { type: "boolean", description: "Output JSON: {url, port}" },
       },
     },
     open: {
@@ -926,7 +887,7 @@ Server management:
   serve              Start the review server (default when no command given)
                        --foreground   Run in the current process with request logging (for debugging)
   stop-server        Stop the running server
-  url                Print the running server's base URL (reads lock file)
+  url                Print the running server's base URL
 
 Repository management:
   repos              List repos registered with the running server
@@ -955,10 +916,10 @@ Flags available on most commands:
   --json       Output machine-readable JSON instead of human text
   --dry-run    Preview action without executing it
   --repo       Target a specific repo (auto-detected from CWD if omitted)
-  --url        Server URL (auto-discovered from lock file if omitted)
+  --url        Server URL (defaults to http://localhost:3000)
 
 URL resolution order:
-  --url flag → CODE_REVIEW_URL env var → lock file (~/.crloop/server.json) → http://localhost:3000
+  --url flag → CODE_REVIEW_URL env var → http://localhost:3000
 
 Examples:
   crloop serve --repo /path/to/project
@@ -990,40 +951,31 @@ async function main(): Promise<void> {
     const argv = command === "serve" ? args.slice(1) : args;
     if (process.env["CRLOOP_DAEMON"] === "1") {
       // Running as daemon — start server and keep process alive
-      const port = await runServer({ argv });
-      writeLockFile(port, process.pid);
+      await runServer({ argv });
     } else {
       // Validate args in the foreground so errors surface before spawning
       const parsedOpts = parseServerOptions(argv);
-      // Idempotency: bail if a live server is already on the same port
-      const existing = readLockFile();
-      if (existing && existing.port === parsedOpts.port) {
-        console.log(`Server running (pid ${existing.pid}) on http://localhost:${existing.port}`);
+      // Idempotency: bail if a server is already responding on the target port
+      if (await probeRunningServer(parsedOpts.port)) {
+        console.log(`Server already running on http://localhost:${parsedOpts.port}`);
         return;
       }
 
       if (parsedOpts.foreground) {
         // Foreground mode — run server in current process with verbose logging
-        const port = await runServer({ argv, verbose: true });
-        writeLockFile(port, process.pid);
-        const cleanup = () => { removeLockFile(); process.exit(0); };
-        process.on("SIGINT", cleanup);
-        process.on("SIGTERM", cleanup);
-        // Ensure lock file removal on any exit (covers Windows where SIGTERM doesn't fire)
-        process.on("exit", () => { try { removeLockFile(); } catch { /* best-effort */ } });
+        await runServer({ argv, verbose: true });
       } else {
         // Spawn detached daemon and exit.
         // On Windows, `detached` creates a new process group (no POSIX signals).
         // Daemon shutdown is handled via the HTTP /api/server/stop endpoint.
-        const child = spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
+        spawn(process.execPath, [process.argv[1]!, "serve", ...argv], {
           detached: true,
           stdio: "ignore",
           env: { ...process.env, CRLOOP_DAEMON: "1" },
-        });
-        child.unref();
+        }).unref();
         try {
-          const lock = await waitForDaemonStartup(child, parsedOpts.port);
-          console.log(`Server running (pid ${lock.pid}) on http://localhost:${lock.port}`);
+          await waitForDaemonStartup(parsedOpts.port);
+          console.log(`Server running on http://localhost:${parsedOpts.port}`);
         } catch (error) {
           console.error((error as Error).message);
           process.exit(1);
@@ -1058,7 +1010,7 @@ async function main(): Promise<void> {
     const notice = await updateCheck;
     if (notice && !hasFlag(subArgs, "--json")) console.log(notice);
   } else if (command === "url") {
-    cmdUrl(args.slice(1));
+    await cmdUrl(args.slice(1));
   } else if (command === "open") {
     await cmdOpen(args.slice(1));
   } else if (command === "comment") {

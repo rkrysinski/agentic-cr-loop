@@ -15,12 +15,7 @@ Requires Node.js 18+ and `git` on PATH.
 
 The CLI is available as `crloop <command>` after global install, or `npx crloop <command>` without installing. See [distribution.md](./distribution.md) for install modes.
 
-All commands except `serve` and `url` assume a review tool server is already running. Commands discover the server URL via:
-
-- **Currently:** `--url` flag, falling back to `http://localhost:3000`
-- **Planned:** `--url` → `CODE_REVIEW_URL` env var → lock file `~/.crloop/server.json` → default `http://localhost:3000`
-
-The full resolution chain will be implemented alongside the lock file in the `serve` / `stop-server` completion work.
+All commands except `serve` assume a review tool server is already running. Commands discover the server URL via: `--url` flag → `CODE_REVIEW_URL` env var → default `http://localhost:3000`.
 
 Global meta-flags (not subcommands):
 
@@ -37,9 +32,9 @@ crloop --version | -v    Print installed version
 | `add-repo` | ✅ Implemented | |
 | `remove-repo` | ✅ Implemented | |
 | `schema` | ✅ Implemented | Updated with all agentic commands |
-| `serve` | ✅ Implemented | Idempotent; lock file written after successful bind |
-| `stop-server` | ✅ Implemented | Lock file removal on stop |
-| `url` | ✅ Implemented | Reads lock file, verifies PID |
+| `serve` | ✅ Implemented | Idempotent; probes port before spawning |
+| `stop-server` | ✅ Implemented | |
+| `url` | ✅ Implemented | Probes server, exits 1 if not responding |
 | `open` | ✅ Implemented | Opens `/crloop/<repoId>` view cross-platform |
 | `comment` | ✅ Implemented | Single + bulk (`--from-file`) + `--dry-run` |
 | `export` | ✅ Implemented | Plain text to stdout, `--file` filter |
@@ -105,7 +100,7 @@ crloop schema [command]
 
 Start the review server. Default command when no subcommand is given. Spawns a detached daemon and exits.
 
-**Idempotent:** if a live server is already running on the same port (detected via lock file PID check), prints `Server running (pid X) on http://localhost:PORT` and exits 0 without spawning a second daemon.
+**Idempotent:** if a server is already responding on the target port (detected via HTTP probe), prints `Server already running on http://localhost:PORT` and exits 0 without spawning a second daemon.
 
 ```
 crloop serve [--repo <path>] [--repo name:<path>] [--port 3000]
@@ -130,7 +125,7 @@ Stop the running server.
 crloop stop-server [--url URL] [--json]
 ```
 
-Outputs `Server stopped.` or `{"stopped": true}` with `--json`. Removes `~/.crloop/server.json` on success.
+Outputs `Server stopped.` or `{"stopped": true}` with `--json`.
 
 ---
 
@@ -140,7 +135,7 @@ Repo-targeting commands (`open`, `comment`, `finish-self-review`, `wait`, `expor
 
 ### `crloop url`
 
-Print the base URL of the running server. Reads the lock file — no network call.
+Print the base URL of the running server. Probes the server to verify it is responding.
 
 ```
 crloop url [--json]
@@ -151,9 +146,9 @@ Output:
 http://localhost:3000
 ```
 
-With `--json`: `{"url": "http://localhost:3000", "port": 3000, "pid": 1234}`.
+With `--json`: `{"url": "http://localhost:3000", "port": 3000}`.
 
-Exits with code 1 if the lock file does not exist or the server process is no longer running. Used by agents and scripts to discover the server URL without hardcoding the port.
+Exits with code 1 if the server is not responding. Used by agents and scripts to discover the server URL.
 
 ### `crloop open`
 
@@ -163,7 +158,7 @@ Open the review UI in the default browser, pointing at the correct repo.
 crloop open [--repo <repoId>] [--url URL]
 ```
 
-Reads the server URL from the lock file (or `--url`). If `--repo` is omitted, matches the current working directory against registered repos via `GET /api/repos`. Opens the browser cross-platform (`open` on macOS, `xdg-open` on Linux, `start` on Windows). Validates that the server is reachable before opening.
+Resolves the server URL (via `--url` or default). If `--repo` is omitted, matches the current working directory against registered repos via `GET /api/repos`. Opens the browser cross-platform (`open` on macOS, `xdg-open` on Linux, `start` on Windows). Validates that the server is reachable before opening.
 
 Opens `http://localhost:<port>/crloop/<repoId>` — the **crloop view** (see [crloop View UI](#crloop-view-ui) below). This is distinct from the root `http://localhost:<port>` which shows the standard UI unchanged.
 
@@ -315,26 +310,19 @@ When `crloopRepoId` is null (standard view), behavior is unchanged.
 ### Entry Point: `src/server/cli.ts`
 
 Existing file. Parses `process.argv` to dispatch to the correct command handler. Each command is a function that:
-1. Resolves the server URL (`--url` → `CODE_REVIEW_URL` → lock file → default)
+1. Resolves the server URL (`--url` → `CODE_REVIEW_URL` → default)
 2. Makes HTTP request(s) to the running server
 3. Formats and prints output
 4. Sets exit code
 
 The file starts with `#!/usr/bin/env node` for npm bin linking.
 
-### Lock File: `~/.crloop/server.json`
+### Server Idempotency (HTTP Probing)
 
-`crloop serve` writes a lock file after the daemon successfully binds the port; `crloop stop-server` removes it. Before spawning, `serve` reads the lock file and checks whether the recorded PID is still alive — if so it prints `Server running` and exits 0 without spawning a second process. This allows any subsequent command to discover the server URL without `--url`.
-
-```json
-{
-  "port": 3000,
-  "pid": 12345,
-  "startedAt": "2026-03-22T10:00:00.000Z"
-}
+`crloop serve` probes the target port before spawning a daemon. If a server is already responding (detected via `GET /api/repos`), it prints `Server already running` and exits 0 without spawning a second process. No lock file is used — liveness is always determined by HTTP probe.
 ```
 
-`crloop url` reads this file and verifies the PID is still alive before reporting the URL. All other commands use the same resolution logic but fall back to the default port rather than erroring if the file is absent.
+The `crloop url` command probes the server and exits 1 if it is not responding. Other commands use the same URL resolution chain but do not probe before making their API calls.
 
 ### Repo Auto-Detection
 
@@ -399,7 +387,7 @@ Validation errors print a clear message and exit with code 1 without making any 
 ### Runtime: tsc-compiled Node.js
 
 The CLI is compiled by the existing `tsc -p tsconfig.server.json` alongside the server code. Uses only Node.js built-ins:
-- `node:fs`, `node:path`, `node:child_process`, `node:url` for serve/daemonization and lock file
+- `node:fs`, `node:path`, `node:child_process`, `node:url` for serve/daemonization
 - Global `fetch()` for HTTP calls (Node.js 18+)
 - No additional dependencies
 
@@ -475,7 +463,7 @@ sequenceDiagram
 
     Agent->>CLI: crloop serve (if not running)
     CLI->>Server: start daemon
-    Note over CLI: writes ~/.crloop/server.json
+    Note over CLI: daemon starts, binds port
 
     Agent->>CLI: crloop add-repo . (if not registered)
     CLI->>Server: POST /api/repos

@@ -59,7 +59,7 @@ npm link crloop
 ```bash
 which crloop                                # must return a path
 crloop --version                            # must match the version in package.json
-crloop serve --repo /tmp/crloop-smoke       # starts in background, prints pid; must exit 0
+crloop serve --repo /tmp/crloop-smoke       # starts in background; must exit 0
 crloop stop-server                          # must print "Server stopped." and exit 0
 crloop skill --install --dry-run            # must print "[dry-run]..." and exit 0 — verifies skill/crloop/ ships in tarball
 ```

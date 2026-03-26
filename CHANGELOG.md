@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed — Replace lock file with HTTP probing
+
+- **Breaking:** `crloop serve` no longer writes `~/.crloop/server.json`. Server liveness is detected by probing the HTTP endpoint instead. The `serve` command is now idempotent even when the lock file was previously missing (e.g. after a crash).
+- **Breaking:** `crloop url --json` output no longer includes a `pid` field (was `{url, port, pid}`, now `{url, port}`).
+- `crloop stop-server` no longer removes a lock file on shutdown.
+- `crloop serve --foreground` no longer writes or cleans up a lock file.
+- `crloop url` now probes the server to verify liveness instead of reading a lock file.
+
 ## [0.2.3] — 2026-03-25
 
 ### Added — Session reset
@@ -15,7 +25,7 @@
 
 ### Added — Foreground / debug mode
 
-- `crloop serve --foreground` — runs the server in the current process instead of spawning a background daemon; logs every HTTP request to stdout (`METHOD /url STATUS DURATIONms`); cleans up the lock file on Ctrl-C / SIGTERM. Intended for diagnosing issues on client machines.
+- `crloop serve --foreground` — runs the server in the current process instead of spawning a background daemon; logs every HTTP request to stdout (`METHOD /url STATUS DURATIONms`). Intended for diagnosing issues on client machines.
 
 ## [0.2.1] — 2026-03-23
 
@@ -35,8 +45,8 @@ Complete agent-human review loop supporting AI agents that self-review, post com
 - Persisted to `.local-code-review/session.json` inside the reviewed repository
 - API endpoints: `GET /api/repos/:repoId/session`, `POST /api/repos/:repoId/session/transition`
 
-**New CLI commands** (all new commands support `--repo` for multi-repo targeting and `--url`/env/lock-file URL resolution):
-- `crloop url` — prints the running server's base URL from the lock file without a network call
+**New CLI commands** (all new commands support `--repo` for multi-repo targeting and `--url`/env URL resolution):
+- `crloop url` — prints the running server's base URL by probing the server
 - `crloop open` — opens the crloop review view in the default browser
 - `crloop comment` — adds a comment to a changed line; supports `--from-file` for bulk import and `--dry-run`
 - `crloop export` — prints comments as plain text to stdout (skips outdated by default); supports `--file` filter and `--include-outdated`
@@ -44,10 +54,9 @@ Complete agent-human review loop supporting AI agents that self-review, post com
 - `crloop finish-self-review` — transitions session from `agent-review` to `human-review`; supports `--dry-run`
 - `crloop wait` — blocks and polls until session transitions to `agent-addressing` (exit 0) or `complete` (exit 2)
 
-**Lock file** (`~/.crloop/server.json`):
-- `crloop serve` writes `{ port, pid, startedAt }` only after the daemon successfully binds the port; running `serve` again on the same port is idempotent — it detects the live process via the lock file and exits 0 with `Server running` instead of spawning a second daemon
-- `crloop stop-server` removes it on shutdown
-- URL resolution chain: `--url` → `CODE_REVIEW_URL` env var → lock file → `http://localhost:3000`
+**Server idempotency:**
+- `crloop serve` probes the target port before spawning — if a server is already responding, it exits 0 with `Server already running` instead of spawning a second daemon
+- URL resolution chain: `--url` → `CODE_REVIEW_URL` env var → `http://localhost:3000`
 
 **crloop View UI** (`/crloop/<repoId>`):
 - Same diff/comment functionality as the standard UI

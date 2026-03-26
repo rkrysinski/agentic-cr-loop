@@ -36,24 +36,18 @@ _start_cli_server() {
   lsof -ti:"$CLI_PORT" | xargs kill -9 2>/dev/null || true
   local logfile="$TMP/qa-cli-bats-server.log"
   crloop serve "$@" --port "$CLI_PORT" > "$logfile" 2>&1
-  CLI_SERVER_PID="$(grep -oE 'pid [0-9]+' "$logfile" | grep -oE '[0-9]+' || true)"
-  local waited=0
-  while ! curl -sf "$CLI_BASE/api/repos" > /dev/null 2>&1; do
-    sleep 0.3; waited=$((waited + 1))
-    if [ "$waited" -gt 30 ]; then
-      echo "Server did not start within 9s:" >&2
-      cat "$logfile" >&2
-      return 1
-    fi
-  done
+  # Server is ready when serve exits — waitForDaemonStartup probes the port
+  if ! curl -sf "$CLI_BASE/api/repos" > /dev/null 2>&1; then
+    echo "Server did not start:" >&2
+    cat "$logfile" >&2
+    return 1
+  fi
 }
 
 _stop_cli_server() {
-  if [ -n "${CLI_SERVER_PID:-}" ] && kill -0 "$CLI_SERVER_PID" 2>/dev/null; then
-    kill "$CLI_SERVER_PID" 2>/dev/null || true
-    wait "$CLI_SERVER_PID" 2>/dev/null || true
-  fi
-  CLI_SERVER_PID=""
+  # Stop via HTTP endpoint, then force-kill anything still on the port
+  curl -sf -X POST "$CLI_BASE/api/server/stop" > /dev/null 2>&1 || true
+  sleep 0.3
   lsof -ti:"$CLI_PORT" | xargs kill -9 2>/dev/null || true
 }
 
@@ -425,7 +419,7 @@ teardown_file() {
   [ "$status" -eq 0 ]
   echo "$output" > "$OUT"
   node -e "const r=JSON.parse(require('fs').readFileSync('$OUT','utf8')); if(r.stopped!==true) throw new Error('stopped not true')"
-  CLI_SERVER_PID=""
+
 }
 
 @test "cli-5, sec 5b: server is unreachable after stop-server, returns 'Connection failed'" {
@@ -435,7 +429,7 @@ teardown_file() {
   run crloop repos --url "$CLI_BASE"
   [ "$status" -ne 0 ]
   [[ "$output" == *"Connection failed"* ]]
-  CLI_SERVER_PID=""
+
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -474,57 +468,40 @@ teardown_file() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
-# cli-6: Lock file and crloop url (FR-57, FR-59, FR-60)
+# cli-6: Server idempotency and crloop url (FR-57, FR-59, FR-60)
 # ═════════════════════════════════════════════════════════════════════════════
 
-@test "cli-6: serve writes ~/.crloop/server.json with port and pid fields" {
-  rm -f "$HOME/.crloop/server.json"
+@test "cli-6: serve is idempotent — second call detects running server and exits 0" {
   _start_cli_server --repo "a:$REPO_A"
-  [ -f "$HOME/.crloop/server.json" ]
-  node -e "
-    const d=JSON.parse(require('fs').readFileSync('$HOME/.crloop/server.json','utf8'));
-    if(!d.port) throw new Error('missing port');
-    if(!d.pid)  throw new Error('missing pid');
-  "
+  run crloop serve --repo "a:$REPO_A" --port "$CLI_PORT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"already running"* ]]
   _stop_cli_server
 }
 
-@test "cli-6: crloop url reads lock file and prints http://localhost:<port>" {
-  rm -f "$HOME/.crloop/server.json"
+@test "cli-6: crloop url prints http://localhost:<port> when server is running" {
   _start_cli_server --repo "a:$REPO_A"
-  run crloop url
+  run crloop url --url "$CLI_BASE"
   [ "$status" -eq 0 ]
   [[ "$output" == *"localhost:$CLI_PORT"* ]]
   _stop_cli_server
 }
 
-@test "cli-6: crloop url --json outputs {url, port, pid}" {
-  rm -f "$HOME/.crloop/server.json"
+@test "cli-6: crloop url --json outputs {url, port}" {
   _start_cli_server --repo "a:$REPO_A"
-  run crloop url --json
+  run crloop url --url "$CLI_BASE" --json
   [ "$status" -eq 0 ]
   echo "$output" > "$OUT"
   node -e "
     const r=JSON.parse(require('fs').readFileSync('$OUT','utf8'));
     if(!r.url) throw new Error('missing url');
     if(!r.port) throw new Error('missing port');
-    if(!r.pid)  throw new Error('missing pid');
   "
   _stop_cli_server
 }
 
-@test "cli-6: stop-server removes ~/.crloop/server.json" {
-  rm -f "$HOME/.crloop/server.json"
-  _start_cli_server --repo "a:$REPO_A"
-  crloop stop-server --url "$CLI_BASE" > /dev/null
-  CLI_SERVER_PID=""
-  sleep 0.3
-  [ ! -f "$HOME/.crloop/server.json" ]
-}
-
-@test "cli-6: crloop url exits 1 when lock file is absent" {
-  rm -f "$HOME/.crloop/server.json"
-  run crloop url
+@test "cli-6: crloop url exits 1 when no server is running" {
+  run crloop url --url "http://localhost:19999"
   [ "$status" -ne 0 ]
 }
 
