@@ -93,7 +93,7 @@ Design reference: [design-skill-cli.md](./design-skill-cli.md)
 
 ### CLI command: `crloop wait`
 
-- [x] `src/server/cli.ts` — Add `cmdWait(args)`: resolves base URL and repoId, polls `GET /api/repos/:repoId/session` every `--poll-interval` seconds (default 3); exits 0 on `agent-addressing`, exits 2 on `complete`
+- [x] `src/server/cli.ts` — Add `cmdWait(args)`: resolves base URL and repoId, polls `GET /api/repos/:repoId/session` every `--poll-interval` seconds (default 1); exits 0 on `agent-addressing`, exits 2 on `complete`
 - [x] `src/server/cli.ts` — Register `"wait"` case in `main()` dispatch
 
 ### CLI schema and help updates

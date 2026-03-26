@@ -228,7 +228,7 @@ Requires `POST /api/repos/:repoId/session/transition` — not yet implemented (s
 Block until the human finishes review.
 
 ```
-crloop wait [--repo <repoId>] [--url URL] [--poll-interval 3]
+crloop wait [--repo <repoId>] [--url URL] [--poll-interval 1]
 ```
 
 Polls `GET /api/repos/:repoId/session` every N seconds. Exits when status changes to `agent-addressing` or `complete`. Exit code 0 if `agent-addressing` (feedback to address), exit code 2 if `complete` (no comments, done).

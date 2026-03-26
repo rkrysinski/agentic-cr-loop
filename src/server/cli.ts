@@ -601,7 +601,7 @@ async function cmdReset(args: string[]): Promise<void> {
 async function cmdWait(args: string[]): Promise<void> {
   const baseUrl = resolveBaseUrl(args);
   const repoId = await resolveRepoId(args, baseUrl);
-  const interval = Number(getFlag(args, "--poll-interval") ?? "3") * 1000;
+  const interval = Number(getFlag(args, "--poll-interval") ?? "1") * 1000;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -837,7 +837,7 @@ function cmdSchema(args: string[]): void {
       options: {
         "--repo": { type: "string", description: "Target repo ID" },
         "--url": { type: "string", description: "Server URL" },
-        "--poll-interval": { type: "number", default: 3, description: "Polling interval in seconds" },
+        "--poll-interval": { type: "number", default: 1, description: "Polling interval in seconds" },
       },
     },
     skill: {
