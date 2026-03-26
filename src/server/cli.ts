@@ -68,7 +68,7 @@ const DEFAULT_PORT = 3000;
 async function probeRunningServer(port: number): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2000);
+    const timer = setTimeout(() => controller.abort(), 500);
     const response = await fetch(`http://localhost:${port}/api/repos`, { signal: controller.signal });
     clearTimeout(timer);
     return response.ok;
@@ -81,7 +81,7 @@ async function waitForDaemonStartup(port: number, timeoutMs = 5_000): Promise<vo
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await probeRunningServer(port)) return;
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`Server failed to start on port ${port} (no response within ${timeoutMs / 1000}s).`);
 }
