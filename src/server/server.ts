@@ -316,7 +316,7 @@ export async function startServer(
     const clientDir = resolveClientDistDirectory(import.meta.url);
     app.use(express.static(clientDir));
     app.get("/{*path}", (_request, response) => {
-      response.sendFile(path.join(clientDir, "index.html"));
+      response.sendFile("index.html", { root: clientDir });
     });
   }
 
