@@ -93,10 +93,12 @@ Only comment on real issues. If you have nothing to flag, post zero comments and
 ```bash
 npx crloop finish-self-review    # transitions agent-review → human-review
 npx crloop open                  # open the UI first so the human sees the review before you block
-npx crloop wait                  # blocks, polling every 3s
+npx crloop wait                  # blocks, polling every 1s — use timeout 600000 (max 10 min)
 # Exit 0 → human left feedback — continue to Step 4
 # Exit 2 → human approved with no comments — review is complete, stop here
 ```
+
+**Timeout handling:** The Bash tool has a hard 10-minute ceiling. Run `crloop wait` with `timeout: 600000`. If the command times out (human hasn't finished yet), **re-run `crloop wait` exactly once more** with the same timeout. Two attempts give the human up to ~20 minutes total. If it times out a second time, stop and tell the human you're still waiting for them to finish the review in the browser.
 
 `crloop open` launches `http://localhost:<port>/crloop/<repoId>` — a focused view with a "Finish Review" button. When the human clicks it, `crloop wait` unblocks. **Always act on the exit code** to determine whether to continue or stop.
 
@@ -150,7 +152,7 @@ npx crloop export [--file <path>]                  # read all comments as plain 
 npx crloop finish-self-review [--dry-run]          # agent-review → human-review
 npx crloop finish-addressing [--dry-run]           # agent-addressing → agent-review
 npx crloop open                                    # open review UI in browser
-npx crloop wait                                    # block until human finishes (exit 0 or 2)
+npx crloop wait                                    # block until human finishes (exit 0 or 2) — use timeout 600000, retry once on timeout
 ```
 
 All repo-targeting commands accept `--repo <id>` to override CWD-based auto-detection.
