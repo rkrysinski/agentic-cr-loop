@@ -209,7 +209,7 @@ export class ReviewService {
       .split("\0")
       .filter((entry) => entry.startsWith("?? "))
       .map((entry) => entry.slice(3))
-      .filter((relativePath) => !isInternalReviewPath(relativePath));
+      .filter((relativePath) => !isInternalReviewPath(relativePath) && !relativePath.endsWith("/"));
 
     return Promise.all(
       untrackedPaths.map(async (relativePath) => {

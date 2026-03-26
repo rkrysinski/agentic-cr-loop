@@ -303,9 +303,12 @@ export async function startServer(
 
   app.use("/api/repos/:repoId", repoRouter);
 
-  app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
+  app.use((error: unknown, request: express.Request, response: express.Response, _next: express.NextFunction) => {
     const status = error instanceof ClientError ? 400 : 500;
     const message = error instanceof Error ? error.message : "Internal server error";
+    if (status === 500) {
+      console.error(`[ERROR] ${request.method} ${request.url}:`, error);
+    }
     response.status(status).json({ error: message });
   });
 
