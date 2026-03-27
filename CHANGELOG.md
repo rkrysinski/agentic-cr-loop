@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.4] — 2026-03-27
 
 ### Added — Stdin bulk comment input
 
