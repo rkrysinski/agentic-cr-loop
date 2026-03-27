@@ -250,13 +250,24 @@ crloop comment \
   --body "Extract this into a helper function"
 ```
 
-Bulk import from a JSON file (preferred when the agent has multiple findings):
+Bulk import from stdin (preferred when the agent has multiple findings — avoids temp files and Write tool permission issues):
+
+```bash
+crloop comment --from-stdin <<'EOF'
+[
+  { "file": "src/server/server.ts", "side": "new", "line": 42, "body": "Extract this into a helper function" },
+  { "file": "src/server/server.ts", "side": "new", "line": 55, "body": "Add error handling here" }
+]
+EOF
+```
+
+Bulk import from a JSON file:
 
 ```bash
 crloop comment --from-file findings.json
 ```
 
-JSON file format:
+JSON format (used by both `--from-stdin` and `--from-file`):
 
 ```json
 [
@@ -300,8 +311,10 @@ crloop serve --repo /path/to/project
 # Register if not already registered
 crloop add-repo /path/to/project
 
-# Post findings (from inside the project directory — repo is auto-detected)
-crloop comment --from-file findings.json
+# Post findings via stdin (from inside the project directory — repo is auto-detected)
+crloop comment --from-stdin <<'EOF'
+[{"file": "src/app.ts", "side": "new", "line": 10, "body": "Consider extracting this logic"}]
+EOF
 
 # Hand off to the human
 crloop finish-self-review

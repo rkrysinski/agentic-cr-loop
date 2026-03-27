@@ -36,7 +36,7 @@ crloop --version | -v    Print installed version
 | `stop-server` | ✅ Implemented | |
 | `url` | ✅ Implemented | Probes server, exits 1 if not responding |
 | `open` | ✅ Implemented | Opens `/crloop/<repoId>` view cross-platform |
-| `comment` | ✅ Implemented | Single + bulk (`--from-file`) + `--dry-run` |
+| `comment` | ✅ Implemented | Single + bulk (`--from-file` / `--from-stdin`) + `--dry-run` |
 | `export` | ✅ Implemented | Plain text to stdout, `--file` filter |
 | `status` | ✅ Implemented | Human-readable + `--json` |
 | `finish-self-review` | ✅ Implemented | Transitions to `human-review`, `--dry-run` |
@@ -208,6 +208,16 @@ The JSON file format:
 ```
 
 The command resolves each `file` to a `changeId`, then calls `POST /api/repos/:repoId/comments` for each entry. Reports success/failure per comment.
+
+### `crloop comment --from-stdin`
+
+Bulk-import comments from stdin. Preferred over `--from-file` in agentic workflows — avoids temp files and Write tool permission issues.
+
+```
+crloop comment --from-stdin [--repo <repoId>] [--url URL] [--dry-run]
+```
+
+Uses the same JSON format as `--from-file`. Reads stdin synchronously via fd 0. Mutually exclusive with `--from-file`.
 
 ### `crloop finish-self-review`
 
@@ -477,7 +487,7 @@ sequenceDiagram
 
     Note over Agent: git diff, git status,<br/>reads files natively,<br/>applies user instructions
 
-    Agent->>CLI: crloop comment --from-file /tmp/findings.json
+    Agent->>CLI: crloop comment --from-stdin
     CLI->>Server: POST /api/repos/:id/comments (per comment)
     Server-->>CLI: 201
     CLI-->>Agent: "N created, 0 failed"

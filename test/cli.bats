@@ -684,3 +684,18 @@ teardown_file() {
   [[ "$status" -eq 0 || "$status" -eq 1 ]]
   _stop_cli_server
 }
+
+@test "cli-8: comment --from-stdin posts comments and --from-stdin + --from-file is rejected" {
+  _start_cli_server --repo "a:$REPO_A"
+
+  # mutual exclusion: --from-file and --from-stdin together must fail
+  run crloop comment --url "$CLI_BASE" --repo a --from-file /dev/null --from-stdin
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+
+  # --from-stdin with valid JSON posts comments (dry-run to avoid needing real changeIds)
+  run bash -c 'echo '\''[{"file":"README.md","side":"new","line":1,"body":"stdin test"}]'\'' | crloop comment --url "'"$CLI_BASE"'" --repo a --from-stdin --dry-run'
+  [ "$status" -eq 0 ]
+
+  _stop_cli_server
+}

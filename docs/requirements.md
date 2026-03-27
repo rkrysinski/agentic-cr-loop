@@ -89,7 +89,7 @@ A local code review tool for reviewing changes in Git working directories. The s
 - **FR-52**: The CLI MUST provide a `status` command that prints the current session state, iteration number, and comment counts.
 - **FR-53**: The CLI MUST provide a `finish-self-review` command that transitions the session from `agent-review` to `human-review`, with `--dry-run` support.
 - **FR-54**: The CLI MUST provide a `wait` command that blocks (polls) until the session transitions to `agent-addressing` (exit 0) or `complete` (exit 2).
-- **FR-55**: The CLI MUST provide a `comment` command that adds a comment to a changed line, supporting single-comment mode (`--file`, `--side`, `--line`, `--body`) and bulk mode (`--from-file`), with `--dry-run` support.
+- **FR-55**: The CLI MUST provide a `comment` command that adds a comment to a changed line, supporting single-comment mode (`--file`, `--side`, `--line`, `--body`) and bulk mode (`--from-file` or `--from-stdin`), with `--dry-run` support. `--from-file` and `--from-stdin` are mutually exclusive.
 - **FR-56**: The CLI MUST provide an `export` command that prints comments as plain text to stdout, with `--file` filter support. Outdated comments MUST be excluded by default; the `--include-outdated` flag MUST include them.
 - **FR-57**: The CLI MUST provide a `url` command that probes the running server and prints its base URL.
 - **FR-58**: The CLI MUST provide an `open` command that opens the crloop review view in the default browser.

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added — Stdin bulk comment input
+
+- `crloop comment --from-stdin` — read JSON comment array from stdin, eliminating the need for a temporary file. Mutually exclusive with `--from-file`.
+
 ### Changed — Replace lock file with HTTP probing
 
 - **Breaking:** `crloop serve` no longer writes `~/.crloop/server.json`. Server liveness is detected by probing the HTTP endpoint instead. The `serve` command is now idempotent even when the lock file was previously missing (e.g. after a crash).

@@ -344,10 +344,16 @@ async function cmdOpen(args: string[]): Promise<void> {
 async function cmdComment(args: string[]): Promise<void> {
   const dryRun = hasFlag(args, "--dry-run");
   const fromFile = getFlag(args, "--from-file");
+  const fromStdin = hasFlag(args, "--from-stdin");
+
+  if (fromFile && fromStdin) {
+    console.error("Error: --from-file and --from-stdin are mutually exclusive");
+    process.exit(1);
+  }
 
   // Validate single-comment inputs early (before any network calls)
   let singleComment: { filePath: string; side: "new" | "old"; line: number; body: string } | null = null;
-  if (!fromFile) {
+  if (!fromFile && !fromStdin) {
     const file = getFlag(args, "--file");
     const sideRaw = getFlag(args, "--side");
     const lineRaw = getFlag(args, "--line");
@@ -356,6 +362,7 @@ async function cmdComment(args: string[]): Promise<void> {
     if (!file || !sideRaw || !lineRaw || !body) {
       console.error("Usage: crloop comment --file <path> --side <new|old> --line <number> --body <text>");
       console.error("       crloop comment --from-file <path>");
+      console.error("       crloop comment --from-stdin [--repo <repoId>] [--url URL] [--dry-run]");
       process.exit(1);
     }
 
@@ -379,9 +386,9 @@ async function cmdComment(args: string[]): Promise<void> {
     return match?.changeId ?? null;
   }
 
-  if (fromFile) {
+  if (fromFile || fromStdin) {
     // Bulk mode
-    const content = readFileSync(fromFile, "utf8");
+    const content = fromFile ? readFileSync(fromFile, "utf8") : readFileSync(0, "utf8");
     const entries = JSON.parse(content) as Array<{ file: string; side: string; line: number; body: string }>;
     let created = 0;
     let failed = 0;
@@ -787,6 +794,7 @@ function cmdSchema(args: string[]): void {
         "--line": { type: "number", description: "Line number (positive integer)" },
         "--body": { type: "string", description: "Comment body text" },
         "--from-file": { type: "string", description: "Path to JSON file with array of comments for bulk import" },
+        "--from-stdin": { type: "boolean", description: "Read JSON comment array from stdin" },
         "--repo": { type: "string", description: "Target repo ID" },
         "--url": { type: "string", description: "Server URL" },
         "--dry-run": { type: "boolean", description: "Validate without creating comments" },
@@ -874,6 +882,7 @@ Usage:
   crloop open [--repo <repoId>] [--url URL]
   crloop comment --file <path> --side <new|old> --line <n> --body <text> [--repo <repoId>] [--url URL] [--dry-run]
   crloop comment --from-file <path> [--repo <repoId>] [--url URL] [--dry-run]
+  crloop comment --from-stdin [--repo <repoId>] [--url URL] [--dry-run]
   crloop export [--repo <repoId>] [--url URL] [--file <path>]
   crloop status [--repo <repoId>] [--url URL] [--json]
   crloop finish-self-review [--repo <repoId>] [--url URL] [--dry-run]

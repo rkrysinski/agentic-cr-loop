@@ -22,7 +22,7 @@ Each pass through is one iteration. You never decide to end the loop — only th
 
 | State | What you do |
 |---|---|
-| `agent-review` | Read the diff natively, write findings to `/tmp/findings.json`, post them, call `finish-self-review` |
+| `agent-review` | Read the diff natively, post findings via `--from-stdin`, call `finish-self-review` |
 | `human-review` | Open the browser, call `crloop wait`, block until the human is done |
 | `agent-addressing` | Read feedback with `crloop export`, fix the code, call `finish-addressing` |
 | `complete` | Loop ends — `crloop wait` exits 2 |
@@ -60,27 +60,30 @@ git diff
 
 Read any changed files as needed. For review criteria, confidence scoring, and what to look for, read **[`references/code-review.md`](references/code-review.md)** (confidence scale 0–100, review categories, and output format) before forming your findings. Apply the user's review instructions (focus areas, exclusions, tone) on top of those guidelines — user instructions override or narrow the defaults.
 
-**Only include findings with confidence ≥ 80.** Filter before writing to `findings.json` — low-confidence guesses create noise for the human reviewer.
+**Only include findings with confidence ≥ 80.** Filter before posting — low-confidence guesses create noise for the human reviewer.
 
-Then write all your findings to `/tmp/findings.json` — use `/tmp`, not anywhere inside the reviewed repo (avoids accidentally dirtying or committing the working tree):
+Do NOT use the Write tool or `--from-file` — always pipe findings via stdin to avoid file permission issues and temp file clutter.
 
-```json
+`side` maps to diff markers: use `new` for `+` lines (additions), `old` for `-` lines (deletions). The line number must match the corresponding file — new-side lines use the new file's line numbers, old-side lines use the old file's. Getting these wrong anchors the comment to the wrong position.
+
+Post the findings via stdin using a heredoc:
+
+```bash
+# Validate before posting — badly anchored comments confuse the reviewer and can't be corrected after posting
+npx crloop comment --dry-run --from-stdin <<'FINDINGS_EOF'
 [
   { "file": "src/auth.ts",  "side": "new", "line": 42, "body": "Missing input validation — this accepts empty string" },
   { "file": "src/utils.ts", "side": "new", "line": 17, "body": "This will throw on null; add a null check" }
 ]
-```
-
-`side` maps to diff markers: use `new` for `+` lines (additions), `old` for `-` lines (deletions). The line number must match the corresponding file — new-side lines use the new file's line numbers, old-side lines use the old file's. Getting these wrong anchors the comment to the wrong position.
-
-Post the findings:
-
-```bash
-# Validate before posting — badly anchored comments confuse the reviewer and can't be corrected after posting
-npx crloop comment --dry-run --from-file /tmp/findings.json
+FINDINGS_EOF
 
 # Post for real
-npx crloop comment --from-file /tmp/findings.json
+npx crloop comment --from-stdin <<'FINDINGS_EOF'
+[
+  { "file": "src/auth.ts",  "side": "new", "line": 42, "body": "Missing input validation — this accepts empty string" },
+  { "file": "src/utils.ts", "side": "new", "line": 17, "body": "This will throw on null; add a null check" }
+]
+FINDINGS_EOF
 # Output: "N created, 0 failed" — if failed > 0, fix the offending entries before continuing
 ```
 
@@ -125,7 +128,7 @@ Then loop back to Step 2 for the next self-review iteration.
 
 ## Handling edge cases
 
-**If `crloop comment` reports failed > 0:** The failed entries had invalid file paths, bad line numbers, or `--side` values that don't match the diff. Fix them in `/tmp/findings.json` and re-run.
+**If `crloop comment` reports failed > 0:** The failed entries had invalid file paths, bad line numbers, or `--side` values that don't match the diff. Fix the entries and re-run with `--from-stdin`.
 
 **If `crloop export` shows no comments after a `wait` exit 0:** The human may have dismissed all comments before clicking "Finish Review". Treat this as approval — call `finish-addressing` to close the iteration, do one final self-review with no findings, hand off, and wait for exit 2.
 
@@ -146,7 +149,8 @@ npx crloop add-repo <path> [--id <id>] [--json]   # register repo
 npx crloop remove-repo <id>                        # unregister repo
 npx crloop reset [--dry-run]                       # reset session to agent-review (iterations)
 npx crloop status [--json]                         # session state, iteration, comment counts
-npx crloop comment --from-file <path> [--dry-run] # bulk post findings (preferred)
+npx crloop comment --from-stdin [--dry-run]       # bulk post findings via stdin (preferred)
+npx crloop comment --from-file <path> [--dry-run] # bulk post findings from file
 npx crloop comment --file <f> --side new|old --line <n> --body "<text>"  # single comment
 npx crloop export [--file <path>]                  # read all comments as plain text
 npx crloop finish-self-review [--dry-run]          # agent-review → human-review

@@ -152,7 +152,7 @@ Each section of the CLI verification is a separate `@test` block (e.g. `cli-5, s
 | FR-52 | CLI `status` command | cli-7 | `test/cli.bats` — cli-7 |
 | FR-53 | CLI `finish-self-review` command | cli-7 | `test/cli.bats` — cli-7 |
 | FR-54 | CLI `wait` command | — | `src/server/server.test.ts` — session transition endpoint; no blocking integration test (skipped per impl-plan) |
-| FR-55 | CLI `comment` command | cli-7 | `test/cli.bats` — cli-7 (`--dry-run`); `src/server/server.test.ts` — POST comments |
+| FR-55 | CLI `comment` command (`--from-file`, `--from-stdin`) | cli-7, cli-8 | `test/cli.bats` — cli-7 (`--dry-run`), cli-8 (`--from-stdin`); `src/server/cli.test.ts` — `--from-stdin` (mutual exclusion, empty stdin, schema, live server); `src/server/server.test.ts` — POST comments |
 | FR-56 | CLI `export` command; `--include-outdated` flag | cli-7 | `test/cli.bats` — cli-7; `src/server/server.test.ts` — export endpoint (default skip + includeOutdated param) |
 | FR-57 | CLI `url` command | cli-6 | `test/cli.bats` — cli-6; `src/server/cli.test.ts` — url command group |
 | FR-58 | CLI `open` command | — | No automated coverage — requires OS browser/desktop interaction |

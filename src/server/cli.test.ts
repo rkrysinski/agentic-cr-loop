@@ -11,11 +11,11 @@ import { createTempGitRepo } from "./testUtils.js";
 const CLI_PATH = new URL("./cli.ts", import.meta.url).pathname;
 const TSX_NODE_OPTIONS = "--import tsx/esm";
 
-function runCli(args: string[], env?: Record<string, string>): { stdout: string; stderr: string; status: number } {
+function runCli(args: string[], env?: Record<string, string>, input?: string): { stdout: string; stderr: string; status: number } {
   const result = spawnSync(
     process.execPath,
     ["--import", "tsx/esm", CLI_PATH, ...args],
-    { encoding: "utf8", timeout: 10_000, env: { ...process.env, NODE_OPTIONS: TSX_NODE_OPTIONS, ...env } }
+    { encoding: "utf8", timeout: 10_000, input, env: { ...process.env, NODE_OPTIONS: TSX_NODE_OPTIONS, ...env } }
   );
   return {
     stdout: result.stdout ?? "",
@@ -479,5 +479,69 @@ describe("crloop CLI — input validation", () => {
     const { status, stderr } = runCli(["comment", "--file", "foo.ts", "--side", "new", "--line", "-5", "--body", "test", "--url", "http://localhost:1"]);
     expect(status).toBe(1);
     expect(stderr).toContain("Invalid line number");
+  });
+});
+
+describe("crloop CLI — comment --from-stdin (no server required)", () => {
+  it("--from-stdin --from-file together exits 1 with mutual-exclusion error", () => {
+    const { status, stderr } = runCli(
+      ["comment", "--from-stdin", "--from-file", "some.json", "--url", "http://localhost:1"],
+      undefined,
+      "[]"
+    );
+    expect(status).toBe(1);
+    expect(stderr).toContain("mutually exclusive");
+  });
+
+  it("--from-stdin with empty stdin exits 1 (JSON parse error)", () => {
+    const { status, stderr } = runCli(
+      ["comment", "--from-stdin", "--url", "http://localhost:1"],
+      undefined,
+      ""
+    );
+    expect(status).toBe(1);
+    // readFileSync(0) on empty input returns "" which fails JSON.parse
+  });
+
+  it("schema output includes --from-stdin option for the comment command", () => {
+    const { status, stdout } = runCli(["schema", "comment"]);
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim()) as { options: Record<string, unknown> };
+    expect(parsed.options["--from-stdin"]).toBeDefined();
+  });
+});
+
+describe("crloop CLI — comment --from-stdin (live server)", () => {
+  let repoPath: string | null = null;
+  const port = 19878;
+  const BASE = `http://localhost:${port}`;
+
+  beforeAll(async () => {
+    repoPath = await createTempGitRepo();
+    runCli(["serve", "--repo", repoPath, "--port", String(port)]);
+  }, 20_000);
+
+  afterAll(async () => {
+    await stopDaemonOnPort(port);
+    if (repoPath) {
+      await fs.rm(repoPath, { recursive: true, force: true });
+      repoPath = null;
+    }
+  });
+
+  it("--from-stdin with valid JSON piped via stdin posts comments", () => {
+    // Repo ID is the lowercased, sanitized basename of the temp directory
+    const repoId = path.basename(repoPath!).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const comments = JSON.stringify([
+      { file: "tracked.txt", side: "new", line: 1, body: "stdin comment" },
+    ]);
+    const { status, stdout, stderr } = runCli(
+      ["comment", "--from-stdin", "--repo", repoId, "--url", BASE],
+      undefined,
+      comments
+    );
+    expect(stderr).toBe("");
+    expect(status).toBe(0);
+    expect(stdout).toContain("1 created, 0 failed");
   });
 });
