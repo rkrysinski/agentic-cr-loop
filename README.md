@@ -1,39 +1,45 @@
 # crloop
 
-`crloop` is a local code review tool for your Git working directory. Browse diffs, annotate changed lines, export structured comments as Markdown — all in a browser UI running entirely on your machine.
+A local code review tool for AI agent workflows. Review Git diffs in a browser UI, annotate changed lines, and feed structured comments back to the agent — all running on your machine. Currently supports Claude Code.
 
-Built for the AI agent workflow: agent writes code → you review and annotate → agent reads your comments and iterates.
+## How it works
 
-## Requirements
+```mermaid
+flowchart LR
+    A["🤖 Agent writes code"] --> B["🤖 Agent self-reviews diff & posts findings"]
+    B --> C["🧑 You review in browser & add comments"]
+    C --> D{"Any feedback?"}
+    D -- Yes --> E["🤖 Agent addresses your comments"]
+    E --> B
+    D -- No --> F["✅ Done"]
+```
 
-- Node.js 18+
-- git in PATH
-- A browser
+The agent reviews its own changes, posts findings, and opens the browser for you. You review the diff, leave comments, and click "Finish Review". The agent reads your feedback, fixes the code, and the loop repeats until you're satisfied.
 
-## Installation
+## Quick start
 
 ```bash
 npm install -g crloop
 ```
 
-## Usage
+### AI agent workflow
+
+Install the Claude Code skill into your project:
 
 ```bash
-crloop serve --repo /path/to/repo
+cd /path/to/repo
+crloop skill --install --scope project
 ```
 
-Open `http://localhost:3000` in your browser.
+Then ask Claude to "review my changes" or "do a code review". It handles the rest.
 
-### Multiple repositories
-
-```bash
-crloop serve --repo /path/to/frontend --repo /path/to/backend
-```
-
-### Manage repos in a running server
+### Manual usage
 
 ```bash
+crloop serve                         # starts the server
 crloop add-repo /path/to/repo        # register a repo
+cd /path/to/repo
+crloop open                          # opens browser with CR of your changes in git working directory
 crloop repos                         # list registered repos
 crloop remove-repo <id>              # unregister a repo
 ```
@@ -50,9 +56,13 @@ crloop stop-server
 crloop --help
 ```
 
-## Uninstall
+## Requirements
 
-Stop any running server first, then remove the package:
+- Node.js 18+
+- git in PATH
+- A browser
+
+## Uninstall
 
 ```bash
 crloop stop-server
