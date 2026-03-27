@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { spawn, exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { deriveRepoId, parseServerOptions } from "./args.js";
+import { resolveNativePath } from "./git.js";
 import { logFatalError, runServer } from "./runServer.js";
 
 function getCurrentVersion(): string {
@@ -210,7 +211,7 @@ async function cmdAddRepo(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const absolutePath = resolve(repoPath);
+  const absolutePath = await resolveNativePath(repoPath);
 
   if (dryRun) {
     const derivedId = id ?? deriveRepoId(absolutePath);
@@ -963,7 +964,7 @@ async function main(): Promise<void> {
       await runServer({ argv });
     } else {
       // Validate args in the foreground so errors surface before spawning
-      const parsedOpts = parseServerOptions(argv);
+      const parsedOpts = await parseServerOptions(argv);
       // Idempotency: bail if a server is already responding on the target port
       if (await probeRunningServer(parsedOpts.port)) {
         console.log(`Server already running on http://localhost:${parsedOpts.port}`);

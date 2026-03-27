@@ -9,6 +9,10 @@ How to install and use `crloop` on a machine that does not have the source repos
 - git in PATH (required by the server — it shells out to `git` to read diffs)
 - A browser
 
+### Windows / Cygwin
+
+On Cygwin, crloop automatically translates Cygwin virtual paths (e.g. `/home/rex/repo`) to native Windows paths using `cygpath`. No special flags are needed — pass paths in Cygwin format as usual.
+
 ## Installation
 
 ```bash

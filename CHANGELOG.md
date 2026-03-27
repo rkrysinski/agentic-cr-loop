@@ -14,6 +14,10 @@
 - `crloop serve --foreground` no longer writes or cleans up a lock file.
 - `crloop url` now probes the server to verify liveness instead of reading a lock file.
 
+### Fixed — Cygwin path handling
+
+- `crloop add-repo` no longer fails with "Not a git repository" on Cygwin. Cygwin virtual paths (e.g. `/home/rex/repo`) are now translated to native Windows paths via `cygpath -w` before being passed to git.
+
 ## [0.2.3] — 2026-03-25
 
 ### Added — Session reset

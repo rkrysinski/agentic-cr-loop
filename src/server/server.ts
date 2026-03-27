@@ -1,11 +1,11 @@
 import http from "node:http";
-import path from "node:path";
 import express from "express";
 import { DIFF_CONTEXT_VALUES } from "../shared/api.js";
 import type { CreateCommentRequest, DiffContextValue, RepoEntry, RepoInfoResponse, UpdateCommentRequest } from "../shared/api.js";
 import { deriveRepoId } from "./args.js";
 import { resolveClientDistDirectory } from "./assetPaths.js";
 import { ClientError } from "./errors.js";
+import { resolveNativePath } from "./git.js";
 import { ReviewService } from "./reviewService.js";
 
 type StartOptions = {
@@ -62,7 +62,7 @@ export async function startServer(
         return;
       }
 
-      const resolvedPath = path.resolve(body.path);
+      const resolvedPath = await resolveNativePath(body.path);
       const id = typeof body.id === "string" && body.id.trim().length > 0 ? body.id : deriveRepoId(resolvedPath);
 
       if (services.has(id)) {

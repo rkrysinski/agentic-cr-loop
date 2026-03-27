@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolveNativePath } from "./git.js";
 
 export type ServerOptions = {
   repos: Array<{ id: string; path: string }>;
@@ -14,7 +15,7 @@ export function deriveRepoId(repoPath: string): string {
   return base || "repo";
 }
 
-export function parseServerOptions(argv: string[]): ServerOptions {
+export async function parseServerOptions(argv: string[]): Promise<ServerOptions> {
   const rawRepos: Array<{ id: string; path: string }> = [];
   let port = 3000;
   let foreground = false;
@@ -47,7 +48,7 @@ export function parseServerOptions(argv: string[]): ServerOptions {
         id = deriveRepoId(path.basename(repoPath));
       }
 
-      rawRepos.push({ id, path: path.resolve(repoPath) });
+      rawRepos.push({ id, path: await resolveNativePath(repoPath) });
       continue;
     }
 

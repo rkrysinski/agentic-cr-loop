@@ -29,25 +29,25 @@ describe("deriveRepoId", () => {
 });
 
 describe("parseServerOptions", () => {
-  it("defaults to port 3000, empty repo list, and foreground false", () => {
-    expect(parseServerOptions([])).toEqual({ repos: [], port: 3000, foreground: false });
+  it("defaults to port 3000, empty repo list, and foreground false", async () => {
+    expect(await parseServerOptions([])).toEqual({ repos: [], port: 3000, foreground: false });
   });
 
-  it("parses --repo with a plain path and derives the id", () => {
-    const result = parseServerOptions(["--repo", "/home/user/my-project"]);
+  it("parses --repo with a plain path and derives the id", async () => {
+    const result = await parseServerOptions(["--repo", "/home/user/my-project"]);
     expect(result.repos).toHaveLength(1);
     expect(result.repos[0]?.id).toBe("my-project");
     expect(result.repos[0]?.path).toBe("/home/user/my-project");
   });
 
-  it("parses --repo with id:path syntax", () => {
-    const result = parseServerOptions(["--repo", "frontend:/home/user/frontend"]);
+  it("parses --repo with id:path syntax", async () => {
+    const result = await parseServerOptions(["--repo", "frontend:/home/user/frontend"]);
     expect(result.repos[0]?.id).toBe("frontend");
     expect(result.repos[0]?.path).toBe("/home/user/frontend");
   });
 
-  it("parses multiple --repo arguments", () => {
-    const result = parseServerOptions([
+  it("parses multiple --repo arguments", async () => {
+    const result = await parseServerOptions([
       "--repo", "a:/repos/a",
       "--repo", "b:/repos/b"
     ]);
@@ -56,35 +56,35 @@ describe("parseServerOptions", () => {
     expect(result.repos[1]?.id).toBe("b");
   });
 
-  it("parses --port", () => {
-    const result = parseServerOptions(["--port", "4000"]);
+  it("parses --port", async () => {
+    const result = await parseServerOptions(["--port", "4000"]);
     expect(result.port).toBe(4000);
   });
 
-  it("throws on invalid --port value", () => {
-    expect(() => parseServerOptions(["--port", "abc"])).toThrow("Invalid --port value");
-    expect(() => parseServerOptions(["--port", "0"])).toThrow("Invalid --port value");
-    expect(() => parseServerOptions(["--port", "-1"])).toThrow("Invalid --port value");
+  it("throws on invalid --port value", async () => {
+    await expect(parseServerOptions(["--port", "abc"])).rejects.toThrow("Invalid --port value");
+    await expect(parseServerOptions(["--port", "0"])).rejects.toThrow("Invalid --port value");
+    await expect(parseServerOptions(["--port", "-1"])).rejects.toThrow("Invalid --port value");
   });
 
-  it("throws on duplicate repo ids", () => {
-    expect(() =>
+  it("throws on duplicate repo ids", async () => {
+    await expect(
       parseServerOptions(["--repo", "main:/repos/a", "--repo", "main:/repos/b"])
-    ).toThrow(/Duplicate repo id "main"/);
+    ).rejects.toThrow(/Duplicate repo id "main"/);
   });
 
-  it("ignores --repo with no following value", () => {
-    const result = parseServerOptions(["--repo"]);
+  it("ignores --repo with no following value", async () => {
+    const result = await parseServerOptions(["--repo"]);
     expect(result.repos).toHaveLength(0);
   });
 
-  it("returns foreground true when --foreground is present", () => {
-    const result = parseServerOptions(["--foreground"]);
+  it("returns foreground true when --foreground is present", async () => {
+    const result = await parseServerOptions(["--foreground"]);
     expect(result.foreground).toBe(true);
   });
 
-  it("returns foreground false when --foreground is absent", () => {
-    const result = parseServerOptions(["--repo", "/some/path"]);
+  it("returns foreground false when --foreground is absent", async () => {
+    const result = await parseServerOptions(["--repo", "/some/path"]);
     expect(result.foreground).toBe(false);
   });
 });

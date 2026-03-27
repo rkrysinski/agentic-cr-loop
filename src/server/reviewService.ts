@@ -6,7 +6,7 @@ import type { FileChange, ReviewComment } from "../shared/types.js";
 import { CommentStore, REVIEW_STORAGE_DIRECTORY, getReviewSessionFileName } from "./commentStore.js";
 import { createBinaryUntrackedChange, createUntrackedChange, parseTrackedDiff } from "./diffParser.js";
 import { renderReviewCommentsText } from "../shared/export.js";
-import { runGit } from "./git.js";
+import { resolveNativePath, runGit } from "./git.js";
 import { ClientError } from "./errors.js";
 import { readSession, resetSession as resetSessionStore, transitionSession as transitionSessionStore } from "./sessionStore.js";
 import type { SessionState, SessionStatus } from "./sessionStore.js";
@@ -172,7 +172,7 @@ export class ReviewService {
   }
 
   private async syncReviewSession(): Promise<void> {
-    const topLevel = normalizeGitTopLevel((await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim());
+    const topLevel = await normalizeGitTopLevel((await runGit(this.repoPath, ["rev-parse", "--show-toplevel"])).trim());
     if (!topLevel) {
       throw new Error("Invalid Git repository");
     }
@@ -270,11 +270,12 @@ function isBinaryBuffer(buffer: Buffer): boolean {
   return sample.includes(0);
 }
 
-/** Normalize git's --show-toplevel output to a native absolute path, handling MSYS-style /c/... paths on Windows. */
-function normalizeGitTopLevel(raw: string): string {
+/** Normalize git's --show-toplevel output to a native absolute path, handling MSYS-style /c/... and Cygwin paths on Windows. */
+async function normalizeGitTopLevel(raw: string): Promise<string> {
   if (process.platform === "win32") {
     const msys = /^\/([a-zA-Z])(\/|$)/.exec(raw);
     if (msys) return path.resolve(`${msys[1].toUpperCase()}:${raw.slice(2)}`);
+    return resolveNativePath(raw);
   }
   return path.resolve(raw);
 }
